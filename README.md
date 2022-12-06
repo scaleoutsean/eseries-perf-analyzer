@@ -66,7 +66,7 @@ vim docker-compose.yml
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
-- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see ![this](/sysname-in-santricity-manager.png) and ![this](/sysid-in-santricity-manager.png).
+- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/sysname-in-santricity-manager.png) and [this](/sysid-in-santricity-manager.png) screenshot.
 
 - In the example below you may also want to change service name (collector-rack26u25-ef600) and `container_name` to match sub-directory name for easier orientation later on:
 
