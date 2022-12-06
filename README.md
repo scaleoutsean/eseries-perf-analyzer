@@ -371,7 +371,7 @@ rack26u25-ef600  | 2022-12-06 06:17:08,134 - collector - INFO - rack26u25-ef600
 rack26u25-ef600  | 2022-12-06 06:17:08,380 - collector - INFO - Time interval: 60.0000 Time to collect and send: 00.2645 Iteration: 2
 ```
 
-- Above we see that our E-Series API is being accessed, array ("folder" is remnant of old WSP function) information sent to InfluxDB and iterations show two successful rounds of collection (enabled with `-i`)
+- Above we see that our E-Series API is being accessed, array ("folder" is a remnant of old WSP function) information sent to InfluxDB and iterations show two successful rounds of collection (enabled with `-i`)
 - To stop all Collector containers when `-d` is used, run `docker-compose stop $CONTAINER_NAME`. To stop and *remove* the container, use `down $CONTAINER_NAME`:
 
 ```sh
@@ -411,7 +411,7 @@ services:
 
 ## Sample Grafana screenshots of EPA/Collector dashboards
 
-This fork's dashboards are identical to upstream, but upstream repo has no screenshots - in fact they're hard to find on the Internet - so below shows a sample of each dashboard.
+This fork's dashboards are identical to upstream, but upstream repository has no screenshots - in fact they're hard to find on the Internet - so below shows a sample of each dashboard.
 
 - System view
 
