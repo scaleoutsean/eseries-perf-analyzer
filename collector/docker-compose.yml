@@ -1,0 +1,25 @@
+version: '3.6'
+
+services:
+
+  collector-rack26u25-ef600:
+    # image: collector:latest
+    image: ntap-grafana-plugin/eseries_monitoring/collector
+    container_name: rack26u25-ef600
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=monitor123
+      - SYSNAME=rack26u25-ef600
+      - SYSID=600A098000F63714000000005E79C888
+      - API=5.5.5.5
+      - RETENTION_PERIOD=26w
+      - DB_ADDRESS=6.6.6.6
+      - DB_PORT=8086
+

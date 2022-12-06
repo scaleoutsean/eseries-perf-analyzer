@@ -1,197 +1,380 @@
-# NetApp E-Series Performance Analyzer
-This project provides an automated installation and deployment of the NetApp E-Series Performance Analyzer, a collection of software and scripts for monitoring the performance of NetApp E-Series storage systems.
+# NetApp E-Series Performance Analyzer ("EPA") without SANtricity Web Services Proxy ("WSP")
 
-This project is intended to allow you to quickly and simply deploy an instance of our performance analyzer for monitoring your E-Series storage systems. We incorporate various open source components and tools in order to do so. While it is primarily intended to serve as a reference implementation for using Grafana to visualize the performance of your E-Series systems, it is also intended to be customizable and extensible based on your individual needs via a developer-friendly plugin architecture. This README is primarily focused on the E-Series performance analysis components. For more information on plugin development please find the "Plugin Architecture" section of this README.
-
-## Quickstart Guide
-You'll need to have [Docker (v1.13.0+)](https://docs.docker.com/install/) and [Docker-Compose](https://docs.docker.com/compose/install/) installed in order to get started. We also utilize [Make](https://www.gnu.org/software/make/) for starting/stopping the components so make sure you have a version of that installed.
-
-The storage systems to be monitored must be defined in the *"<project_dir\>/plugins/eseries_monitoring/collector/config.json"* file. There is an example file located at *"<project_dir\>/plugins/eseries_monitoring/collector/config.sample.json"* for your reference. You may also choose to add the systems to Web Services manually, as detailed below.
-
-Once Docker is installed and the storage systems are configured, run the command _"make run"_ in the project's root folder. You will then be prompted for confirmation to download the necessary container images. If you wish to update to a newer image tag, you can cancel out and do so now. Within a few minutes, all dependencies should be retrieved and installed, and the performance analyzer should be running.
-
-Open **http://<host\>:3000/d/ZOshR4NZk/system-view-dashboard** to reach the Grafana login page and the E-Series System View dashboard. Use the default login credentials of _admin/admin_ for first-time login.
-
-## Overview
-The Web Services Proxy will periodically poll your storage system(s) for performance data at a regular interval. Using a simple Python script, this data is collected and pushed into an [InfluxDB](https://www.influxdata.com/) time-series database. [Grafana](https://grafana.com/), a data visualization engine for time-series data, is then utilized along with several customized dashboards to present the data graphically. All of these components are integrated together using [Docker](https://www.docker.com/) and [Ansible](https://www.ansible.com/).
-
-The only real requirements to utilize this project are a Linux OS and a Docker installation with Docker Compose. ~95% of the installation and configuration process is automated using Ansible and Docker.
-
-Our descriptions below of the various components will in no way fully do them justice. It is recommended that you visit the project/home pages for each in order to gain a full understanding of what they can provide and how they can be fully utilized. We will attempt to provide the high-level information that you absolutely need to know, but probably little beyond that.
-
-## Components
-### NetApp SANtricity Web Services Proxy
-The Web Services Proxy provides a RESTful interface for managing/monitoring E-Series storage systems. Our newest hardware models provide a RESTful API out-of-the-box, but the Web Services Proxy will support the newest systems as well as the legacy storage systems that do not. It is highly scalable and can support upwards of 500 E-Series systems while using < 2 GB of memory.
-
-The Web Services Proxy is provided with the default configuration and settings. It can be accessed at **http://<host\>:8080**. If you do not wish for the API to be externally accessible, you may remove the port mapping in the *"<project_dir>/plugins/eseries_monitoring/docker-compose.yml"* file:
-~~~~
-netapp_web_services:
-    ...
-    ports:
-      - 8080:8080
-      - 8443:8443
-~~~~
-
-The Web Services Proxy installation includes a GUI component that can be used to manage the newest E-Series systems (those running firmware levels 11.40 and above), which may or may not work for your environment.
-
-#### Managing Web Services Proxy Credentials
-By default the credentials _admin/admin_ will be used for accessing the Web Services Proxy. If you wish to modify the password used then follow this procedure.
-
-##### Update the password for the web services proxy service
-Edit the file `.auth.env` in the root of the project. Change the value of the `PROXY_PASSWORD` variable to the password that you wish to use and save the file. This
-will be used to configure the password for the proxy service.
-     
-##### Update the password used by the collector plugin
-Edit the file `<project_dir>/plugins/eseries_monitoring/collector/config.json` and change the value of the `password` key. This is the top level `password` key and not the password for an individual storage system which is a different password.
-
-Once both the `.auth.env` and `config.json` files have been updated then the images will need to be rebuilt if the project is running. This can be done with a simple `make restart` command. If the project has not been built or started yet then the changes will take effect when you do build and start the project.
+- [NetApp E-Series Performance Analyzer ("EPA") without SANtricity Web Services Proxy ("WSP")](#netapp-e-series-performance-analyzer-epa-without-santricity-web-services-proxy-wsp)
+  - [What is this thing](#what-is-this-thing)
+  - [How to use this fork](#how-to-use-this-fork)
+    - [Summary](#summary)
+    - [Build containers and create configuration files](#build-containers-and-create-configuration-files)
+    - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
+    - [Start services](#start-services)
+  - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
+  - [Update password for the monitor account](#update-password-for-the-monitor-account)
+  - [Notes](#notes)
+  - [Walk-through](#walk-through)
+    - [Build EPA](#build-epa)
+    - [Use collector](#use-collector)
+    - [Use collector Docker Hub image](#use-collector-docker-hub-image)
+  - [Component versions](#component-versions)
 
 
-### InfluxDB
-[InfluxDB](https://www.influxdata.com/) is our persistent store for preserving metrics data. Grafana supports [many different backends](https://grafana.com/plugins?type=datasource), but we chose InfluxDB due to its speed and scalability as well as the power and simplicity of its query language.
+## What is this thing
 
-While we do have a Python script predefined for use with InfluxDB and the Web Services Proxy, which collects E-Series performance metrics, we also provide some additional collector example scripts at the root of the project. One of these is written in Python, and the other in Bash. If you would like to provide additional metrics for collection, you may use these scripts as an example.
-### Grafana
-[Grafana](https://grafana.com/) is an open-source tool designed to help you visualize time-series data. It has the capability to accept plugins for additional functionality, but its core provides a lot of power with no addons.
+This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0 (see its README.md for additional information) created with the following objectives:
 
-Data from a configured datasource is displayed in Grafana via user-defined dashboards. Grafana dashboards are built/generated in the GUI, but are stored/represented in JSON format on disk. While we provide several pre-built dashboards, it is entirely possible (and encouraged) for you to [create your own](http://docs.grafana.org/guides/getting_started/). The source for our dashboards can be found in *"<project_dir\>/plugins/eseries_monitoring/dashboards/"*
+- Disentangle E-Series Collector from the rest of EPA and make it easy to run it anywhere (shell, Docker/Docker Compose, Kubernetes, Nomad)
+- Remove SANtricity Web Services Proxy (WSP) dependency so that one collector script captures data for one and only one E-Series array
 
-## Supporting Tools
-Installing each of these components and configuring them properly on an arbitrary OS version can be difficult. Rather than requiring a complex installation and configuration step, we utilize a couple of different tools to facilitate this type of deployment.
-### Ansible
-We use [Ansible](https://www.ansible.com/) in order to define and apply consistent configurations for the different components listed above. A simple Ansible playbook can save thousands of lines worth of shell scripting.
+Additionally, minor differences include:
 
-Primarily, we utilize Ansible to configure Grafana and import/export dashboards as required.
-### Docker
-[Docker](https://www.docker.com/) allows you to define an environment to run a particular application in code, including the OS, dependencies, and any required configuration/customization. It is similar to creating a custom virtual machine image for each component, but much easier, more dynamic, and lighter weight resource-wise. Such a configuration is known as a Docker image. Each component of our solution has an official, unofficial, or custom-built Docker image that defines its environment and configuration such that only an installation of Docker is required to use it.
+- Latest minor version of Grafana v8 (8.5.15), and Alpine OS image for Python 3.10 (3.10-alpine3.17)
+- Expanded number of required arguments in `collector.py` to avoid mistakes and (for the most part) the need to understand how the EPA Makefile works
+- Collector container no longer shares Docker network with the two (InfluxDB, Grafana) EPA containers because the assumption is Collector will run on a different host or in any case access InfluxDB over public host network
+- Unit tests and Makefile in the EPA directory for collector plugin no longer work
+- The SANtricity Web Services Proxy container was upgraded to latest and can run, but it's set to not start with EPA because `collector.py` no longer uses it. It can be started independently and used on port 8443/tcp by those who need it.
 
-We use version 2 of the Compose file format, with features that require at least Docker version 1.13.0+.
+## How to use this fork
 
-[Docker Compose](https://docs.docker.com/compose/) allows multiple Docker images to be orchestrated together to solve a larger problem. A common example is a web server that also requires a database.
+### Summary
 
-In our case, we have several components that must be run together for everything to work correctly. There are startup dependencies, and certain components require communication with other components. Docker-Compose allows us to define the various services we require, how they should behave, where they should store their data, and which should be externally accessible. This is all done via Docker Compose.
+- We build EPA images which builds one of all images including the one used by Collector (although Collector can also be built on its own)
+- Docker Compose for EPA starts Influx and Grafana, while Docker Compose for Collector starts one or more Collector containers
 
-## Getting Started
-### Dependencies
-You'll need to install [Docker](https://docs.docker.com/install/) and [Docker Compose](https://docs.docker.com/compose/install/). All other dependencies are provided through use of our Docker images. You also need access to [Make](https://www.gnu.org/software/make/).
-### Configuration
-#### Storage Systems
-Arrays to be monitored should be added to the *"<project_dir\>/plugins/eseries_monitoring/collector/config.json"* file. A sample configuration file is provided at *"<project_dir\>/plugins/eseries_monitoring/collector/config.sample.json"* for reference. For most systems, you will also need to provide a valid password to log in to the target storage system. If you do not, or you provide an incorrect password, it's possible that we won't be able to pull performance data for that system.
+### Build containers and create configuration files
 
-It is also possible to manually add storage systems using the Web Services Proxy interactive API documentation found at **http://<host\>:8080/devmgr/docs/#/Storage-Systems/new_StorageSystem**.
+- Clone the repository
+- Navigate to the `epa` folder and run `make build` to download and build Docker container images
+- Run `make run` to start InfluxDB v1 and Grafana v8. Unlike the original, WSP and Collector will *not* be started
 
-Once everything is started, arrays can also be managed through the SANtricity® Unified Manager as described below. Note that although they will still be monitored, legacy arrays added through the API/config files will not appear in this manager. Use of this manager is briefly described below.
-#### Disk Usage, Data Retention, and Downsampling
-With our data collection we use ~260 KB per drive/volume per day. Based on this, you can expect to consume 250-300 GB of storage space for 100 systems for one year.
+```sh
+git clone github.com/scaleoutsean/eseries-perf-analyzer
+cd eseries-perf-analyzer
+# go to the epa folder
+cd epa
+make build
+# go back to top level and then to the collector folder
+cd ..
+cd collector
+vim docker-compose.yml
+```
 
-By default, we retain performance metrics for one week before they are downsampled. Those downsampled metrics are then retained for one year by default. This retention period is modifiable and we utilize an environment variable *"RETENTION_PERIOD"* for this purpose. The best place to set this is within the *"<project_dir\>/.env"* file. For example, setting a retention period of 4 weeks would look like this:
-~~~~
-...
-RETENTION_PERIOD=4w
-...
-~~~~
-A list of possible durations and valid duration formats can be found [here](https://docs.influxdata.com/influxdb/v1.7/query_language/spec/#durations). Note that the minimum possible retention duration is 1 hour. Setting this variable to a value of **INF** will result in performance metrics that are retained indefinitely.
+- When editing `collector/docker-compose.yml`, provide the following for each E-Series array:
+  - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
+  - PASSWORD - SANtricity password for the account used to monitor
+  - SYSNAME - SANtricity array name, such as rack26u25-ef600 - get this from SANtricity Web UI
+  - SYSID - SANtricity WWID for the array, such as 600A098000F63714000000005E79C888 - get this from SANtricity Web UI
+  - API - SANtricity controller's IP address such as 6.6.6.6
+  - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
+  - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
-**Note:** A change in the retention period requires a restart of the services before it will take effect.
-#### InfluxDB
-InfluxDB is configurable through the config file located at *"<project_dir\>/influxdb/influxdb.conf"*. Information about configuration options can be found [here](https://docs.influxdata.com/influxdb/v1.7/administration/config/).
-#### Dashboards
-The included E-Series dashboards are located in *"<project_dir\>/plugins/eseries_monitoring/ansible/dashboards/"* and will be imported into Grafana when started. Dashboards can also be imported from within the Grafana interface by navigating to **Dashboards->Home**, clicking on the drop-down at the top of the page, and selecting **Import Dashboard**.
+- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see ![this](sysname-in-santricity-manager.png) and ![this](sysid-in-santricity-manager.png).
 
-Dashboards are imported/exported using JSON and that documentation can be found [here](http://docs.grafana.org/reference/dashboard/). You may use the provided pre-configured dashboards as a reference for creating your own. We have provided a make target for automatically exporting new/user-modified dashboards to disk for backup. This pulls current dashboards from the service and stores them locally in the *"<project_dir\>/backups/"* directory in JSON format. To execute this simply run the command _"make backup-dashboards"_ in the root folder of the project. The Grafana instance must be running when you execute this command.
-### Starting It Up
-It's pretty simple: run the command _"make run"_ from within the project root directory. This will begin the process of building, setting up, and running everything. When you want to stop it, run the command _"make stop"_. If you're trying to monitor the status of any of these tools, you can do so using standard Docker commands. To remove any current container instances, run the command _"make clean"_. A list of all possible make targets can be viewed using the _"make help"_ command.
+- In the example below you may also want to change service name (collector-rack26u25-ef600) and `container_name` to match sub-directory name for easier orientation later on:
 
-_"make run"_ will prompt you for confirmation on whether or not you wish to continue and allow the downloading of default container images. If you wish to update to a newer tag image, you can cancel out and do so now. At this time core services will start, followed thereafter by any plugins, including the E-Series performance monitoring services.
+```yaml
+services:
 
-We've done our best to ensure that the configured Docker images not only build and work in most environments, but that they are also well-used and tested by the community, and don't have security holes. New security issues are found all of the time, however, and we may not be able to update the image tags immediately. You may choose to change the image tags to a newer or different version, just be aware that we haven't tested that variation and you might run into problems with the build or during runtime.
+  collector-rack26u25-ef600:
+    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    container_name: rack26u25-ef600
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=monitor123
+      - SYSNAME=rack26u25-ef600
+      - SYSID=600A098000F63714000000005E79C888
+      - API=6.6.6.6
+      - RETENTION_PERIOD=26w
+      - DB_ADDRESS=7.7.7.7
+      - DB_PORT=8086
+```
 
-Once everything is started, you have access to several pages to control and configure.
+- There's a sample directory (`collector/docker-compose.yml/rack26u25-ef600`) which matches the disk array name from above YAML, and the purpose is to have one directory per each array, and a `docker-compose.yml` where service name is `collector-$SYSNAME` (where SYSNAME is System Name you gave to E-Series array). You can rename it, and you can rename the string in YAML file above.
+- You can also copy-paste the sample folder and rename it and ignore the original sample folder (just leave it there for reference). With two directory copies named `array1` and `array2`, your `collector/docker-compose.yaml` may look similar to this:
 
-## Once It's Started
-### Accessing the Web Services Proxy
-The Web Services Proxy can be accessed at **http://<host\>:8080**. From here you can access the SANtricity® Unified Manager using default credentials of _admin/admin_. This is a UI frontend for managing storage arrays. There are also links to the Web Services API reference as well as the NetApp support site. Through this manager, it is also possible to create and organize your arrays into folders. This allows you to arrange arrays into logical groups. These groups are exposed in the dashboards, and graphs can be filtered by these groups. These folders are updated at start, and then periodically every 10 minutes. If you would like to see your folder changes reflected in dashboards immediately, simply restart services using _"make restart"_.
-### Accessing the Grafana Interface and Dashboards
-The dashboards are available at **http://<host\>:3000** using default credentials _admin/admin_. Grafana should be pre-configured for immediate access to your data. Documentation for additional configuration and navigation can be found [here](http://docs.grafana.org/guides/getting_started/).
-## Troubleshooting
-### I don't have access to Docker
-At this time (and this is unlikely to change), Docker is a hard requirement for using this project.
-### I don't have network access on this machine
-Your only option at this point is to save/export the Docker images on a machine that does have general internet access and then copy them and import them to the target machine. This is an advanced workflow that we do not currently cover in this guide, but is not overly difficult to achieve.
-### I can't pull the Docker images
-Check your access to DockerHub. If you are running this on a machine with network segregation, you may need to update your Docker binary to utilize a local DockerHub mirror or repository to get this to work.
-### A Docker image failed to build
-We pin our Docker images to a known good tag at the time that we commit changes. The downside to pinning to a major/minor version rather than a specific image hash is that while you do get the benefit of new patches (security updates, etc.), the possibility of breakage does exist. If an image fails to build, try to determine where the failure occurred and if it's an environment issue or an issue with an update to the Docker image tag. It's quite likely that you'll be able to get things to function correctly by rolling back to an older version.
-### I don't see any data in the charts
-Did you remember to add any storage systems to the Web Services Proxy instance, either through the Ansible helper scripts or manually? If not, you didn't give us anything to push metrics on yet.
+```yaml
+version: '3.6'
 
-Assuming that you did, verify that the collector container is running and that it is successfully collecting metrics. You can do this by checking the container logs by running the command _"docker logs -f collector"_.
+services:
 
-If you have added your own metrics that aren't showing up, verify that you're sending the data to the correct server address and port.
-### I made some changes to <X\> and now everything is broken!
-While we do encourage variations, improvements, and additions, these are definitely something we can't support. While you may enter an issue and/or ask for help, we can't guarantee that we can, or will try to fix your deployment and may ask you to revert to a known configuration.
-### I get prompted each time I perform "make run"
-You may add _"QUIET=1"_ to the *"<project_dir\>/.env"* file. This will automatically choose "yes" when prompted by the build/run process.
+  collector-array1:
+    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    container_name: array1
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=monitor123
+      - SYSNAME=rack26u25-ef600
+      - SYSID=600A098000F63714000000005E79C888
+      - API=5.5.5.5
+      - RETENTION_PERIOD=26w
+      - DB_ADDRESS=7.7.7.7
+      - DB_PORT=8086
 
-## Plugin architecture
-As of version 2.1, the Performance Analyzer project has been restructured to support extensions via plugins. Core services of the Performance Analyzer that are not considered plugins include: Grafana, InfluxDB, and Ansible. Plugins can make use of these services to extend functionality to suit a particular user's situation. Plugins can be found in the *"<project_dir>/plugins"* directory, and each gets their own folder within. When services are started (or restarted) via the **make** commands, and once core services have started, this plugins folder is scanned and any plugins found are then built (if necessary) and started as well.
+  collector-array2:
+    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    container_name: array2
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=monitor123
+      - SYSNAME=rack15u04-e5760
+      - SYSID=600A098000F63714000000005E79C111
+      - API=6.6.6.6
+      - RETENTION_PERIOD=26w
+      - DB_ADDRESS=7.7.7.7
+      - DB_PORT=8086
+```
 
-When services are stopped, plugins are stopped first, followed by core services.
+Now we have:
 
-### Plugin development
-Plugins can consist of as much or as little as needed for their functionality. This can be as simple as just including some extra dashboards, or as complex as spinning up their own Docker containers. For a complete example of this plugin architecture, the E-Series monitoring components are now featured in the *eseries_monitoring* plugin found in the plugins directory. We intend this plugin to not only be the primary purpose of this project, but to also serve as a reference for plugin development. This plugin showcases all of the major components a plugin might want to incorporate: It spins up Docker containers via its own **docker-compose.yml** and **build_info.txt** files, it uses Ansible to create a new data source for Grafana, and it includes multiple of its own dashboards that are imported when services are started.
+- `epa/docker-compose.yml` with InfluxDB and Grafana ready to start in the `EPA` directory (requires no changes, activated with `make run`)
+- `ntap-grafana-plugin/eseries_monitoring/collector:latest` image built with EPA's `make build`. You may copy this image to other hosts or upload to container registry
+- On this or other system: `collector/docker-compose.yml` where several Collector containers can be started to collect data from different E-Series arrays and send them to InfluxDB
 
-### Plugin structure
-#### Docker containers
-In order for plugins to spin up their own Docker containers, you must include a **docker-compose.yml** file in the root directory of your plugin. This Compose file does not require any special formatting. However, we do recommend you format any image names like so:
-~~~~
-image: ${PROJ_NAME}-plugin/PLUGIN_NAME/COMPONENT_NAME
-~~~~
-Where *${PROJ_NAME}* will be automatically replaced. *PLUGIN_NAME* is the name of your plugin's directory, and *COMPONENT_NAME* is the name of the specific component image. We recommend this for organization purposes, and to match how our included plugins are set up. This will make your plugin consistent with the included NetApp plugins and will make it easier to distinguish when listing Docker containers.
+### Adjust firewall settings for InfluxDB and Grafana ports
 
-Another reason for this naming convention is that any of your plugin's component images that need to be built are defined in the **build_info.txt** file, which you should place in your plugin's root directory, and those images will have their names formatted this way automatically. Component images are built using standard Dockerfile conventions. The **build_info.txt** included for the *eseries_monitoring* plugin is commented to explain how this file is formatted and used:
-~~~~
-# This file defines the order in which components for this plugin are built.
-# Components are built from top to bottom.
-# Per-line: first is the folder containing the Dockerfile, and second is the output image tag
-# NOTE: The output image tag will be prefixed with "ntap-grafana-plugin/*plugin_directory_name*/"
-#       The output image tag is optional, if omitted it will match the Dockerfile directory
+The original EPA exposes WSP (8080/tcp) and Grafana (3000/tcp) to the outside world.
 
-# ex. The alpine image here will be built from the folder "plugins/eseries_monitoring/alpine_base"
-#     and will be tagged "ntap-grafana-plugin/eseries_monitoring/alpine-base"
-#
-#     The webservices image here will be built from the folder "plugins/eseries_monitoring/webservices"
-#     and will be tagged "ntap-grafana-plugin/eseries_monitoring/webservices"
+This fork does not have WSP. Grafana is the same (3000/tcp), but InfluxDB is now exposed on port 8086/tcp. The idea is you may run Collectors in various locations (closer to E-Series, for example) outside of the InfluxDB VM and send data to InfluxDB.
 
-alpine_base alpine-base
-python_base python-base
-webservices
-collector
-~~~~
+To protect InfluxDB service, you may use your OS settings to open 8086/tcp to hosts where Collector will run. Collector itself does not need open inbound ports.
 
-Plugin containers are managed automatically when services are started/stopped/cleaned. They are intended to be plug-and-play, so if you would like to disable a plugin from being part of your services, simply remove its folder from the *plugins* directory and restart the project.
+### Start services
 
-##### Docker networking
-All containers in the core service offering are part of a Docker network we create at start. This network is named **eseries_perf_analyzer**. If you would like your plugin to interface with these core services, you can connect them to this Docker network. In your plugin's **docker-compose.yml** file, any service that would like access to this network must include:
-~~~~
-networks:
-      - eseries_perf_analyzer
-~~~~
-And at the bottom of your **docker-compose.yml** file, you must declare this network as external like so:
-~~~~
-networks:
-  eseries_perf_analyzer:
-    external: true
-~~~~
+- EPA is started with `make run` (which runs services using docker-compose)
 
-For an example of this, please look at the *eseries_monitoring* plugin's **docker-compose.yml** file.
+```sh
+# go to epa
+cd epa
+make run
+```
 
-#### Dashboards
-If you would like your plugin to include custom Grafana dashboards, simply place their **JSON** files into a *dashboards* folder in your plugin's root directory. For example: *<project_dir>/plugins/my_plugin/dashboards/my_custom_dashboard.json*
+- Inspect the output and make sure InfluxDB and Grafana are listening on ports 8086 and 3000, respectively. Login to Grafana with admin/admin.
+- Next start Collector (maybe you'll need to add `sudo`)
 
-This folder is scanned when services start and any dashboards found are imported into Grafana automatically.
+```sh
+# go to collector
+cd collector
+docker-compose up
+```
 
-#### Ansible tasks
-We provide the ability for plugins to run their own Ansible tasks using the Ansible container we spin up as part of the core services. Create an *ansible_tasks* folder in your plugin's root directory, and place any valid **.yml** files into it. When services are started, this folder is scanned and any valid Ansible tasks will be ran after tasks in the core playbook.
+- If you see it working properly, hit CTRL+C and then run it with `docker-compose up -d` to have it run in the background
+- Collector containers doesn't listen on any ports, it only creates outgoing connections to SANtricity API endpoints and InfluxDB
 
-As an example of this, please take a look at the *influxdb_internal_monitoring* plugin, which runs a task to add a new data source to Grafana.
+## Add or remove a monitored array
+
+To add a SANtricity array, change docker-compose.yml for Collector: make a copy of the sample directory, rename it (array3, for example) add another section in docker-compose.yml, and run `docker-compose up array3 -d`.
+
+To remove and array, `docker-compose down array3`. Then remove the folder and configuration section.
+
+## Update password for the monitor account
+
+Change it on SANtricity, run `docker-compose down array3`, change the password in docker-compose.yml, and start the container with `docker-compose up array3` to verify it's working, then hit CTRL+C to stop it and start it again with `-d`. 
+
+Collector containers are stateless and have no data that needs to be persisted to its own volume.
+
+## Notes
+
+Below details are mostly related to this fork. For upstream details please check their read-me file.
+
+**Q:** Why do I need to fill in so many details in Collector's YAML file? **A:** Because it's simple. If you fill it out correctly, it will work. If you don't, it won't. There should be no other place to troubleshoot.
+
+**Q:** It's not convenient for me to have multiple storage admins edit `collector/docker-compose.yml` **A:** The whole point of separating Collector from EPA is that centralization can be avoided, so when there's no one "storage team" that manages all arrays, each admin can have their own.
+
+```sh
+somedir
+  epa               # VM1
+  collector1/arrayA # can be only on VM2
+  collector2/arrayB1 # can be only on VM3
+  collector2/arrayB2 # can be only on VM3
+```
+
+**Q:** How to modify Collector's Docker image? **A:** If you want to use EPA to build like in walk-through below, you can modify it in `epa/plugins/eseries_monitoring/collector`. You can also use the one in `collector/rack26u25-ef600`, but as mentioned elsewhere it uses python-base image from EPA so you still need to run `make build` and such in the `epa` directory. The difference is: the former approach can break `Makefile` scripts (i.e. if you mess up Collector build, `make build` won't work). The latter cannot, so it's easier to experiment with.
+
+**Q:** This looks complicated... **A:** If you can't handle it, install InfluxDB any way you can/want, run Collector from the CLI (`python3 collector/rack26u25-ef600/collector.py -h`). Create a data source (InfluxDB) for Grafana and add your own dashboards or try to replicate EPA's configuration by looking at the source code, configuration files and exported dashboard JSON files.
+
+**Q:** Why can't we have one config.json for all monitored arrays? **A:** See the first answer. In this approach there may be different people managing different arrays. Each can run their own Collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password) without touching InfluxDB and Grafana.
+
+**Q:** I first (or "I only") tried to build Collector container and it failed. **A:** Then don't do that. Collector uses a base image from EPA, so EPA must be built (`make build`) first or you could edit Collector's Dockerfile, or you could build Collector on EPA InfluxDB VM and then upload Collector image to your registry to let all collector runners avoid the need to build EPA and Collector.
+
+**Q:** What if I run existing upstream EPA v3.0.0? Can I add more E-Series arrays without using WSP **A**: Yes. You need to modify InfluxDB to listen on an external and port 8086/tcp, and then just build and configure this fork EPA and Collector, and run only Collector's docker-compose. All arrays are put in "All Storage Systems" and if System Names and WWN's are unique they shouldn't collide with existing storage systems and WSP's "folders".
+
+**Q:** What if I run own InfluxDB v1.8 and Grafana v8? Can I use Collector without EPA? **A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on WSP. Just build this fork of EPA and Collector container, and then run just Collector's docker-compose. Note that this Collector doesn't support InfluxDB v2, a bit of additional work would be required for that.
+
+**Q:** Since this EPA builds collector container, why can't I just run that one like upstream does? **A:** It's probably possible - you can specify the right image and environment variables in `epa/plugins/eseries_monitoring/docker-compose.yaml` and try `make run` - but that hasn't been tested because the purpose of this fork is (1) to dis-entangle Collector from InfluxDB and Grafana, and (2) be able to run multiple collectors, which is easier from the collector folder than from the epa folder.
+
+**Q:** Where's my InfluxDB? **A:** It is created in `epa/influx-database` on first successful run of EPA (`make run`). 
+
+**Q:** Where's my Grafana DB? **A:** It is created as local Docker volume - see `epa/docker-compose.yml`. 
+
+**Q:** How much memory does each Collector container need? **A:** It my testing, less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
+
+**Q:** `collector.py` looks messy. **A**: Yes. I couldn't spend more time on this. Please improve it and submit a pull request, it will be appreciated.
+
+**Q:** Can I run Collector without containers? **A:** Yes. Run collector.py in the sample directory with `-h` or try this with own variables:
+
+```sh
+python3 collector/rack26u25-ef600/collector.py \
+  -u ${USERNAME} -p ${PASSWORD} \
+  --api ${API} \
+  --dbAddress ${DB_ADDRESS}:8086 \
+  --retention ${RETENTION_PERIOD} \
+  --sysname ${SYSNAME} --sysid ${SYSID} \
+  -i -s
+```
+
+Example for array2 above (remember, `rack15u04-e5760` should correspond to System Name in SANtricity Web UI and the same goes for WWN, to avoid confusion:
+
+```sh
+python3 collector/array3/collector.py \
+  -u monitor -p monitor123 \
+  --api 5.5.5.5 \
+  --dbAddress 7.7.7.7:8086 \
+  --retention 26w \
+  --sysname rack15u04-e5760 \
+  --sysid 600A098000F63714000000005E79C888 \
+  -i -s
+```
+
+**Q:** What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? **A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to the other controller and restart the collector container. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin requests to two controllers. Then if one fails you should see 50% less metric delivered to Grafana, and get a hint. I haven't tried multiple controllers in docker-compose.yaml, but I'd first try `API=5.5.5.1 5.5.5.2`.
+
+**Q:** I tried to run Collector on the same host as EPA InfluxDB and Grafana, and `--dbAddress localhost:8086` (or `DB_ADDRESS=7.7.7.7`) doesn't work. Why? **A:** Because InfluxDB is not running on `localhost`, but on `influxdb` (`epa/docker-compose.yaml`). Change the value to `--dbAddress influxdb:8086` (`DB_ADDRESS=influxdb`) when running Collector in Docker on the same host as EPA.
+
+## Walk-through
+
+### Build EPA
+
+- Run `make build` in `epa` and inspect images:
+
+```sh
+$ make build 
+
+$ docker images | grep ntap
+ntap-grafana/ansible                                 3.0               b5e28ea3de6e   18 minutes ago   384MB
+ntap-grafana/influxdb                                3.0               0de6bf41b550   21 minutes ago   173MB
+ntap-grafana/alpine-base                             3.0               5510f7cd5042   22 minutes ago   7.05MB
+ntap-grafana-plugin/eseries_monitoring/collector     latest            42f2438474b6   23 minutes ago   75.7MB
+ntap-grafana-plugin/eseries_monitoring/webservices   latest            6c1b94316eed   23 minutes ago   203MB
+ntap-grafana-plugin/eseries_monitoring/alpine-base   latest            5d17de7f905d   23 minutes ago   7.05MB
+ntap-grafana/python-base                             3.0               43b56b1ee660   24 minutes ago   50MB
+ntap-grafana-plugin/eseries_monitoring/python-base   latest            59f897165fca   6 hours ago      50MB
+ntap-grafana/grafana                                 3.0               00af3efd1202   5 weeks ago      287MB
+```
+
+- Export collector (ntap-grafana-plugin/eseries_monitoring/collector:latest) image. If you have container registry, you may tag your collector image with own tags and upload to registry.
+
+```sh
+$ cd epa
+$ make export-plugins
+
+$ ll images/
+total 338148
+-rw-r--r-- 1 sean sean   7354368 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-alpine-base.tar
+-rw-r--r-- 1 sean sean  81607680 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-collector.tar
+-rw-r--r-- 1 sean sean  53046272 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-python-base.tar
+-rw-r--r-- 1 sean sean 204250624 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-webservices.tar
+```
+
+- `make run` to start InfluxDB and Grafana. Collector will fail and exit because `docker-compose.yml` in the `epa/plugins/eseries_monitoring` subdirectory has incorrect ENV configuration (that's on purpose, we don't want to run that one). You can leave that container or remove it with `docker rm $CONTAINER_ID`).
+
+```sh
+$ cd epa
+$ make run 
+
+$ docker ps -a
+CONTAINER ID   IMAGE                       COMMAND                  CREATED          STATUS              PORTS                   NAMES
+533ace123ec4   collector:latest            "./docker-entrypoint…"   14 seconds ago   Exited (1) 13 seconds ago                                               collector
+46c4971c20a6   ntap-grafana/grafana:3.0    "/run.sh"                15 seconds ago   Up 14 seconds       0.0.0.0:3000->3000/tcp  grafana
+3af632f3645a   ntap-grafana/influxdb:3.0   "/entrypoint.sh /bin…"   15 seconds ago   Up 14 seconds       0.0.0.0:8086->8086/tcp  influxdb
+
+$ docker rm 533ace123ec4 # remove unnecessary collector container; we just wanted to build the collector image
+```
+
+- Notice (`PORTS`, above) that Grafana and InfluxDB ports are open
+- Login to Grafana and change its admin password
+
+### Use collector
+
+- Use this cloned repository and work from the `collector` folder.
+
+- Copy `epa/images/ntap-grafana-plugin-eseries_monitoring-collector.tar` to the VM where Collector will run and import the image. If you have uploaded it to internal registry, pull it instead.
+
+```sh
+$ docker load ntap-grafana-plugin-eseries_monitoring-collector.tar
+Loaded image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+```
+
+- In the `collector` folder, edit `docker-compose.yml` as explained earlier. Then start it, first without `-d` to make sure it works, then with `-d`.
+
+```sh
+$ docker-compose up
+[+] Running 2/0
+ ⠿ Network collector_default  Created                              0.0s
+ ⠿ Container rack26u25-ef600  Created                              0.0s
+0.0s 
+Attaching to rack26u25-ef600
+rack26u25-ef600  | 2022-12-06 06:16:08,058 - collector - INFO - rack26u25-ef600
+rack26u25-ef600  | 2022-12-06 06:16:08,058 - collector - INFO - Collecting system folder information...
+rack26u25-ef600  | 2022-12-06 06:16:08,452 - collector - INFO - Time interval: 60.0000 Time to collect and send: 00.3967 Iteration: 1
+rack26u25-ef600  | 2022-12-06 06:17:08,134 - collector - INFO - rack26u25-ef600
+rack26u25-ef600  | 2022-12-06 06:17:08,380 - collector - INFO - Time interval: 60.0000 Time to collect and send: 00.2645 Iteration: 2
+```
+
+- Above we see that our E-Series API is being accessed, array ("folder" is remnant of old WSP function) information sent to InfluxDB and iterations show two successful rounds of collection (enabled with `-i`)
+- To stop all Collector containers when `-d` is used, run `docker-compose stop $CONTAINER_NAME`. To stop and *remove* the container, use `down $CONTAINER_NAME`:
+
+```sh
+$ docker-compose down
+[+] Running 2/0
+ ⠿ Container rack26u25-ef600  Removed                              0.0s
+ ⠿ Network collector_default  Removed                              0.0s 
+```
+
+- If you rebuild the container in VM where you have EPA, you can run `down` as per above to remove old collector container(s), then `up -d` to start them based on latest image.
+
+### Use collector Docker Hub image 
+
+- Let's say you figured out InfluxDB on your own and just want a ready-made collector image that doesn't use WSP. You should build it on your own as explained in Q&A, but if you want a quick try:
+
+```sh
+$ docker pull scaleoutsean/epa-collector:v3.0.0
+v3.0.0: Pulling from scaleoutsean/epa-collector
+Digest: sha256:2ceca8e7a10ad9ddc31bdbf07baeeec843188642d39197b47252df1ac62d012c
+Status: Downloaded newer image for scaleoutsean/epa-collector:v3.0.0
+docker.io/scaleoutsean/epa-collector:v3.0.0
+
+- `cd collector`, and edit `docker-compose.yml` to use `image: scaleoutsean/epa-collector:v3.0.0` (not `:latest`)
+
+```yaml
+version: '3.6'
+
+services:
+
+  collector-rack26u25-ef600:
+    # image: ntap-grafana-plugin/eseries_monitoring/collector:latest 
+    image: scaleoutsean/epa-collector:v3.0.0
+```
+
+- Edit environment variables (username, password, etc.) and run Collector with `docker-compose up`.
+
+## Component versions
+
+This fork of EPA v3.0.0 was tested with E-Series SANtricity 11.74 and current Docker CE. It should work with other recent SANtricity versions and Docker CE.
