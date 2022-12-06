@@ -196,9 +196,13 @@ Collector containers are stateless and have no data that needs to be persisted t
 
 Below details are mostly related to this fork. For upstream details please check their read-me file.
 
-**Q:** Why do I need to fill in so many details in Collector's YAML file? **A:** Because it's simple. If you fill it out correctly, it will work. If you don't, it won't. There should be no other place to troubleshoot.
+**Q:** Why do I need to fill in so many details in Collector's YAML file? 
 
-**Q:** It's not convenient for me to have multiple storage admins edit `collector/docker-compose.yml` **A:** The whole point of separating Collector from EPA is that centralization can be avoided, so when there's no one "storage team" that manages all arrays, each admin can have their own.
+**A:** Because it's simple. If you fill it out correctly, it will work. If you don't, it won't. There should be no other place to troubleshoot.
+
+**Q:** It's not convenient for me to have multiple storage admins edit `collector/docker-compose.yml` 
+
+**A:** The whole point of separating Collector from EPA is that centralization can be avoided, so when there's no one "storage team" that manages all arrays, each admin can have their own.
 
 ```sh
 somedir
@@ -208,29 +212,53 @@ somedir
   collector2/arrayB2 # can be only on VM3
 ```
 
-**Q:** How to modify Collector's Docker image? **A:** If you want to use EPA to build like in walk-through below, you can modify it in `epa/plugins/eseries_monitoring/collector`. You can also use the one in `collector/rack26u25-ef600`, but as mentioned elsewhere it uses python-base image from EPA so you still need to run `make build` and such in the `epa` directory. The difference is: the former approach can break `Makefile` scripts (i.e. if you mess up Collector build, `make build` won't work). The latter cannot, so it's easier to experiment with.
+**Q:** How to modify Collector's Docker image? 
 
-**Q:** This looks complicated... **A:** If you can't handle it, install InfluxDB any way you can/want, run Collector from the CLI (`python3 collector/rack26u25-ef600/collector.py -h`). Create a data source (InfluxDB) for Grafana and add your own dashboards or try to replicate EPA's configuration by looking at the source code, configuration files and exported dashboard JSON files.
+**A:** If you want to use EPA to build like in walk-through below, you can modify it in `epa/plugins/eseries_monitoring/collector`. You can also use the one in `collector/rack26u25-ef600`, but as mentioned elsewhere it uses python-base image from EPA so you still need to run `make build` and such in the `epa` directory. The difference is: the former approach can break `Makefile` scripts (i.e. if you mess up Collector build, `make build` won't work). The latter cannot, so it's easier to experiment with.
 
-**Q:** Why can't we have one config.json for all monitored arrays? **A:** See the first answer. In this approach there may be different people managing different arrays. Each can run their own Collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password) without touching InfluxDB and Grafana.
+**Q:** This looks complicated... 
 
-**Q:** I first (or "I only") tried to build Collector container and it failed. **A:** Then don't do that. Collector uses a base image from EPA, so EPA must be built (`make build`) first or you could edit Collector's Dockerfile, or you could build Collector on EPA InfluxDB VM and then upload Collector image to your registry to let all collector runners avoid the need to build EPA and Collector.
+**A:** If you can't handle it, install InfluxDB any way you can/want, run Collector from the CLI (`python3 collector/rack26u25-ef600/collector.py -h`). Create a data source (InfluxDB) for Grafana and add your own dashboards or try to replicate EPA's configuration by looking at the source code, configuration files and exported dashboard JSON files.
 
-**Q:** What if I run existing upstream EPA v3.0.0? Can I add more E-Series arrays without using WSP **A**: Yes. You need to modify InfluxDB to listen on an external and port 8086/tcp, and then just build and configure this fork EPA and Collector, and run only Collector's docker-compose. All arrays are put in "All Storage Systems" and if System Names and WWN's are unique they shouldn't collide with existing storage systems and WSP's "folders".
+**Q:** Why can't we have one config.json for all monitored arrays? 
 
-**Q:** What if I run own InfluxDB v1.8 and Grafana v8? Can I use Collector without EPA? **A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on WSP. Just build this fork of EPA and Collector container, and then run just Collector's docker-compose. Note that this Collector doesn't support InfluxDB v2, a bit of additional work would be required for that.
+**A:** See the first answer. In this approach there may be different people managing different arrays. Each can run their own Collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password) without touching InfluxDB and Grafana.
 
-**Q:** Since this EPA builds collector container, why can't I just run that one like upstream does? **A:** It's probably possible - you can specify the right image and environment variables in `epa/plugins/eseries_monitoring/docker-compose.yaml` and try `make run` - but that hasn't been tested because the purpose of this fork is (1) to dis-entangle Collector from InfluxDB and Grafana, and (2) be able to run multiple collectors, which is easier from the collector folder than from the epa folder.
+**Q:** I first (or "I only") tried to build Collector container and it failed. 
 
-**Q:** Where's my InfluxDB? **A:** It is created in `epa/influx-database` on first successful run of EPA (`make run`). 
+**A:** Then don't do that. Collector uses a base image from EPA, so EPA must be built (`make build`) first or you could edit Collector's Dockerfile, or you could build Collector on EPA InfluxDB VM and then upload Collector image to your registry to let all collector runners avoid the need to build EPA and Collector.
 
-**Q:** Where's my Grafana DB? **A:** It is created as local Docker volume - see `epa/docker-compose.yml`. 
+**Q:** What if I run existing upstream EPA v3.0.0? Can I add more E-Series arrays without using WSP 
 
-**Q:** How much memory does each Collector container need? **A:** It my testing, less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
+**A**: Yes. You need to modify InfluxDB to listen on an external and port 8086/tcp, and then just build and configure this fork EPA and Collector, and run only Collector's docker-compose. All arrays are put in "All Storage Systems" and if System Names and WWN's are unique they shouldn't collide with existing storage systems and WSP's "folders".
 
-**Q:** `collector.py` looks messy. **A**: Yes. I couldn't spend more time on this. Please improve it and submit a pull request, it will be appreciated.
+**Q:** What if I run own InfluxDB v1.8 and Grafana v8? Can I use Collector without EPA? 
 
-**Q:** Can I run Collector without containers? **A:** Yes. Run collector.py in the sample directory with `-h` or try this with own variables:
+**A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on WSP. Just build this fork of EPA and Collector container, and then run just Collector's docker-compose. Note that this Collector doesn't support InfluxDB v2, a bit of additional work would be required for that.
+
+**Q:** Since this EPA builds collector container, why can't I just run that one like upstream does? 
+
+**A:** It's probably possible - you can specify the right image and environment variables in `epa/plugins/eseries_monitoring/docker-compose.yaml` and try `make run` - but that hasn't been tested because the purpose of this fork is (1) to dis-entangle Collector from InfluxDB and Grafana, and (2) be able to run multiple collectors, which is easier from the collector folder than from the epa folder.
+
+**Q:** Where's my InfluxDB?
+
+**A:** It is created in `epa/influx-database` on first successful run of EPA (`make run`). 
+
+**Q:** Where's my Grafana DB? 
+
+**A:** It is created as local Docker volume - see `epa/docker-compose.yml`. 
+
+**Q:** How much memory does each Collector container need? 
+
+**A:** It my testing, less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
+
+**Q:** `collector.py` looks messy. 
+
+**A**: Yes. I couldn't spend more time on this. Please improve it and submit a pull request, it will be appreciated.
+
+**Q:** Can I run Collector without containers? 
+
+**A:** Yes. Run collector.py in the sample directory with `-h` or try this with own variables:
 
 ```sh
 python3 collector/rack26u25-ef600/collector.py \
@@ -255,9 +283,13 @@ python3 collector/array3/collector.py \
   -i -s
 ```
 
-**Q:** What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? **A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to the other controller and restart the collector container. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin requests to two controllers. Then if one fails you should see 50% less metric delivered to Grafana, and get a hint. I haven't tried multiple controllers in docker-compose.yaml, but I'd first try `API=5.5.5.1 5.5.5.2`.
+**Q:** What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? 
 
-**Q:** I tried to run Collector on the same host as EPA InfluxDB and Grafana, and `--dbAddress localhost:8086` (or `DB_ADDRESS=7.7.7.7`) doesn't work. Why? **A:** Because InfluxDB is not running on `localhost`, but on `influxdb` (`epa/docker-compose.yaml`). Change the value to `--dbAddress influxdb:8086` (`DB_ADDRESS=influxdb`) when running Collector in Docker on the same host as EPA.
+**A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to the other controller and restart the collector container. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin requests to two controllers. Then if one fails you should see 50% less metric delivered to Grafana, and get a hint. I haven't tried multiple controllers in docker-compose.yaml, but I'd first try `API=5.5.5.1 5.5.5.2`.
+
+**Q:** I tried to run Collector on the same host as EPA InfluxDB and Grafana, and `--dbAddress localhost:8086` (or `DB_ADDRESS=7.7.7.7`) doesn't work. Why? 
+
+**A:** Because InfluxDB is not running on `localhost`, but on `influxdb` (`epa/docker-compose.yaml`). Change the value to `--dbAddress influxdb:8086` (`DB_ADDRESS=influxdb`) when running Collector in Docker on the same host as EPA.
 
 ## Walk-through
 
@@ -361,8 +393,9 @@ v3.0.0: Pulling from scaleoutsean/epa-collector
 Digest: sha256:2ceca8e7a10ad9ddc31bdbf07baeeec843188642d39197b47252df1ac62d012c
 Status: Downloaded newer image for scaleoutsean/epa-collector:v3.0.0
 docker.io/scaleoutsean/epa-collector:v3.0.0
+```
 
-- `cd collector`, and edit `docker-compose.yml` to use `image: scaleoutsean/epa-collector:v3.0.0` (not `:latest`)
+- Go to the collector folder with `cd collector` and edit `docker-compose.yml` to use `image: scaleoutsean/epa-collector:v3.0.0` (not `:latest`)
 
 ```yaml
 version: '3.6'
