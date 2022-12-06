@@ -178,7 +178,7 @@ docker-compose up
 ```
 
 - If you see it working properly, hit CTRL+C and then run it with `docker-compose up -d` to have it run in the background
-- Collector containers doesn't listen on any ports, it only creates outgoing connections to SANtricity API endpoints and InfluxDB
+- Collector containers don't listen on any ports, they only create outgoing connections to SANtricity API endpoints and InfluxDB
 
 ## Add or remove a monitored array
 

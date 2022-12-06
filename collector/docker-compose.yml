@@ -3,8 +3,9 @@ version: '3.6'
 services:
 
   collector-rack26u25-ef600:
-    # image: collector:latest
-    image: ntap-grafana-plugin/eseries_monitoring/collector
+    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    # Docker Hub
+    # image: docker.io/scaleoutsean/epa-collector:v3.0.0
     container_name: rack26u25-ef600
     mem_limit: 64m
     restart: unless-stopped
