@@ -14,6 +14,7 @@
     - [Build EPA](#build-epa)
     - [Use collector](#use-collector)
     - [Use collector Docker Hub image](#use-collector-docker-hub-image)
+  - [Sample Grafana screenshots of EPA/Collector dashboards](#sample-grafana-screenshots-of-epacollector-dashboards)
   - [Component versions](#component-versions)
 
 
@@ -374,6 +375,26 @@ services:
 ```
 
 - Edit environment variables (username, password, etc.) and run Collector with `docker-compose up`.
+
+## Sample Grafana screenshots of EPA/Collector dashboards
+
+This fork's dashboards are identical to upstream, but upstream repo has no screenshots - in fact they're hard to find on the Internet - so below shows a sample of each dashboard.
+
+- System view
+
+![E-Series System](/sample-screenshot-epa-collector-system.png)
+
+- Array interfaces
+
+![E-Series Array Interfaces.png](/sample-screenshot-epa-collector-interfaces.png)
+
+- Physical disks 
+
+![E-Series Physical Disks.png](/sample-screenshot-epa-collector-disks.png)
+
+- Logical volumes
+
+![E-Series Volumes.png](/sample-screenshot-epa-collector-volumes.png)
 
 ## Component versions
 
