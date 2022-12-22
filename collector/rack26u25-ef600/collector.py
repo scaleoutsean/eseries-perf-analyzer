@@ -272,11 +272,6 @@ else:
 #######################
 
 
-def get_configuration():
-    dict = {}
-    return dict
-
-
 def get_session():
     """
     Returns a session with the appropriate content type and login information.
