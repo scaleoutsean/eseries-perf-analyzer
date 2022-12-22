@@ -210,7 +210,7 @@ PARSER.add_argument('-p', '--password', default='', type=str, required=True,
                          'Default: \'' + DEFAULT_PASSWORD + '\'. <String>')
 PARSER.add_argument('--api', default='',  nargs='+', required=True,
                     help='<Required> The IPv4 address for the SANtricity API endpoint. '
-                         'Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to: \'' +
+                         'Example: --api 5.5.5.5 6.6.6.6. Port number is always set to: \'' +
                     DEFAULT_SYSTEM_PORT + '\'. '
                          'May be provided twice (for two controllers). <IPv4 Address>')
 PARSER.add_argument('--sysname', default='', type=str, required=True,
@@ -224,10 +224,10 @@ PARSER.add_argument('-t', '--intervalTime', type=int, default=60, choices=[60, 1
                     ' to InfluxDB. Default: 60. <Integer>')
 PARSER.add_argument('--dbAddress', default='influxdb:8086', type=str, required=True,
                     help='<Required> The hostname, IPv4 address, or FQDN and the port for InfluxDB. '
-                    'Default: influxdb:8086. In EPA InfluxDB defaults to port 8086. Example: 7.7.7.7:8086.')
+                    'In EPA InfluxDB defaults to port 8086. Example: 7.7.7.7:8086. Default: influxdb:8086.')
 PARSER.add_argument('-r', '--retention', default=DEFAULT_RETENTION, type=str, required=False,
                     help='Data retention for InfluxDB as an integer suffixed by a calendar unit. '
-                    'Example: 4w translates into 28 day data retention. Default: 52w. '
+                    'Example: 4w translates into 28 days of data retention. '
                     'Default: \'' + DEFAULT_RETENTION + '\'.')
 PARSER.add_argument('-s', '--showStorageNames', action='store_true',
                     help='Outputs the storage array names found from the SANtricity API to console. Optional. <switch>')
@@ -252,7 +252,7 @@ PARSER.add_argument('-g', '--showInterfaceMetrics', action='store_true', default
 PARSER.add_argument('-i', '--showIteration', action='store_true', default=0,
                     help='Outputs the current loop iteration. Optional. <switch>')
 PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
-                    help='Pull information from SANtricity, but do not send it to InfluxDB.  Optional. <swtich>')
+                    help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <swtich>')
 CMD = PARSER.parse_args()
 
 if CMD.dbAddress == '' or CMD.dbAddress == None:
@@ -326,7 +326,7 @@ def get_system_name(sys):
 
 def get_drive_location(storage_id, session):
     """
-    :param storage_id: Storage system ID on the Webserver
+    :param storage_id: Storage system ID (WWN)
     :param session: the session of the thread that calls this definition
     ::return: returns a dictionary containing the disk id matched up against
     the tray id it is located in:
@@ -354,7 +354,7 @@ def get_drive_location(storage_id, session):
 
 def collect_storage_metrics(sys):
     """
-    Collects all defined storage metrics and posts them to influxdb
+    Collects all defined storage metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
     """
     try:
@@ -464,7 +464,7 @@ def collect_storage_metrics(sys):
 
 def collect_major_event_log(sys):
     """
-    Collects all defined MEL metrics and posts them to influxdb
+    Collects all defined MEL metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
     """
     try:
@@ -492,8 +492,8 @@ def collect_major_event_log(sys):
             item = dict(
                 measurement="major_event_log",
                 tags=dict(
-                    sys_id=sys_id,
                     sys_name=sys_name,
+                    sys_id=sys_id,                    
                     event_type=mel["eventType"],
                     time_stamp=mel["timeStamp"],
                     category=mel["category"],
@@ -540,7 +540,7 @@ def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_
 
 def collect_system_state(sys, checksums):
     """
-    Collects state information from the storage system and posts it to influxdb
+    Collects state information from the storage system and posts it to InfluxDB
     :param sys: The JSON object of a storage_system
     """
     try:
@@ -668,7 +668,8 @@ def get_storage_system_folder_list():
 
 def collect_system_folders(systems):
     """
-    Collects all folders defined in the WSP and posts them to influxdb
+    Collects folder defined and posts it to InfluxDB
+    Legacy function from the time EPA used WSP
     :param systems: List of all system folders (names and IDs)
     """
     try:
@@ -754,7 +755,7 @@ if __name__ == "__main__":
                     "We were unable to retrieve the storage-system list! Status-code={}".format(response.status_code))
         except requests.exceptions.HTTPError or requests.exceptions.ConnectionError as e:
             LOG.warning(
-                "Unable to connect to the API to get storage-system list!", e)
+                "Unable to connect to the API!", e)
         except Exception as e:
             LOG.warning("Unexpected exception!", e)
         else:
