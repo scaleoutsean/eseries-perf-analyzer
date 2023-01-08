@@ -12,5 +12,5 @@
 
 alpine_base alpine-base
 python_base python-base
-webservices
-collector
+# webservices
+# collector

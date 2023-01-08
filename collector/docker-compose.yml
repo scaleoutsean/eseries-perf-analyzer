@@ -2,11 +2,26 @@ version: '3.6'
 
 services:
 
-  collector-rack26u25-ef600:
+  collector-dbmanager:
+    image: ntap-grafana-plugin/eseries_monitoring/dbmanager:latest
+    container_name: dbmanager
+    mem_limit: 32m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - RETENTION_PERIOD=52w
+      - DB_ADDRESS=6.6.6.6
+      - DB_PORT=8086
+
+  collector-R26U25-EF600:
     image: ntap-grafana-plugin/eseries_monitoring/collector:latest
     # Docker Hub
     # image: docker.io/scaleoutsean/epa-collector:v3.0.0
-    container_name: rack26u25-ef600
+    container_name: R26U25-EF600
     mem_limit: 64m
     restart: unless-stopped
     logging:
@@ -17,10 +32,31 @@ services:
     environment: 
       - USERNAME=monitor
       - PASSWORD=monitor123
-      - SYSNAME=rack26u25-ef600
+      - SYSNAME=R26U25-EF600
       - SYSID=600A098000F63714000000005E79C888
       - API=5.5.5.5
-      - RETENTION_PERIOD=26w
+      - RETENTION_PERIOD=52w
       - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086
 
+  collector-R24U04-E2824:
+    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    # Docker Hub
+    # image: docker.io/scaleoutsean/epa-collector:v3.0.0
+    container_name: R24U04-E2824
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=monitor123
+      - SYSNAME=R24U04-E2824
+      - SYSID=600A098000F63714000000005E79C999
+      - API=7.7.7.7
+      - RETENTION_PERIOD=52w
+      - DB_ADDRESS=6.6.6.6
+      - DB_PORT=8086

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Retrieves and collects data from the the NetApp E-series web server
+Retrieves and collects data from the the NetApp E-Series API server
 and sends the data to an InfluxDB server
 """
 import struct
@@ -22,10 +22,10 @@ from influxdb.exceptions import InfluxDBClientError
 DEFAULT_USERNAME = 'monitor'
 DEFAULT_PASSWORD = 'monitor123'
 
-global DEFAULT_SYSTEM_NAME
-global DEFAULT_SYSTEM_ID
-global sys_name
-global sys_id
+# global DEFAULT_SYSTEM_NAME
+# global DEFAULT_SYSTEM_ID
+# global sys_name
+# global sys_id
 # DEFAULT_SYSTEM_NAME = 'rack26u25-ef600'
 # DEFAULT_SYSTEM_ID = '600A098000F63714000000005E79C888'
 # DEFAULT_SYSTEM_API_IP = '5.5.5.5'
@@ -34,8 +34,8 @@ DEFAULT_SYSTEM_ID = ''
 DEFAULT_SYSTEM_API_IP = ''
 
 DEFAULT_SYSTEM_PORT = '8443'
-DEFAULT_SYSTEM_EP = 'https://' + DEFAULT_SYSTEM_API_IP + \
-    ':' + DEFAULT_SYSTEM_PORT + '/devmgr/v2/storage-systems'
+# DEFAULT_SYSTEM_EP = 'https://' + DEFAULT_SYSTEM_API_IP + \
+#    ':' + DEFAULT_SYSTEM_PORT + '/devmgr/v2/storage-systems'
 
 INFLUXDB_HOSTNAME = 'influxdb'
 INFLUXDB_PORT = 8086
@@ -43,12 +43,13 @@ INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
 # NOTE(bdustin): time in seconds between folder collections
-FOLDER_COLLECTION_INTERVAL = 86400*365*10
+# FOLDER_COLLECTION_INTERVAL = 86400*365*10
+# FOLDER_COLLECTION_INTERVAL = 120
 
 __version__ = '1.0'
 
 #######################
-# LIST OF METRICS######
+# LIST OF METRICS #####
 #######################
 
 CONTROLLER_PARAMS = [
@@ -223,8 +224,9 @@ PARSER.add_argument('-t', '--intervalTime', type=int, default=60, choices=[60, 1
                     help='Interval (seconds) to poll and send data from the SANtricity API '
                     ' to InfluxDB. Default: 60. <Integer>')
 PARSER.add_argument('--dbAddress', default='influxdb:8086', type=str, required=True,
-                    help='<Required> The hostname, IPv4 address, or FQDN and the port for InfluxDB. '
-                    'Default: influxdb:8086. In EPA InfluxDB defaults to port 8086. Example: 7.7.7.7:8086.')
+                    help='<Required> The hostname (IPv4 address or FQDN) and the port for InfluxDB. '
+                    'Default: influxdb:8086. Use public IPv4 of InfluxDB system rather than container name'
+                    ' when running collector externally. In EPA InfluxDB uses port 8086. Example: 7.7.7.7:8086.')
 PARSER.add_argument('-r', '--retention', default=DEFAULT_RETENTION, type=str, required=False,
                     help='Data retention for InfluxDB as an integer suffixed by a calendar unit. '
                     'Example: 4w translates into 28 day data retention. Default: 52w. '
@@ -255,26 +257,30 @@ PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB.  Optional. <swtich>')
 CMD = PARSER.parse_args()
 
+if CMD.sysname == '' or CMD.sysname == None:
+    LOG.warning("sysname not provided. Using default: %s", DEFAULT_SYSTEM_NAME)
+    sys_name = DEFAULT_SYSTEM_NAME
+else:
+    sys_name = CMD.sysname
+
+if CMD.sysid == '' or CMD.sysid == None:
+    LOG.warning("sysid not provided. Using default: %s", DEFAULT_SYSTEM_ID)
+    sys_id = DEFAULT_SYSTEM_ID
+else:
+    sys_id = CMD.sysid
+
 if CMD.dbAddress == '' or CMD.dbAddress == None:
-    INFLUXDB_HOSTNAME = 'influxdb'
-    INFLUXDB_PORT = 8086
+    LOG.warning("InfluxDB server was not provided. Default setting (influxdb:8086) works only when collector and InfluxDB are on same host")
+    influxdb_host = INFLUXDB_HOSTNAME
+    influxdb_port = INFLUXDB_PORT
 else:
-    INFLUXDB_HOSTNAME = CMD.dbAddress.split(":")[0]
-    INFLUXDB_PORT = CMD.dbAddress.split(":")[1]
-if CMD.retention == '' or CMD.retention == None:
-    RETENTION_DUR = DEFAULT_RETENTION
-else:
-    RETENTION_DUR = CMD.retention
+    influxdb_host = CMD.dbAddress.split(":")[0]
+    influxdb_port = CMD.dbAddress.split(":")[1]
 
 
 #######################
-# HELPER FUNCTIONS#####
+# HELPER FUNCTIONS ####
 #######################
-
-
-def get_configuration():
-    dict = {}
-    return dict
 
 
 def get_session():
@@ -284,7 +290,6 @@ def get_session():
     """
     request_session = requests.Session()
 
-    # Not trying to use default values. Username and password are required.
     username = CMD.username
     password = CMD.password
 
@@ -313,26 +318,26 @@ def get_controller():
     return (storage_controller_ep)
 
 
-def get_system_name(sys):
-    sys_id = CMD.sysid
-    sys_name = CMD.sysname
-    if not sys_name or len(sys_name) <= 0:
-        sys_name = sys_id
-    if not sys_name or len(sys_name) <= 0:
-        sys_name = DEFAULT_SYSTEM_NAME
-        sys_id = DEFAULT_SYSTEM_ID
-    return sys_name, sys_id
+# def get_system_name(sys):
+    #sys_id = CMD.sysid
+    #sys_name = CMD.sysname
+    #if not sys_name or len(sys_name) <= 0:
+    #    sys_name = sys_id
+    #if not sys_name or len(sys_name) <= 0:
+    #    sys_name = DEFAULT_SYSTEM_NAME
+    #    sys_id = DEFAULT_SYSTEM_ID
+    #return sys_name, sys_id
 
 
-def get_drive_location(storage_id, session):
+def get_drive_location(sys_id, session):
     """
-    :param storage_id: Storage system ID on the Webserver
+    :param sys_id: Storage system ID (WWN) on the controller
     :param session: the session of the thread that calls this definition
     ::return: returns a dictionary containing the disk id matched up against
     the tray id it is located in:
     """
     hardware_list = session.get("{}/{}/hardware-inventory".format(
-        get_controller(), storage_id)).json()
+        get_controller(), sys_id)).json()
     tray_list = hardware_list["trays"]
     drive_list = hardware_list["drives"]
     tray_ids = {}
@@ -354,16 +359,16 @@ def get_drive_location(storage_id, session):
 
 def collect_storage_metrics(sys):
     """
-    Collects all defined storage metrics and posts them to influxdb
-    :param sys: The JSON object of a storage_system
+    Collects all defined storage metrics and posts them to InfluxDB
+    :param sys: The JSON object of a storage system
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=INFLUXDB_HOSTNAME,
-                                port=INFLUXDB_PORT, database=INFLUXDB_DATABASE)
+        client = InfluxDBClient(host=influxdb_host,
+                                port=influxdb_port, database=INFLUXDB_DATABASE)
 
-        sys_name = (get_system_name(sys))[0]
-        sys_id = (get_system_name(sys))[1]
+        # sys_name = (get_system_name(sys))[0]
+        # sys_id = (get_system_name(sys))[1]
 
         json_body = list()
 
@@ -464,16 +469,16 @@ def collect_storage_metrics(sys):
 
 def collect_major_event_log(sys):
     """
-    Collects all defined MEL metrics and posts them to influxdb
+    Collects all defined MEL metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=INFLUXDB_HOSTNAME,
-                                port=INFLUXDB_PORT, database=INFLUXDB_DATABASE)
+        client = InfluxDBClient(host=influxdb_host,
+                                port=influxdb_port, database=INFLUXDB_DATABASE)
 
-        sys_name = get_system_name(sys)[0]
-        sys_id = get_system_name(sys)[1]
+        # sys_name = get_system_name(sys)[0]
+        # sys_id = get_system_name(sys)[1]
         json_body = list()
         start_from = -1
         mel_grab_count = 8192
@@ -540,13 +545,13 @@ def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_
 
 def collect_system_state(sys, checksums):
     """
-    Collects state information from the storage system and posts it to influxdb
+    Collects state information from the storage system and posts it to InfluxDB
     :param sys: The JSON object of a storage_system
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=INFLUXDB_HOSTNAME,
-                                port=INFLUXDB_PORT, database=INFLUXDB_DATABASE)
+        client = InfluxDBClient(host=influxdb_host,
+                                port=influxdb_port, database=INFLUXDB_DATABASE)
 
         sys_id = sys["wwn"]
         sys_name = sys["name"]
@@ -626,7 +631,7 @@ def collect_system_state(sys, checksums):
                                                           p_fail_type, p_obj_ref, p_obj_type,
                                                           False, datetime.utcnow().isoformat()))
 
-        # write failures to influxdb
+        # write failures to InfluxDB
         if CMD.showStateMetrics:
             LOG.info("Writing {} failures".format(len(json_body)))
         client.write_points(json_body, database=INFLUXDB_DATABASE)
@@ -649,56 +654,8 @@ def create_continuous_query(params_list, database):
             "Creation of continuous query on '{}' failed: {}".format(database, err))
 
 
-def get_storage_system_ids_folder_list():
-    folders = [{'name': 'All Storage Systems',
-                'systemIDs': [], 'systemNames': []}]
-    return folders
-
-
-def add_system_names_to_ids_list(folder_of_ids):
-    folder_of_ids = [{'name': 'All Storage Systems', 'systemIDs': [
-        CMD.sysid], 'systemNames': [CMD.sysname]}]
-    return folder_of_ids
-
-
-def get_storage_system_folder_list():
-    folders = get_storage_system_ids_folder_list()
-    return add_system_names_to_ids_list(folders)
-
-
-def collect_system_folders(systems):
-    """
-    Collects all folders defined in the WSP and posts them to influxdb
-    :param systems: List of all system folders (names and IDs)
-    """
-    try:
-        client = InfluxDBClient(host=INFLUXDB_HOSTNAME,
-                                port=INFLUXDB_PORT, database=INFLUXDB_DATABASE)
-        json_body = list()
-
-        for folder in systems:
-            for name in folder["systemNames"]:
-                sys_item = dict(
-                    measurement="folders",
-                    tags=dict(
-                        folder_name=folder["name"],
-                        sys_name=name
-                    ),
-                    fields=dict(
-                        dummy=0
-                    )
-                )
-                json_body.append(sys_item)
-        if not CMD.doNotPost:
-            client.drop_measurement("folders")
-            client.write_points(
-                json_body, database=INFLUXDB_DATABASE, time_precision="s")
-
-    except RuntimeError:
-        LOG.error("Error when attempting to post system folders")
-
 #######################
-# MAIN FUNCTIONS#######
+# MAIN FUNCTIONS ######
 #######################
 
 
@@ -708,8 +665,8 @@ if __name__ == "__main__":
     SESSION = get_session()
     loopIteration = 1
 
-    client = InfluxDBClient(host=INFLUXDB_HOSTNAME,
-                            port=INFLUXDB_PORT, database=INFLUXDB_DATABASE)
+    client = InfluxDBClient(host=influxdb_host,
+                            port=influxdb_port, database=INFLUXDB_DATABASE)
     client.create_database(INFLUXDB_DATABASE)
 
     storage_controller_ep = get_controller()
@@ -726,11 +683,11 @@ if __name__ == "__main__":
                                           "1w", "1", True)
         try:
             client.create_retention_policy(
-                "downsample_retention", RETENTION_DUR, "1", INFLUXDB_DATABASE, False)
+                "downsample_retention", DEFAULT_RETENTION, "1", INFLUXDB_DATABASE, False)
         except InfluxDBClientError:
-            LOG.info("Updating retention policy to {}...".format(RETENTION_DUR))
+            LOG.info("Updating retention policy to {}...".format(retention))
             client.alter_retention_policy("downsample_retention", INFLUXDB_DATABASE,
-                                          RETENTION_DUR, "1", False)
+                                          DEFAULT_RETENTION, "1", False)
 
         # set up continuous queries that will downsample our metric data periodically
         create_continuous_query(DRIVE_PARAMS, "disks")
@@ -741,12 +698,9 @@ if __name__ == "__main__":
     except requests.exceptions.HTTPError or requests.exceptions.ConnectionError:
         LOG.exception("Failed to add configured systems!")
 
-    last_folder_collection = -1
-
     checksums = dict()
     while True:
         time_start = time.time()
-        (sys_name, sys_id) = get_system_name("random")
         try:
             response = SESSION.get(storage_controller_ep)
             if response.status_code != 200:
@@ -758,26 +712,20 @@ if __name__ == "__main__":
         except Exception as e:
             LOG.warning("Unexpected exception!", e)
         else:
-            storageList = [{'name': sys_name, 'wwn': sys_id}]
+            sys = {'name': sys_name, 'wwn': sys_id}
             if CMD.showStorageNames:
-                LOG.info(CMD.sysname)
-
-            if (last_folder_collection < 0 or time.time() - last_folder_collection >= FOLDER_COLLECTION_INTERVAL):
-                LOG.info("Collecting system folder information...")
-                storage_system_list = get_storage_system_folder_list()
-                collect_system_folders(storage_system_list)
-                last_folder_collection = time.time()
+                LOG.info(sys_name)
 
             collector = [executor.submit(
-                collect_storage_metrics, sys) for sys in storageList]
+                collect_storage_metrics, sys)]
             concurrent.futures.wait(collector)
 
             collector = [executor.submit(
-                collect_system_state, sys, checksums) for sys in storageList]
+                collect_system_state, sys, checksums)]
             concurrent.futures.wait(collector)
 
             collector = [executor.submit(
-                collect_major_event_log, sys) for sys in storageList]
+                collect_major_event_log, sys)]
             concurrent.futures.wait(collector)
 
         time_difference = time.time() - time_start
