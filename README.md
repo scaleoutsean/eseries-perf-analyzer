@@ -47,8 +47,11 @@ vim docker-compose.yml
 # We are still in ./collector subdirectory.
 # InfluxDB and Grafana are already running, start collector(s) and dbmanager:
 docker-compose up
-# Check Grafana and if OK, hit CTRL+C, and restart with:
+# Check Grafana and if OK, hit CTRL+C, restart with:
 docker-compose up -d
+# If not OK, CTRL+C and "docker-compose down". 
+# Then review config.json and docker-compose.yml.
+# collector.py and db_manager.py can be started from the CLI for easier troubleshooting.
 ```
 
 - `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, rm, restart these two.
@@ -57,8 +60,8 @@ docker-compose up -d
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - PASSWORD - SANtricity password for the account used to monitor
-  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`!
-  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - get this from the SANtricity Web UI
+  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be found [here](https://github.com/scaleoutsean/eseries-perf-analyzer/blob/master/sysname-in-santricity-manager.png)
+  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - [this detail](https://github.com/scaleoutsean/eseries-perf-analyzer/blob/master/sysid-in-santricity-manager.png) can be found in the SANtricity Web UI
   - API - SANtricity controller's IP address such as 6.6.6.6
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
