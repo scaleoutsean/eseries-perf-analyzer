@@ -1,23 +1,5 @@
 # NetApp E-Series Performance Analyzer ("EPA") without SANtricity Web Services Proxy ("WSP")
 
-- [NetApp E-Series Performance Analyzer ("EPA") without SANtricity Web Services Proxy ("WSP")](#netapp-e-series-performance-analyzer-epa-without-santricity-web-services-proxy-wsp)
-  - [What is this thing](#what-is-this-thing)
-  - [How to use this fork](#how-to-use-this-fork)
-    - [Summary](#summary)
-    - [Build containers and create configuration files](#build-containers-and-create-configuration-files)
-    - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
-    - [Start services](#start-services)
-  - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
-  - [Update password for the monitor account](#update-password-for-the-monitor-account)
-  - [Walk-through](#walk-through)
-    - [Build EPA](#build-epa)
-    - [Use collector](#use-collector)
-    - [Use collector Docker Hub image](#use-collector-docker-hub-image)
-  - [Sample Grafana screenshots of EPA/Collector dashboards](#sample-grafana-screenshots-of-epacollector-dashboards)
-  - [Tips and questions](#tips-and-questions)
-  - [Component versions](#component-versions)
-
-
 ## What is this thing
 
 This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0 (see its README.md for additional information) created with the following objectives:
@@ -43,7 +25,7 @@ Additionally, minor differences include:
 
 ### Build containers and create configuration files
 
-- If you have existing EPA, images, volumes and service ports will cause conflict. Either use a new VM or run `make clean` and `docker-compose down` to stop and remove old containers.
+- If you have existing EPA, images, volumes and service ports may cause container name and port conflicts. Either use a new VM or run `make clean` and `docker-compose down` to stop and remove old containers.
 - Clone the repository
 - Descend into `epa`, run `make start` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces.
 - Go to `collector` subdirectory, edit two files (config.json and docker-compose.yml) and run `make build` to create containers.
@@ -69,21 +51,21 @@ docker-compose up
 docker-compose up -d
 ```
 
-- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, rm, restart.
-- `./collector`'s valus are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
+- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, rm, restart these two.
+- `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
 
-- When editing `collector/docker-compose.yml`, provide the following for each E-Series array:
+- When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - PASSWORD - SANtricity password for the account used to monitor
-  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI
+  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`!
   - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - get this from the SANtricity Web UI
   - API - SANtricity controller's IP address such as 6.6.6.6
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
-- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/sysname-in-santricity-manager.png) and [this](/sysid-in-santricity-manager.png) screenshot.
+- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/sysname-in-santricity-manager.png) and [this](/sysid-in-santricity-manager.png) screenshot. Although that can create confusion, but SYSNAME can be arbitrary; just keep the names in `./collector/docker-compose.yml` and `./collector/config.json` consistent!
 
-- `container_name` to match the name in config.json:
+- `container_name` to match the name in `./collector/config.json`:
 
 ```yaml
 services:
@@ -109,7 +91,7 @@ services:
       - DB_PORT=8086
 ```
 
-- Matching name in `config.json`:
+- Matching SYSNAME/name in `config.json` is replicated by Collector's `make build` to `./collector/dbmanager/config.json`:
 
 ```json
 {
@@ -121,9 +103,9 @@ services:
 }
 ```
 
-- If you wanted to customize collector container images, directory with Docker config files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could have service names like `collector-$SYSNAME` (where SYSNAME is System Name you gave to E-Series array).
+- To customize collector container images, the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `$SYSNAME` is System Name given to each E-Series array).
 
-- `dbmanager` doesn't do much and doesn't yet make use `RETENTION_PERIOD` (just ignore that). Only `DB_ADDRESS` and syntax/names of `config.json` need to be correct.
+- `dbmanager` doesn't do much and doesn't yet make use `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` and syntax/names of `config.json` need to be correct.
 
 ```yaml
 version: '3.6'
@@ -160,7 +142,7 @@ To add a SANtricity array:
 
 - Go to `./collector`
 - Edit `docker-compose.yml` - if you copy-paste, make sure you get the variables and `container_name` right!
-- Edit `config.json` to add another record for the new array
+- Edit `config.json` to add a matching record for the new array
 - `docker-compose down`
 - `make build`
 - `docker-compose up -d`
@@ -169,9 +151,9 @@ To remove an array, remove it from `config.json` and `docker-compose.yml` and do
 
 ## Update password for the monitor account
 
-Let's say you want to change it for `R11U01-EF300`. Change it on the array, then find this array in `docker-compose.yml`, change the password in `PASSWORD=`, and run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`. 
+To change the monitor account password for `R11U01-EF300`, change it on the array as array admin, find this array in `docker-compose.yml`, change the password value in the `PASSWORD=` row for the array, run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`. 
 
-The array name has not changed so we didn't need to edit `./collector/config.json` and rebuild `./collector/dbmanager`. That's why running `make build` wasn't necessary.
+The array name has not changed, so it wasn't necessary to edit `./collector/config.json` and rebuild `./collector/dbmanager`. That's also why running `make build` wasn't necessary.
 
 ## Walk-through
 
@@ -258,7 +240,7 @@ This fork's dashboards are identical to upstream, but upstream repository has no
 
 ![E-Series Volumes.png](/sample-screenshot-epa-collector-volumes.png)
 
-## Tips and questions
+## Tips and Q&A
 
 Below details are mostly related to this fork. For upstream details please check their read-me file.
 
@@ -272,7 +254,7 @@ Below details are mostly related to this fork. For upstream details please check
 
 **Q:** How to modify Collector's Docker image? 
 
-**A:** Any way you want. Example: `cp -pr ./collector/collector ./collector/mycollector', then edit your container, build it, change ./collector/docker-compose.yml` and `./collector/config.json` to make sure it's used. Finally, run `make run` followed by `docker-compose up $mycollector`. 
+**A:** Any way you want. Example: `cp -pr ./collector/collector ./collector/mycollector`, edit container config in the new location, build the container with `docker build -t ${NAME} .`, change `./collector/docker-compose.yml` to use the new Docker image, change `./collector/config.json` to make sure a folder is created in Grafana. Finally, run `docker-compose up $mycollector`. Collector's Makefile could automate this, but currently it is very simple and doesn't have that feature.
 
 **Q:** This looks complicated... 
 
@@ -315,7 +297,7 @@ Below details are mostly related to this fork. For upstream details please check
 **A:** Yes. Run `db_manager.py - h` and `collector.py -h`. Example:
 
 ```sh
-python3 collector/R26U25-EF600/collector.py \
+python3 ./collector/collector/collector.py \
   -u ${USERNAME} -p ${PASSWORD} \
   --api ${API} \
   --dbAddress ${DB_ADDRESS}:8086 \
@@ -334,7 +316,7 @@ python3 collector/R26U25-EF600/collector.py \
 
 **Q:** Can E-Series' WWN change?
 
-**A:** Normally not, but it's theoretically [possible](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/E-Series_SANtricity_Software_Suite/WWNs_changed_after_offline_replacement_of_tray_0). Should that happen you'd have to update your configuration and restart Collector container.
+**A:** Normally it can't, but it's theoretically [possible](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/E-Series_SANtricity_Software_Suite/WWNs_changed_after_offline_replacement_of_tray_0). Should that happen you'd have to update your configuration and restart Collector container.
 
 ## Component versions
 
