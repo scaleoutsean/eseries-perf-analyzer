@@ -45,8 +45,12 @@ PARSER = argparse.ArgumentParser()
 
 PARSER.add_argument('-t', '--intervalTime', type=int, default=300,
                     help='Provide the time (seconds) in which the script polls and sends folder '
-                         'names from the JSON configuration file to InfluxDB to be used by Grafana. '
-                         'If not specified, will use the default time of 300 seconds. <time>')
+                         'names from the JSON configuration file to InfluxDB to be exposed in Grafana. '
+                         'Default: 300 (seconds). <int>')
+PARSER.add_argument('--dbAddress', default='influxdb:8086', type=str, required=True,
+                    help='<Required> The hostname (IPv4 address or FQDN) and port for InfluxDB. '
+                    'Default: influxdb:8086. Use public IPv4 of InfluxDB system rather than the container name'
+                    ' when running collector externally. In EPA InfluxDB uses port 8086. Example: 7.7.7.7:8086.')
 PARSER.add_argument('-r', '--retention', type=str, default='52w',
                     help='The default retention duration for InfluxDB. At the moment, not used.')
 PARSER.add_argument('-i', '--showIteration', action='store_true', default=0,

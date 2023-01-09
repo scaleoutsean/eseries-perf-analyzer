@@ -19,8 +19,6 @@ services:
 
   collector-R26U25-EF600:
     image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-    # Docker Hub
-    # image: docker.io/scaleoutsean/epa-collector:v3.0.0
     container_name: R26U25-EF600
     mem_limit: 64m
     restart: unless-stopped
@@ -41,8 +39,6 @@ services:
 
   collector-R24U04-E2824:
     image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-    # Docker Hub
-    # image: docker.io/scaleoutsean/epa-collector:v3.0.0
     container_name: R24U04-E2824
     mem_limit: 64m
     restart: unless-stopped

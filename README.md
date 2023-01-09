@@ -27,56 +27,70 @@ This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://githu
 
 Additionally, minor differences include:
 
-- Latest minor version of Grafana v8 (8.5.15), and Alpine OS image for Python 3.10 (3.10-alpine3.17)
-- Expanded number of required arguments in `collector.py` to avoid mistakes and (for the most part) the need to understand how the EPA Makefile works
-- Collector container no longer shares Docker network with the two (InfluxDB, Grafana) EPA containers because the assumption is Collector will run on a different host or in any case access InfluxDB over public host network
+- Updated Grafana v8 (8.5.15), and Alpine OS image for Python 3.10 (3.10-alpine3.17)
+- Expanded number of required arguments in `collector.py` to avoid unintentional mistakes
+- Collector container no longer shares Docker network with the two (InfluxDB, Grafana) EPA containers because the assumption is Collector probably runs on a different host or accesses InfluxDB over public host network
 - Unit tests and Makefile in the EPA directory for collector plugin no longer work
-- The SANtricity Web Services Proxy container was upgraded to latest and can run, but it's set to not start with EPA because `collector.py` no longer uses it. It can be started independently and used on port 8443/tcp by those who need it.
+- The SANtricity Web Services Proxy container has been removed in this fork's version v3.0.1. Fork v3.0.0 still has WSP (newer version than upstream v3.0.0!), but it doesn't run (it can be started independently and used on port 8443/tcp by those who need it).
 
 ## How to use this fork
 
 ### Summary
 
-- We build EPA images which builds one of all images including the one used by Collector (although Collector can also be built on its own)
-- Docker Compose for EPA starts Influx and Grafana, while Docker Compose for Collector starts one or more Collector containers
+- `epa`: Build and run InfluxDB and Grafana in the `epa` sub-directory. These containers are from the original EPA and include Grafana dashboards.
+- `collector`: in the `collector` sub-directory, build and run collector(s) (one per E-Series array) and a "helper" container called `dbmanager` (one per InfluxDB).
+- The makefiles currently still require Docker Compose v1
 
 ### Build containers and create configuration files
 
+- If you have existing EPA, images, volumes and service ports will cause conflict. Either use a new VM or run `make clean` and `docker-compose down` to stop and remove old containers.
 - Clone the repository
-- Navigate to the `epa` folder and run `make build` to download and build Docker container images
-- Run `make run` to start InfluxDB v1 and Grafana v8. Unlike the original, WSP and Collector will *not* be started
+- Descend into `epa`, run `make start` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces.
+- Go to `collector` subdirectory, edit two files (config.json and docker-compose.yml) and run `make build` to create containers.
 
 ```sh
 git clone github.com/scaleoutsean/eseries-perf-analyzer
 cd eseries-perf-analyzer
-# go to the epa folder
-cd epa
-make build
-# go back to top level and then to the collector folder
-cd ..
-cd collector
+# Go to the epa folder
+cd epa; make run
+# Go back to top level and then to the collector folder
+cd ..; cd collector
+# Enter name of E-Series array (or arrays) to show in Grafana drop-down list.
+# This file will be copied to ./collector/dbmanager/config.json when "make run" is executed.
+# You can also copy it manually or edit it in place if you don't want to use Makefile. 
+vim config.json
+# Edit docker-compose file leave dbmanager unchanged. Collector containers should reflect config.json:
+#     container_name, specifically , must be the same as array name in config.json.
 vim docker-compose.yml
+# We are still in ./collector subdirectory.
+# InfluxDB and Grafana are already running, start collector(s) and dbmanager:
+docker-compose up
+# Check Grafana and if OK, hit CTRL+C, and restart with:
+docker-compose up -d
 ```
+
+- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, rm, restart.
+- `./collector`'s valus are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
 
 - When editing `collector/docker-compose.yml`, provide the following for each E-Series array:
   - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - PASSWORD - SANtricity password for the account used to monitor
-  - SYSNAME - SANtricity array name, such as rack26u25-ef600 - get this from SANtricity Web UI
-  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - get this from SANtricity Web UI
+  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI
+  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - get this from the SANtricity Web UI
   - API - SANtricity controller's IP address such as 6.6.6.6
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
 - Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/sysname-in-santricity-manager.png) and [this](/sysid-in-santricity-manager.png) screenshot.
 
-- In the example below you may also want to change service name (collector-rack26u25-ef600) and `container_name` to match sub-directory name for easier orientation later on:
+- `container_name` to match the name in config.json:
 
 ```yaml
 services:
 
-  collector-rack26u25-ef600:
+  collector-R26U25-EF600:
     image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-    container_name: rack26u25-ef600
+    container_name: R26U25-EF600
     mem_limit: 64m
     restart: unless-stopped
     logging:
@@ -87,7 +101,7 @@ services:
     environment: 
       - USERNAME=monitor
       - PASSWORD=monitor123
-      - SYSNAME=rack26u25-ef600
+      - SYSNAME=R26U25-EF600
       - SYSID=600A098000F63714000000005E79C888
       - API=6.6.6.6
       - RETENTION_PERIOD=26w
@@ -95,18 +109,31 @@ services:
       - DB_PORT=8086
 ```
 
-- There's a sample directory (`collector/docker-compose.yml/rack26u25-ef600`) which matches the disk array name from above YAML, and the purpose is to have one directory per each array, and a `docker-compose.yml` where service name is `collector-$SYSNAME` (where SYSNAME is System Name you gave to E-Series array). You can rename it, and you can rename the string in YAML file above.
-- You can also copy-paste the sample folder and rename it and ignore the original sample folder (just leave it there for reference). With two directory copies named `array1` and `array2`, your `collector/docker-compose.yaml` may look similar to this:
+- Matching name in `config.json`:
+
+```json
+{
+    "storage_systems": [
+        {
+            "name": "R26U25-EF600"
+        }
+    ]
+}
+```
+
+- If you wanted to customize collector container images, directory with Docker config files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could have service names like `collector-$SYSNAME` (where SYSNAME is System Name you gave to E-Series array).
+
+- `dbmanager` doesn't do much and doesn't yet make use `RETENTION_PERIOD` (just ignore that). Only `DB_ADDRESS` and syntax/names of `config.json` need to be correct.
 
 ```yaml
 version: '3.6'
 
 services:
 
-  collector-array1:
-    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-    container_name: array1
-    mem_limit: 64m
+  collector-dbmanager:
+    image: ntap-grafana-plugin/eseries_monitoring/dbmanager:latest
+    container_name: dbmanager
+    mem_limit: 32m
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -114,202 +141,102 @@ services:
         max-file: "5"
         max-size: 10m
     environment: 
-      - USERNAME=monitor
-      - PASSWORD=monitor123
-      - SYSNAME=rack26u25-ef600
-      - SYSID=600A098000F63714000000005E79C888
-      - API=5.5.5.5
-      - RETENTION_PERIOD=26w
-      - DB_ADDRESS=7.7.7.7
-      - DB_PORT=8086
-
-  collector-array2:
-    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-    container_name: array2
-    mem_limit: 64m
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "5"
-        max-size: 10m
-    environment: 
-      - USERNAME=monitor
-      - PASSWORD=monitor123
-      - SYSNAME=rack15u04-e5760
-      - SYSID=600A098000F63714000000005E79C111
-      - API=6.6.6.6
-      - RETENTION_PERIOD=26w
-      - DB_ADDRESS=7.7.7.7
+      - RETENTION_PERIOD=52w
+      - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086
 ```
-
-Now we have:
-
-- `epa/docker-compose.yml` with InfluxDB and Grafana ready to start in the `EPA` directory (requires no changes, activated with `make run`)
-- `ntap-grafana-plugin/eseries_monitoring/collector:latest` image built with EPA's `make build`. You may copy this image to other hosts or upload to container registry
-- On this or other system: `collector/docker-compose.yml` where several Collector containers can be started to collect data from different E-Series arrays and send them to InfluxDB
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
 
-The original EPA exposes WSP (8080/tcp) and Grafana (3000/tcp) to the outside world.
+The original EPA exposes the SANtricity WSP (8080/tcp) and Grafana (3000/tcp) to the outside world.
 
 This fork does not have WSP. Grafana is the same (3000/tcp), but InfluxDB is now exposed on port 8086/tcp. The idea is you may run Collectors in various locations (closer to E-Series, for example) outside of the InfluxDB VM and send data to InfluxDB.
 
-To protect InfluxDB service, you may use your OS settings to open 8086/tcp to hosts where Collector will run. Collector itself does not need open inbound ports.
-
-### Start services
-
-- EPA is started with `make run` (which runs services using docker-compose)
-
-```sh
-# go to epa
-cd epa
-make run
-```
-
-- Inspect the output and make sure InfluxDB and Grafana are listening on ports 8086 and 3000, respectively. Login to Grafana with admin/admin.
-- Next start Collector (maybe you'll need to add `sudo`)
-
-```sh
-# go to collector
-cd collector
-docker-compose up
-```
-
-- If you see it working properly, hit CTRL+C and then run it with `docker-compose up -d` to have it run in the background
-- Collector containers don't listen on any ports, they only create outgoing connections to SANtricity API endpoints and InfluxDB
+To protect InfluxDB service, you may use your OS settings to open 8086/tcp to hosts where Collector will run. Collector and dbmanager do not need open inbound ports - both only connect to InfluxDB.
 
 ## Add or remove a monitored array
 
-To add a SANtricity array, change docker-compose.yml for Collector: make a copy of the sample directory, rename it (array3, for example) add another section in docker-compose.yml, and run `docker-compose up array3 -d`.
+To add a SANtricity array:
 
-To remove and array, `docker-compose down array3`. Then remove the folder and configuration section.
+- Go to `./collector`
+- Edit `docker-compose.yml` - if you copy-paste, make sure you get the variables and `container_name` right!
+- Edit `config.json` to add another record for the new array
+- `docker-compose down`
+- `make build`
+- `docker-compose up -d`
+
+To remove an array, remove it from `config.json` and `docker-compose.yml` and do the last three steps the same way.
 
 ## Update password for the monitor account
 
-Change it on SANtricity, run `docker-compose down array3`, change the password in docker-compose.yml, and start the container with `docker-compose up array3` to verify it's working, then hit CTRL+C to stop it and start it again with `-d`. 
+Let's say you want to change it for `R11U01-EF300`. Change it on the array, then find this array in `docker-compose.yml`, change the password in `PASSWORD=`, and run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`. 
 
-Collector containers are stateless and have no data that needs to be persisted to its own volume.
+The array name has not changed so we didn't need to edit `./collector/config.json` and rebuild `./collector/dbmanager`. That's why running `make build` wasn't necessary.
 
 ## Walk-through
 
 ### Build EPA
 
-- Run `make build` in `epa` and inspect images:
+- `cd epa && make build`:
 
 ```sh
-$ make build 
+# make build 
 
-$ docker images | grep ntap
-ntap-grafana/ansible                                 3.0               b5e28ea3de6e   18 minutes ago   384MB
-ntap-grafana/influxdb                                3.0               0de6bf41b550   21 minutes ago   173MB
-ntap-grafana/alpine-base                             3.0               5510f7cd5042   22 minutes ago   7.05MB
-ntap-grafana-plugin/eseries_monitoring/collector     latest            42f2438474b6   23 minutes ago   75.7MB
-ntap-grafana-plugin/eseries_monitoring/webservices   latest            6c1b94316eed   23 minutes ago   203MB
-ntap-grafana-plugin/eseries_monitoring/alpine-base   latest            5d17de7f905d   23 minutes ago   7.05MB
-ntap-grafana/python-base                             3.0               43b56b1ee660   24 minutes ago   50MB
-ntap-grafana-plugin/eseries_monitoring/python-base   latest            59f897165fca   6 hours ago      50MB
-ntap-grafana/grafana                                 3.0               00af3efd1202   5 weeks ago      287MB
+# docker images 
+REPOSITORY                                           TAG               IMAGE ID       CREATED              SIZE
+ntap-grafana-plugin/eseries_monitoring/python-base   latest            9d5f8085ab4a   51 seconds ago       50.1MB
+<none>                                               <none>            510d1a737cad   52 seconds ago       12.9MB
+ntap-grafana-plugin/eseries_monitoring/alpine-base   latest            85a1ebbfbc5e   54 seconds ago       7.05MB
+ntap-grafana/influxdb                                3.1               4c650d02806a   55 seconds ago       173MB
+ntap-grafana/ansible                                 3.1               94ee4e4a0405   About a minute ago   398MB
+<none>                                               <none>            bd3051fd74a4   About a minute ago   621MB
+ntap-grafana/python-base                             3.1               5216517bec73   2 minutes ago        50.1MB
+<none>                                               <none>            e9b76094f71d   2 minutes ago        12MB
 ```
 
-- Export collector (ntap-grafana-plugin/eseries_monitoring/collector:latest) image. If you have container registry, you may tag your collector image with own tags and upload to registry.
+- Build and run containers in `./collector`:
 
-```sh
-$ cd epa
-$ make export-plugins
+```
+$ pwd
+/home/sean/eseries-perf-analyzer/collector
 
-$ ll images/
-total 338148
--rw-r--r-- 1 sean sean   7354368 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-alpine-base.tar
--rw-r--r-- 1 sean sean  81607680 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-collector.tar
--rw-r--r-- 1 sean sean  53046272 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-python-base.tar
--rw-r--r-- 1 sean sean 204250624 Dec  5 10:41 ntap-grafana-plugin-eseries_monitoring-webservices.tar
+$ cat docker-compose.yml | grep name
+    container_name: dbmanager
+    container_name: R26U25-EF600
+    container_name: R24U04-E2824
+
+$ cat config.json
+{
+    "storage_systems": [
+        {
+            "name": "R26U25-EF600"
+        },
+        {
+            "name": "R24U04-E2824"
+        }
+    ]
+}
+
+$ make build
+
+$ docker-compose down && docker-compose up -d
+
+$ #expect one dbmanager and two collector containers that reflect names in config.json
+
+$ docker ps -a | grep monitoring 
+CONTAINER ID   IMAGE                                                     NAMES
+9d725fa1a756   ntap-grafana-plugin/eseries_monitoring/collector    R24U04-E2824
+1048f321d631   ntap-grafana-plugin/eseries_monitoring/collector    R26U25-EF600
+61d3cb5e83bc   ntap-grafana-plugin/eseries_monitoring/dbmanager    dbmanager
+
+$ # expect two containers listening on external ports - InfluxDB and Grafana
+
+$ docker ps -a | grep '0.0.0.0'
+95dd8ec86b82   ntap-grafana/grafana:3.0    0.0.0.0:3000->3000/tcp, :::3000->3000/tcp   grafana
+f00b858c0728   ntap-grafana/influxdb:3.0   0.0.0.0:8086->8086/tcp, :::8086->8086/tcp   influxdb
 ```
 
-- `make run` to start InfluxDB and Grafana. Collector will fail and exit because `docker-compose.yml` in the `epa/plugins/eseries_monitoring` sub-directory has incorrect ENV configuration (that's on purpose, we don't want to run that container by default). You can leave that container in place or remove it with `docker rm $CONTAINER_ID`).
-
-```sh
-$ cd epa
-$ make run 
-
-$ docker ps -a
-CONTAINER ID   IMAGE                       COMMAND                  CREATED          STATUS              PORTS                   NAMES
-533ace123ec4   collector:latest            "./docker-entrypoint…"   14 seconds ago   Exited (1) 13 seconds ago                                               collector
-46c4971c20a6   ntap-grafana/grafana:3.0    "/run.sh"                15 seconds ago   Up 14 seconds       0.0.0.0:3000->3000/tcp  grafana
-3af632f3645a   ntap-grafana/influxdb:3.0   "/entrypoint.sh /bin…"   15 seconds ago   Up 14 seconds       0.0.0.0:8086->8086/tcp  influxdb
-
-$ docker rm 533ace123ec4 # remove unnecessary collector container; we just wanted to build the collector image
-```
-
-- Notice (`PORTS`, in output just above) that Grafana and InfluxDB ports are open
 - Login to Grafana and change its admin password
-
-### Use collector
-
-- Use this cloned repository and work from the `collector` folder (not `epa` - the main purpose of this fork is to remove the risk of impacting EPA containers!).
-
-- Copy `epa/images/ntap-grafana-plugin-eseries_monitoring-collector.tar` to the VM where Collector will run and import the image. If you have uploaded it to internal registry, pull it instead.
-
-```sh
-$ cd epa/images
-$ docker load < ntap-grafana-plugin-eseries_monitoring-collector.tar
-Loaded image: ntap-grafana-plugin/eseries_monitoring/collector:latest
-```
-
-- In the `collector` folder, edit `docker-compose.yml` as explained earlier. Then start it, first without `-d` to make sure it works, then with `-d`.
-
-```sh
-$ docker-compose up
-[+] Running 2/0
- ⠿ Network collector_default  Created                              0.0s
- ⠿ Container rack26u25-ef600  Created                              0.0s
-0.0s 
-Attaching to rack26u25-ef600
-rack26u25-ef600  | 2022-12-06 06:16:08,058 - collector - INFO - rack26u25-ef600
-rack26u25-ef600  | 2022-12-06 06:16:08,058 - collector - INFO - Collecting system folder information...
-rack26u25-ef600  | 2022-12-06 06:16:08,452 - collector - INFO - Time interval: 60.0000 Time to collect and send: 00.3967 Iteration: 1
-rack26u25-ef600  | 2022-12-06 06:17:08,134 - collector - INFO - rack26u25-ef600
-rack26u25-ef600  | 2022-12-06 06:17:08,380 - collector - INFO - Time interval: 60.0000 Time to collect and send: 00.2645 Iteration: 2
-```
-
-- Above we see that our E-Series API is being accessed, array ("folder" is a remnant of old WSP function) information sent to InfluxDB and iterations show two successful rounds of collection (enabled with `-i`)
-- To stop all Collector containers when `-d` is used, run `docker-compose stop $CONTAINER_NAME`. To stop and *remove* the container, use `down $CONTAINER_NAME`:
-
-```sh
-$ docker-compose down
-[+] Running 2/0
- ⠿ Container rack26u25-ef600  Removed                              0.0s
- ⠿ Network collector_default  Removed                              0.0s 
-```
-
-- If you rebuild the container in a VM where you have EPA, you can run `down` as per above to remove old collector container(s), then `up -d` to start them based on latest image. Just don't run `docker-compose down` in the `epa` folder (that would remove InfluxDB and Grafana)!
-
-### Use collector Docker Hub image 
-
-- Let's say you figured out InfluxDB on your own and just want a ready-made collector image that doesn't use WSP. You should build it on your own as explained in Q&A, but if you want a quick try:
-
-```sh
-$ docker pull scaleoutsean/epa-collector:v3.0.0
-v3.0.0: Pulling from scaleoutsean/epa-collector
-Digest: sha256:2ceca8e7a10ad9ddc31bdbf07baeeec843188642d39197b47252df1ac62d012c
-Status: Downloaded newer image for scaleoutsean/epa-collector:v3.0.0
-docker.io/scaleoutsean/epa-collector:v3.0.0
-```
-
-- Go to the collector folder with `cd collector` and edit `docker-compose.yml` to use `image: scaleoutsean/epa-collector:v3.0.0` (not `:latest`)
-
-```yaml
-version: '3.6'
-
-services:
-
-  collector-rack26u25-ef600:
-    # image: ntap-grafana-plugin/eseries_monitoring/collector:latest 
-    image: scaleoutsean/epa-collector:v3.0.0
-```
-
-- Edit environment variables (username, password, etc.) and run Collector with `docker-compose up`.
 
 ## Sample Grafana screenshots of EPA/Collector dashboards
 
@@ -331,95 +258,69 @@ This fork's dashboards are identical to upstream, but upstream repository has no
 
 ![E-Series Volumes.png](/sample-screenshot-epa-collector-volumes.png)
 
-
 ## Tips and questions
 
 Below details are mostly related to this fork. For upstream details please check their read-me file.
 
 **Q:** Why do I need to fill in so many details in Collector's YAML file? 
 
-**A:** Because it's simple. If you fill it out correctly, it will work. If you don't, it won't. There should be no other place to troubleshoot.
+**A:** I think it lowers the possibility of making a mistake and if collector containers run on different machines, each will still need its own config file. But users are free to make changes as you see fit.
 
-**Q:** It's not convenient for me to have multiple storage admins edit `collector/docker-compose.yml` 
+**Q:** It's not convenient for me to have multiple storage admins edit `./collector/docker-compose.yml` 
 
 **A:** The whole point of separating Collector from EPA is that centralization can be avoided, so when there's no one "storage team" that manages all arrays, each admin can have their own.
 
-```sh
-somedir
-  epa                # VM1
-  collector1/arrayA  # can run on VM2
-  collector2/arrayB1 # can run on VM3
-  collector2/arrayB2 # can also run on VM3
-```
-
 **Q:** How to modify Collector's Docker image? 
 
-**A:** If you want to use EPA to build like in walk-through below, you can modify it in `epa/plugins/eseries_monitoring/collector`. You can also use the one in `collector/rack26u25-ef600`, but as mentioned elsewhere it uses python-base image from EPA so you still need to run `make build` and such in the `epa` directory. The difference is: the former approach can break `Makefile` scripts (i.e. if you mess up Collector build, `make build` won't work). The latter cannot, so it's easier to experiment with.
+**A:** Any way you want. Example: `cp -pr ./collector/collector ./collector/mycollector', then edit your container, build it, change ./collector/docker-compose.yml` and `./collector/config.json` to make sure it's used. Finally, run `make run` followed by `docker-compose up $mycollector`. 
 
 **Q:** This looks complicated... 
 
-**A:** If you can't handle it, install InfluxDB any way you can/want, run Collector from the CLI (`python3 collector/rack26u25-ef600/collector.py -h`). Create a data source (InfluxDB) for Grafana and add your own dashboards or try to replicate EPA's configuration by looking at the source code, configuration files and exported dashboard JSON files.
+**A:** If you can't handle it, install InfluxDB any way you can/want, run Collector from the CLI (`python3 ./collector/collector/collector.py -h`). Create a data source (InfluxDB) for Grafana and add your own dashboards or try to replicate EPA's configuration by looking at the source code, configuration files and exported dashboard JSON files.
 
 **Q:** Why can't we have one config.json for all monitored arrays? 
 
-**A:** See the first answer. In this approach there may be different people managing different arrays. Each can run their own Collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password) without touching InfluxDB and Grafana.
+**A:** There may be different people managing different arrays. Each can run their own Collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password) without touching InfluxDB and Grafana.
 
-**Q:** I first (or "I only") tried to build Collector container and it failed. 
+**Q:** If I have three arrays, two VMs with collectors and these send data to one InfluxDB, do I need to run 1, 2 or 3 dbmanager containers?
 
-**A:** Then don't do that. Collector uses a base image from EPA, so EPA must be built (`make build`) first or you could edit Collector's Dockerfile, or you could build Collector on EPA InfluxDB VM and then upload Collector image to your registry to let all collector runners avoid the need to build EPA and Collector.
+**A:** Just one dbmanager is needed if you have one InfluxDB. 
 
-**Q:** What if I run existing upstream EPA v3.0.0? Can I add more E-Series arrays without using WSP 
+**Q:** What does dbmanager actually do?
 
-**A**: Yes. You need to modify InfluxDB to listen on an external and port 8086/tcp, and then just build and configure this fork EPA and Collector, and run only Collector's docker-compose. All arrays are put in "All Storage Systems" and if System Names and WWN's are unique they shouldn't collide with existing storage systems and WSP's "folders".
+**A:** It just creates a drop-down list of arrays in EPA's Grafana dashboards. It's a stupid reason to run a container, but previously (upstream EPA and this EPA fork v3.0.0) EPA got its list of arrays from the WSP and it "knew" which arrays are being monitored. Here we could have collector containers running in several places and none of them know what other containers exist out there. dbmanager is there to gather that list and periodically push it to InfluxDB, while dropping other folders which no longer need to be monitored. If we didn't want to remove other folders from the menu, we could have the code in each collector (just add own folder, and don't worry about dropping anything) but I think the idea behind dropping older folders was to decrease database bloat and that's why it's in there. If you have a better idea or know that's unnecessary, feel free to submit a pull request. InfluxDB v1 is old so I'm not in a mood to devise new ways to deal with it.
 
-**Q:** What if I run own InfluxDB v1.8 and Grafana v8? Can I use Collector without EPA? 
+**Q:** I run existing upstream EPA v3.0.0. Can I add more E-Series arrays without using WSP?
 
-**A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on WSP. Just build this fork of EPA and Collector container, and then run just Collector's docker-compose. Note that this Collector doesn't support InfluxDB v2, a bit of additional work would be required for that.
+**A**: It could be done, but it's complicated because dbmanager.py now drops folder tags for arrays it's not aware of. It's too much trouble, I think.
 
-**Q:** Since this EPA builds collector container, why can't I just run that one like upstream does? 
+**Q:** What if I run my own InfluxDB v1.8 and Grafana v8? Can I use this Collector without EPA?
 
-**A:** It's probably possible - you can specify the right image and environment variables in `epa/plugins/eseries_monitoring/docker-compose.yaml` and try `make run` - but that hasn't been tested because the purpose of this fork is (1) to dis-entangle Collector from InfluxDB and Grafana, and (2) be able to run multiple collectors, which is easier from the collector folder than from the epa folder.
+**A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on the WSP. Just build this fork of EPA and Collector container, and then run just Collector's docker-compose. Note that this Collector doesn't support InfluxDB v2 - additional work would be required for that.
 
-**Q:** Where's my InfluxDB?
+**Q:** Where's my InfluxDB data?
 
-**A:** It is created in `epa/influx-database` on first successful run of EPA (`make run`). 
+**A:** It is the `epa/influx-database` sub-directory and created on first successful run of EPA (`make run`). 
 
-**Q:** Where's my Grafana data? 
+**Q:** Where's my Grafana data? I see nothing when I look at the dashboards!
 
-**A:** It uses a local Docker volume - see `epa/docker-compose.yml`. 
+**A:** It uses a local Docker volume, `epa/docker-compose.yml`. Grafana data can't be seen in dahboards until Collector successfully runs and sends it to InfluxDB. `dbmanager` also must create Influx "folders" (system tags, actually) that let you select arrays for which collector collects data.
 
 **Q:** How much memory does each Collector container need? 
 
 **A:** It my testing, much less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
 
-**Q:** `collector.py` looks messy. 
-
-**A**: Yes. I couldn't spend more time on this. Please improve it and submit a pull request, it will be appreciated.
-
 **Q:** Can I run Collector without containers? 
 
-**A:** Yes. Run collector.py in the sample directory with `-h` or try this with own variables:
+**A:** Yes. Run `db_manager.py - h` and `collector.py -h`. Example:
 
 ```sh
-python3 collector/rack26u25-ef600/collector.py \
+python3 collector/R26U25-EF600/collector.py \
   -u ${USERNAME} -p ${PASSWORD} \
   --api ${API} \
   --dbAddress ${DB_ADDRESS}:8086 \
   --retention ${RETENTION_PERIOD} \
   --sysname ${SYSNAME} --sysid ${SYSID} \
-  -i -s
-```
-
-Example for array2 above (remember, `rack15u04-e5760` should correspond to System Name in SANtricity Web UI and the same goes for WWN, to avoid confusion:
-
-```sh
-python3 collector/array3/collector.py \
-  -u monitor -p monitor123 \
-  --api 5.5.5.5 \
-  --dbAddress 7.7.7.7:8086 \
-  --retention 26w \
-  --sysname rack15u04-e5760 \
-  --sysid 600A098000F63714000000005E79C888 \
   -i -s
 ```
 
@@ -429,7 +330,7 @@ python3 collector/array3/collector.py \
 
 **Q:** I tried to run Collector on the same host as EPA InfluxDB and Grafana, and `--dbAddress localhost:8086` (or `DB_ADDRESS=7.7.7.7`) doesn't work. Why? 
 
-**A:** Because InfluxDB is not running on `localhost`, but on `influxdb` (`epa/docker-compose.yaml`). Change the value to `--dbAddress influxdb:8086` (`DB_ADDRESS=influxdb`) when running Collector in Docker on the same host as EPA.
+**A:** Because InfluxDB is not listening on `localhost`, but on `influxdb` interface. If you're on the same host you can use the external IPv4 address of InfluxDB VM (`--dbAddress 7.7.7.7:8086`).
 
 **Q:** Can E-Series' WWN change?
 
@@ -437,4 +338,4 @@ python3 collector/array3/collector.py \
 
 ## Component versions
 
-This fork of EPA v3.0.0 was tested with E-Series SANtricity 11.74 and current Docker CE. It should work with other recent SANtricity versions and Docker CE.
+This fork of EPA v3.1 was tested with E-Series SANtricity 11.74, current Docker CE, Docker Compose v1, and Ubuntu 22.04. It should work with other recent SANtricity versions and Linux distributions.
