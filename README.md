@@ -66,7 +66,7 @@ docker-compose up -d
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
-- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/sysname-in-santricity-manager.png) and [this](/sysid-in-santricity-manager.png) screenshot. Although that can create confusion, but SYSNAME can be arbitrary; just keep the names in `./collector/docker-compose.yml` and `./collector/config.json` consistent!
+- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/images/sysname-in-santricity-manager.png) and [this](/images/sysid-in-santricity-manager.png) screenshot. Although that can create confusion, but SYSNAME can be arbitrary; just keep the names in `./collector/docker-compose.yml` and `./collector/config.json` consistent!
 
 - `container_name` to match the name in `./collector/config.json`:
 
@@ -244,25 +244,25 @@ This fork's dashboards are identical to upstream, but upstream repository has no
 
 - System view
 
-![E-Series System](/sample-screenshot-epa-collector-system.png)
+![E-Series System](/images/sample-screenshot-epa-collector-system.png)
 
 - Array interfaces
 
-![E-Series Array Interfaces.png](/sample-screenshot-epa-collector-interfaces.png)
+![E-Series Array Interfaces.png](/images/sample-screenshot-epa-collector-interfaces.png)
 
 This screenshot shows *aggregate* values. Further below there are other charts with individual metrics.
 
 - Physical disks 
 
-![E-Series Physical Disks.png](/sample-screenshot-epa-collector-disks.png)
+![E-Series Physical Disks.png](/images/sample-screenshot-epa-collector-disks.png)
 
 - Logical volumes
 
-![E-Series Volumes.png](/sample-screenshot-epa-collector-volumes.png)
+![E-Series Volumes.png](/images/sample-screenshot-epa-collector-volumes.png)
 
 - Physical disks - SSD wear level (%)
 
-![E-Series SSD Wear Level](/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
+![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
 This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, a recent SANtricity 11.7 (e.g. 11.74) with at least one SSD are required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values.
 
