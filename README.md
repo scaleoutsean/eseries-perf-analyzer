@@ -61,13 +61,12 @@ docker-compose up -d
   - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - PASSWORD - SANtricity password for the account used to monitor
   - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be viewed [in this image](/images/sysname-in-santricity-manager.png)
-  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png).
+  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png)
   - API - SANtricity controller's IP address such as 6.6.6.6
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
-
-- Where to find values of API, SYSNAME and SYSID? The API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above. 
-  - For consistency it is recommended that SYSNAME in EPA is the same as actual sysname, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (plus `_` and `-`; if interested please check the Docker Compose documentation): just make sure array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent
+- Where to find the correct values for API, SYSNAME and SYSID? The API addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above
+  - For consistency's sake it is recommended that SYSNAME in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent, or otherwise array metrics and events may get collected, but the name won't appear in array drop-down list in Grafana dashboard
 
 - `container_name` to match the name in `./collector/config.json`:
 
