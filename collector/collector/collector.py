@@ -22,29 +22,16 @@ from influxdb.exceptions import InfluxDBClientError
 DEFAULT_USERNAME = 'monitor'
 DEFAULT_PASSWORD = 'monitor123'
 
-# global DEFAULT_SYSTEM_NAME
-# global DEFAULT_SYSTEM_ID
-# global sys_name
-# global sys_id
-# DEFAULT_SYSTEM_NAME = 'rack26u25-ef600'
-# DEFAULT_SYSTEM_ID = '600A098000F63714000000005E79C888'
-# DEFAULT_SYSTEM_API_IP = '5.5.5.5'
 DEFAULT_SYSTEM_NAME = ''
 DEFAULT_SYSTEM_ID = ''
 DEFAULT_SYSTEM_API_IP = ''
 
 DEFAULT_SYSTEM_PORT = '8443'
-# DEFAULT_SYSTEM_EP = 'https://' + DEFAULT_SYSTEM_API_IP + \
-#    ':' + DEFAULT_SYSTEM_PORT + '/devmgr/v2/storage-systems'
 
 INFLUXDB_HOSTNAME = 'influxdb'
 INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
-
-# NOTE(bdustin): time in seconds between folder collections
-# FOLDER_COLLECTION_INTERVAL = 86400*365*10
-# FOLDER_COLLECTION_INTERVAL = 120
 
 __version__ = '1.0'
 
@@ -318,17 +305,6 @@ def get_controller():
     return (storage_controller_ep)
 
 
-# def get_system_name(sys):
-    #sys_id = CMD.sysid
-    #sys_name = CMD.sysname
-    #if not sys_name or len(sys_name) <= 0:
-    #    sys_name = sys_id
-    #if not sys_name or len(sys_name) <= 0:
-    #    sys_name = DEFAULT_SYSTEM_NAME
-    #    sys_id = DEFAULT_SYSTEM_ID
-    #return sys_name, sys_id
-
-
 def get_drive_location(sys_id, session):
     """
     :param sys_id: Storage system ID (WWN) on the controller
@@ -366,10 +342,6 @@ def collect_storage_metrics(sys):
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
-
-        # sys_name = (get_system_name(sys))[0]
-        # sys_id = (get_system_name(sys))[1]
-
         json_body = list()
 
         drive_stats_list = session.get(("{}/{}/analysed-drive-statistics").format(
@@ -380,9 +352,18 @@ def collect_storage_metrics(sys):
                 location_send = drive_locations.get(stats["diskId"])
                 LOG.info(("Tray{:02.0f}, Slot{:03.0f}").format(
                     location_send[0], location_send[1]))
+        
+        drive_phys_stats_list = session.get(("{}/{}/drives").format(
+            get_controller(), sys_id)).json()
+        
 
         for stats in drive_stats_list:
             disk_location_info = drive_locations.get(stats["diskId"])
+            # find physicl drive that matches stats['trayRef'] and stats['driveSlot']
+            for pdrive in drive_phys_stats_list:
+                if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
+                    pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
+            fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
             disk_item = dict(
                 measurement="disks",
                 tags=dict(
@@ -391,9 +372,7 @@ def collect_storage_metrics(sys):
                     sys_tray=("{:02.0f}").format(disk_location_info[0]),
                     sys_tray_slot=("{:03.0f}").format(disk_location_info[1])
                 ),
-                fields=dict(
-                    (metric, stats.get(metric)) for metric in DRIVE_PARAMS
-                )
+                fields= fields_dict
             )
             if CMD.showDriveMetrics:
                 LOG.info("Drive payload: %s", disk_item)
@@ -476,9 +455,6 @@ def collect_major_event_log(sys):
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
-
-        # sys_name = get_system_name(sys)[0]
-        # sys_id = get_system_name(sys)[1]
         json_body = list()
         start_from = -1
         mel_grab_count = 8192
