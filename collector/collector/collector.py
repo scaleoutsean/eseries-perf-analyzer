@@ -359,7 +359,7 @@ def collect_storage_metrics(sys):
 
         for stats in drive_stats_list:
             disk_location_info = drive_locations.get(stats["diskId"])
-            # find physicl drive that matches stats['trayRef'] and stats['driveSlot']
+            # find physical drive that matches stats['trayRef'] and stats['driveSlot']
             for pdrive in drive_phys_stats_list:
                 if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
                     pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})

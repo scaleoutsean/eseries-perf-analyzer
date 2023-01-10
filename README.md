@@ -160,14 +160,16 @@ The array name has not changed, so it wasn't necessary to edit `./collector/conf
 
 ## Walk-through
 
-### Build EPA
+- If collector and dbmanager run on a different host, create firewall rules to open 8086/tcp only to collector clients, and 3000/tcp (Grafana) only to users allowed to access Grafana (even better, deploy a reverse proxy with TLS to protect Grafana)
 
-- `cd epa && make build`:
+- Build and run InfluxDB and Grafana:
 
 ```sh
-# make build 
+$ cd epa
 
-# docker images 
+$ make build 
+
+$ docker images 
 REPOSITORY                                           TAG               IMAGE ID       CREATED              SIZE
 ntap-grafana-plugin/eseries_monitoring/python-base   latest            9d5f8085ab4a   51 seconds ago       50.1MB
 <none>                                               <none>            510d1a737cad   52 seconds ago       12.9MB
@@ -177,18 +179,32 @@ ntap-grafana/ansible                                 3.1               94ee4e4a0
 <none>                                               <none>            bd3051fd74a4   About a minute ago   621MB
 ntap-grafana/python-base                             3.1               5216517bec73   2 minutes ago        50.1MB
 <none>                                               <none>            e9b76094f71d   2 minutes ago        12MB
+
+$ make run    # runs: docker-compose up -d
+
+$ # expect to see two containers listening on external ports - InfluxDB and Grafana
+
+$ docker ps -a | grep '0.0.0.0'
+95dd8ec86b82   ntap-grafana/grafana:3.0    0.0.0.0:3000->3000/tcp, :::3000->3000/tcp   grafana
+f00b858c0728   ntap-grafana/influxdb:3.0   0.0.0.0:8086->8086/tcp, :::8086->8086/tcp   influxdb
 ```
 
-- Build and run containers in `./collector`:
+- Login to Grafana with admin/admin and change admin password. At this point you're not supposed to see anything in the EPA dashboards
 
-```
+- Go to top-level collector directory to build Collector-related containers
+
+```sh
 $ pwd
 /home/sean/eseries-perf-analyzer/collector
+
+$ # edit docker-compose.yml and config.json
 
 $ cat docker-compose.yml | grep name
     container_name: dbmanager
     container_name: R26U25-EF600
     container_name: R24U04-E2824
+
+$ # ensure container names in docker-compose.yml and system names in config.json are consistent
 
 $ cat config.json
 {
@@ -203,25 +219,24 @@ $ cat config.json
 }
 
 $ make build
+```
 
-$ docker-compose down && docker-compose up -d
+- `make build` builds two containers, collector & dbmanager, and copies `config.json` to `./collector/dbmanager/config.json`
+- There should be two new container images (collector & dbmanager) used by two or more containers (here three, because there are two arrays)
 
-$ #expect one dbmanager and two collector containers that reflect names in config.json
-
+```sh
 $ docker ps -a | grep monitoring 
-CONTAINER ID   IMAGE                                                     NAMES
+CONTAINER ID   IMAGE                                               NAMES
 9d725fa1a756   ntap-grafana-plugin/eseries_monitoring/collector    R24U04-E2824
 1048f321d631   ntap-grafana-plugin/eseries_monitoring/collector    R26U25-EF600
 61d3cb5e83bc   ntap-grafana-plugin/eseries_monitoring/dbmanager    dbmanager
-
-$ # expect two containers listening on external ports - InfluxDB and Grafana
-
-$ docker ps -a | grep '0.0.0.0'
-95dd8ec86b82   ntap-grafana/grafana:3.0    0.0.0.0:3000->3000/tcp, :::3000->3000/tcp   grafana
-f00b858c0728   ntap-grafana/influxdb:3.0   0.0.0.0:8086->8086/tcp, :::8086->8086/tcp   influxdb
 ```
 
-- Login to Grafana and change its admin password
+- Stop any existing Collector collectors and start new (or updated) containers
+
+```sh
+$ docker-compose down && docker-compose up 
+```
 
 ## Sample Grafana screenshots of EPA/Collector dashboards
 
@@ -235,6 +250,8 @@ This fork's dashboards are identical to upstream, but upstream repository has no
 
 ![E-Series Array Interfaces.png](/sample-screenshot-epa-collector-interfaces.png)
 
+This screenshot shows *aggregate* values. Further below there are other charts with individual metrics.
+
 - Physical disks 
 
 ![E-Series Physical Disks.png](/sample-screenshot-epa-collector-disks.png)
@@ -242,6 +259,12 @@ This fork's dashboards are identical to upstream, but upstream repository has no
 - Logical volumes
 
 ![E-Series Volumes.png](/sample-screenshot-epa-collector-volumes.png)
+
+- Physical disks - SSD wear level (%)
+
+![E-Series SSD Wear Level](/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
+
+This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, a recent SANtricity 11.7 (e.g. 11.74) with at least one SSD are required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values.
 
 ## Tips and Q&A
 
@@ -323,4 +346,4 @@ python3 ./collector/collector/collector.py \
 
 ## Component versions
 
-This fork of EPA v3.1 was tested with E-Series SANtricity 11.74, current Docker CE, Docker Compose v1, and Ubuntu 22.04. It should work with other recent SANtricity versions and Linux distributions.
+This fork of EPA was tested with E-Series SANtricity 11.74, current Docker CE, Docker Compose v1, and Ubuntu 22.04. It should work with other recent SANtricity versions and Linux distributions.
