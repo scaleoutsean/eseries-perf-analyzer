@@ -60,13 +60,14 @@ docker-compose up -d
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - PASSWORD - SANtricity password for the account used to monitor
-  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be found [here](https://github.com/scaleoutsean/eseries-perf-analyzer/blob/master/images/sysname-in-santricity-manager.png)
-  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - [this detail](https://github.com/scaleoutsean/images/eseries-perf-analyzer/blob/master/sysid-in-santricity-manager.png) can be found in the SANtricity Web UI
+  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be viewed [in this image](/images/sysname-in-santricity-manager.png)
+  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png).
   - API - SANtricity controller's IP address such as 6.6.6.6
   - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
   - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 
-- Where to find values of API, SYSNAME and SYSID? API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser. For SYSNAME and SYSID see [this](/images/sysname-in-santricity-manager.png) and [this](/images/sysid-in-santricity-manager.png) screenshot. Although that can create confusion, but SYSNAME can be arbitrary; just keep the names in `./collector/docker-compose.yml` and `./collector/config.json` consistent!
+- Where to find values of API, SYSNAME and SYSID? The API are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above. 
+  - For consistency it is recommended that SYSNAME in EPA is the same as actual sysname, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (plus `_` and `-`; if interested please check the Docker Compose documentation): just make sure array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent
 
 - `container_name` to match the name in `./collector/config.json`:
 
