@@ -264,7 +264,7 @@ This screenshot shows *aggregate* values. Further below there are other charts w
 
 ![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
-This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, a recent SANtricity 11.7 (e.g. 11.74) with at least one SSD are required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values.
+This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity 11.7 (e.g. 11.74) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are not collected from the E2824 array which happens to have SANtricity 11.50 and no SSD disks.
 
 ## Tips and Q&A
 
@@ -314,13 +314,17 @@ Below details are mostly related to this fork. For upstream details please check
 
 **A:** It uses a local Docker volume, `epa/docker-compose.yml`. Grafana data can't be seen in dahboards until Collector successfully runs and sends it to InfluxDB. `dbmanager` also must create Influx "folders" (system tags, actually) that let you select arrays for which collector collects data.
 
+**Q:** If I use my own Grafana, do I need to recreate EPA dashboards from scratch?
+
+**A:** It should be possible to create an identically named data source (to connect to InfluxDB) and import dashboards from `epa/plugins/eseries_monitoring/dashboards`. Grafana 9 users need to do the same, but may also have to [make minor edits](https://github.com/grafana/grafana/discussions/45230) to Grafana 8 dashboards.
+
 **Q:** How much memory does each Collector container need? 
 
 **A:** It my testing, much less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
 
-**Q:** Can I run Collector without containers? 
+**Q:** How to use Collector outside of a containers? 
 
-**A:** Yes. Run `db_manager.py - h` and `collector.py -h`. Example:
+**A:** Run `db_manager.py - h` and `collector.py -h`. Example for the latter:
 
 ```sh
 python3 ./collector/collector/collector.py \
