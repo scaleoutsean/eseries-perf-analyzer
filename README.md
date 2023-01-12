@@ -17,6 +17,13 @@ Additionally, minor differences include:
 
 ## How to use this fork
 
+### Requirements
+
+- SANtricity OS >= 11.52 (soft; 11.52 and 11.74 have been tested 11.6* not yet)
+- Docker CE 20.10.22 (soft; recent Docker CE or Podman should work)
+- Docker Compose (soft; both v1 and v2 should work)
+- Ubuntu 22.04 (soft; other recent Linux OS should work)
+
 ### Summary
 
 - `epa`: Build and run InfluxDB and Grafana in the `epa` sub-directory. These containers are from the original EPA and include Grafana dashboards.
@@ -25,10 +32,10 @@ Additionally, minor differences include:
 
 ### Build containers and create configuration files
 
-- If you have existing EPA, images, volumes and service ports may cause container name and port conflicts. Either use a new VM or run `make clean` and `docker-compose down` to stop and remove old containers.
+- Older existing EPA, images, volumes and service ports may cause container name and port conflicts. Either use a new VM or run `make stop; docker-compose down; make rm` to stop and remove old containers before building new ones. Data (InfluxDB and Grafana) can be left in place.
 - Clone the repository
-- Descend into `epa`, run `make start` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces.
-- Go to `collector` subdirectory, edit two files (config.json and docker-compose.yml) and run `make build` to create containers.
+- Descend to the `epa` directory, run `make run` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces so set up firewall accordingly.
+- Go to `collector` directory, edit two files (`config.json` and `docker-compose.yml`) and run `make build` to create containers and `docker-compose up` to start them.
 
 ```sh
 git clone github.com/scaleoutsean/eseries-perf-analyzer
@@ -54,17 +61,17 @@ docker-compose up -d
 # collector.py and db_manager.py can be started from the CLI for easier troubleshooting.
 ```
 
-- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, rm, restart these two.
+- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two.
 - `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
 
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
-  - USERNAME - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
-  - PASSWORD - SANtricity password for the account used to monitor
-  - SYSNAME - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be viewed [in this image](/images/sysname-in-santricity-manager.png)
-  - SYSID - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png)
-  - API - SANtricity controller's IP address such as 6.6.6.6
-  - RETENTION_PERIOD - data retention in InfluxDB, such as 52w (52 weeks)
-  - DB_ADDRESS - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
+  - `USERNAME` - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
+  - `PASSWORD` - SANtricity password for the account used to monitor
+  - `SYSNAME` - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be viewed [in this image](/images/sysname-in-santricity-manager.png)
+  - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png)
+  - `API` - SANtricity controller's IP address such as 6.6.6.6
+  - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
+  - `DB_ADDRESS` - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 - Where to find the correct values for API, SYSNAME and SYSID? The API addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above
   - For consistency's sake it is recommended that SYSNAME in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent, or otherwise array metrics and events may get collected, but the name won't appear in array drop-down list in Grafana dashboard
 
@@ -141,7 +148,7 @@ To protect InfluxDB service, you may use your OS settings to open 8086/tcp to ho
 
 ## Add or remove a monitored array
 
-To add a SANtricity array:
+To add a SANtricity array, we don't need to do anything in the `epa` subdirectory.
 
 - Go to `./collector`
 - Edit `docker-compose.yml` - if you copy-paste, make sure you get the variables and `container_name` right!
@@ -264,7 +271,7 @@ This screenshot shows *aggregate* values. Further below there are other charts w
 
 ![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
-This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity 11.7 (e.g. 11.74) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are not collected from the E2824 array which happens to have SANtricity 11.50 and no SSD disks.
+This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are not collected from the E2824 array which happens to have SANtricity 11.50 and no SSD disks.
 
 ## Tips and Q&A
 
@@ -298,9 +305,9 @@ Below details are mostly related to this fork. For upstream details please check
 
 **A:** It just creates a drop-down list of arrays in EPA's Grafana dashboards. It's a stupid reason to run a container, but previously (upstream EPA and this EPA fork v3.0.0) EPA got its list of arrays from the WSP and it "knew" which arrays are being monitored. Here we could have collector containers running in several places and none of them know what other containers exist out there. dbmanager is there to gather that list and periodically push it to InfluxDB, while dropping other folders which no longer need to be monitored. If we didn't want to remove other folders from the menu, we could have the code in each collector (just add own folder, and don't worry about dropping anything) but I think the idea behind dropping older folders was to decrease database bloat and that's why it's in there. If you have a better idea or know that's unnecessary, feel free to submit a pull request. InfluxDB v1 is old so I'm not in a mood to devise new ways to deal with it.
 
-**Q:** I run existing upstream EPA v3.0.0. Can I add more E-Series arrays without using WSP?
+**Q:** I have existing upstream EPA v3.0.0. Can I add more E-Series arrays without using WSP?
 
-**A**: It could be done, but it's complicated because dbmanager.py now drops folder tags for arrays it's not aware of. It's too much trouble, I think.
+**A**: It could be done, but it's complicated because dbmanager.py now drops folder tags for arrays it's not aware of. It's too much trouble. Best to remove that and you can probably retain all data. EPA v3.0.0 dashboards and InfluxDB have not been modified in this fork's v3.1.0.
 
 **Q:** What if I run my own InfluxDB v1.8 and Grafana v8? Can I use this Collector without EPA?
 
@@ -338,16 +345,9 @@ python3 ./collector/collector/collector.py \
 
 **Q:** What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? 
 
-**A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to the other controller and restart the collector container. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin requests to two controllers. Then if one fails you should see 50% less metric delivered to Grafana, and get a hint. I haven't tried multiple controllers in docker-compose.yaml, but I'd first try `API=5.5.5.1 5.5.5.2`.
+**A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to the other controller and restart the collector container. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin requests to two controllers. If one fails you should see 50% less metric delivered to Grafana, and get a hint. Or, in docker-compose.yaml: `API=5.5.5.1 5.5.5.2`.
 
-**Q:** I tried to run Collector on the same host as EPA InfluxDB and Grafana, and `--dbAddress localhost:8086` (or `DB_ADDRESS=7.7.7.7`) doesn't work. Why? 
-
-**A:** Because InfluxDB is not listening on `localhost`, but on `influxdb` interface. If you're on the same host you can use the external IPv4 address of InfluxDB VM (`--dbAddress 7.7.7.7:8086`).
-
-**Q:** Can E-Series' WWN change?
+**Q:** Can the E-Series' WWN change?
 
 **A:** Normally it can't, but it's theoretically [possible](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/E-Series_SANtricity_Software_Suite/WWNs_changed_after_offline_replacement_of_tray_0). Should that happen you'd have to update your configuration and restart Collector container.
 
-## Component versions
-
-This fork of EPA was tested with E-Series SANtricity 11.74, current Docker CE, Docker Compose v1, and Ubuntu 22.04. It should work with other recent SANtricity versions and Linux distributions.

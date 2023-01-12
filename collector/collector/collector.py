@@ -311,7 +311,7 @@ def get_controller(query):
         storage_controller_ep = 'https://' + \
             CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
             api_path
-        LOG.warn(("Controller selection: {}").format(storage_controller_ep))
+        LOG.info(("Controller selection: {}").format(storage_controller_ep))
     return (storage_controller_ep)
 
 
