@@ -257,7 +257,7 @@ else:
     sys_id = CMD.sysid
 
 if CMD.dbAddress == '' or CMD.dbAddress == None:
-    LOG.warning("InfluxDB server was not provided. Default setting (influxdb:8086) works only when collector and InfluxDB are on same host")
+    LOG.warning("InfluxDB server was not provided. Default setting (influxdb:8086) works only when collector and InfluxDB containers are on same host")
     influxdb_host = INFLUXDB_HOSTNAME
     influxdb_port = INFLUXDB_PORT
 else:
@@ -289,19 +289,29 @@ def get_session():
     return request_session
 
 
-def get_controller():
+def get_controller(query):
+    """
+    Returns a SANtricity API URL with param-based path.
+    :return: Returns a SANtricity API URL path string to storage-systems or firmware
+    """
+    if query == "sys":
+        api_path = '/devmgr/v2/storage-systems'
+    elif query == "fw":
+        api_path = '/devmgr/v2/firmware/embedded-firmware'
+    else:
+        LOG.error("Unsupported API path requested")
     if (len(CMD.api) == 0) or (CMD.api == None) or (CMD.api == ''):
         storage_controller_ep = 'https://' + \
-            DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + '/devmgr/v2/storage-systems'
+            DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + api_path 
     elif (len(CMD.api) == 1):
         storage_controller_ep = 'https://' + \
-            CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + \
-            '/devmgr/v2/storage-systems'
+            CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + api_path
     else:
         controller = random.randrange(0, 2)
         storage_controller_ep = 'https://' + \
             CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
-            '/devmgr/v2/storage-systems'
+            api_path
+        LOG.warn(("Controller selection: {}").format(storage_controller_ep))
     return (storage_controller_ep)
 
 
@@ -313,7 +323,7 @@ def get_drive_location(sys_id, session):
     the tray id it is located in:
     """
     hardware_list = session.get("{}/{}/hardware-inventory".format(
-        get_controller(), sys_id)).json()
+        get_controller("sys"), sys_id)).json()
     tray_list = hardware_list["trays"]
     drive_list = hardware_list["drives"]
     tray_ids = {}
@@ -328,7 +338,7 @@ def get_drive_location(sys_id, session):
         if tray_id != "none":
             drive_location[drive["driveRef"]] = [
                 tray_id, drive["physicalLocation"]["slot"]]
-        else:
+        else:   
             LOG.error("Error matching drive to a tray in the storage system")
     return drive_location
 
@@ -343,27 +353,46 @@ def collect_storage_metrics(sys):
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-
         drive_stats_list = session.get(("{}/{}/analysed-drive-statistics").format(
-            get_controller(), sys_id)).json()
+            get_controller("sys"), sys_id)).json()
         drive_locations = get_drive_location(sys_id, session)
         if CMD.showDriveNames:
             for stats in drive_stats_list:
                 location_send = drive_locations.get(stats["diskId"])
                 LOG.info(("Tray{:02.0f}, Slot{:03.0f}").format(
-                    location_send[0], location_send[1]))
-        
-        drive_phys_stats_list = session.get(("{}/{}/drives").format(
-            get_controller(), sys_id)).json()
-        
+                    location_send[0], location_send[1]))  
 
+        # workaround to get around API differences in < 11.70      
+        fw_resp = session.get(("{}/{}/versions").format(get_controller("fw"), sys_id)).json()
+        fw_cv = fw_resp['codeVersions']
+        for mod in (range(len(fw_cv))):
+            if fw_cv[mod]['codeModule'] == 'management':
+                minor_vers = int((fw_cv[mod]['versionString']).split(".")[1])
+                if int(minor_vers) >= 52:
+                    drive_phys_stats_list = session.get(("{}/{}/drives").format(
+                        get_controller("sys"), sys_id)).json()
+                else:
+                    LOG.info("Minor SANtricity management OS version is too old - upgrade to 11.52 or higher:", minor_vers)
         for stats in drive_stats_list:
+            pdict = {}
             disk_location_info = drive_locations.get(stats["diskId"])
-            # find physical drive that matches stats['trayRef'] and stats['driveSlot']
-            for pdrive in drive_phys_stats_list:
-                if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
-                    pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
-            fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
+            if minor_vers >= 70:
+                for pdrive in drive_phys_stats_list:
+                    if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
+                        if isinstance(pdrive['ssdWearLife']['percentEnduranceUsed'], int): 
+                            pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
+            elif minor_vers >= 52 and minor_vers < 62:
+                for pdrive in drive_phys_stats_list:
+                    if pdrive['driveMediaType'] == 'ssd' and pdrive['driveRef'] == stats['diskId']:
+                        if isinstance(pdrive['ssdWearLife']['percentEnduranceUsed'], int):
+                            pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
+            else:
+                LOG.warning("SANtricity version not tested - skipping")
+            
+            if 'percentEnduranceUsed' in pdict.keys(): 
+                fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
+            else: 
+                fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS)
             disk_item = dict(
                 measurement="disks",
                 tags=dict(
@@ -379,7 +408,7 @@ def collect_storage_metrics(sys):
             json_body.append(disk_item)
 
         interface_stats_list = session.get(("{}/{}/analysed-interface-statistics").format(
-            get_controller(), sys_id)).json()
+            get_controller("sys"), sys_id)).json()
         if CMD.showInterfaceNames:
             for stats in interface_stats_list:
                 LOG.info(stats["interfaceId"])
@@ -401,7 +430,7 @@ def collect_storage_metrics(sys):
             json_body.append(if_item)
 
         system_stats_list = session.get(("{}/{}/analysed-system-statistics").format(
-            get_controller(), sys_id)).json()
+            get_controller("sys"), sys_id)).json()
         sys_item = dict(
             measurement="systems",
             tags=dict(
@@ -417,7 +446,7 @@ def collect_storage_metrics(sys):
         json_body.append(sys_item)
 
         volume_stats_list = session.get(("{}/{}/analysed-volume-statistics").format(
-            get_controller(), sys_id)).json()
+            get_controller("sys"), sys_id)).json()
         if CMD.showVolumeNames:
             for stats in volume_stats_list:
                 LOG.info(stats["volumeName"])
@@ -464,7 +493,7 @@ def collect_major_event_log(sys):
         if query:
             start_from = int(next(query.get_points())["wwn"]) + 1
 
-        mel_response = session.get(("{}/{}/mel-events").format(get_controller(), sys_id),
+        mel_response = session.get(("{}/{}/mel-events").format(get_controller("sys"), sys_id),
                                    params={"count": mel_grab_count, "startSequenceNumber": start_from}, timeout=(6.10, CMD.intervalTime*2)).json()
         if CMD.showMELMetrics:
             LOG.info("Starting from %s", str(start_from))
@@ -532,7 +561,7 @@ def collect_system_state(sys, checksums):
         sys_id = sys["wwn"]
         sys_name = sys["name"]
         failure_response = session.get(
-            ("{}/{}/failures").format(get_controller(), sys_id)).json()
+            ("{}/{}/failures").format(get_controller("sys"), sys_id)).json()
 
         # we can skip us if this is the same response we handled last time
         old_checksum = checksums.get(str(sys_id))
@@ -645,10 +674,7 @@ if __name__ == "__main__":
                             port=influxdb_port, database=INFLUXDB_DATABASE)
     client.create_database(INFLUXDB_DATABASE)
 
-    storage_controller_ep = get_controller()
-
     try:
-        SESSION.get(storage_controller_ep, timeout=30)
 
         try:
             client.create_retention_policy(
@@ -678,13 +704,13 @@ if __name__ == "__main__":
     while True:
         time_start = time.time()
         try:
-            response = SESSION.get(storage_controller_ep)
+            response = SESSION.get(get_controller("sys"))
             if response.status_code != 200:
                 LOG.warning(
-                    "We were unable to retrieve the storage-system list! Status-code={}".format(response.status_code))
+                    "Unable to connect to storage-system API endpoint! Status-code={}".format(response.status_code))
         except requests.exceptions.HTTPError or requests.exceptions.ConnectionError as e:
             LOG.warning(
-                "Unable to connect to the API to get storage-system list!", e)
+                "Unable to connect to the API!", e)
         except Exception as e:
             LOG.warning("Unexpected exception!", e)
         else:
