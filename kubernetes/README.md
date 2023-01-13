@@ -183,15 +183,15 @@ If Grafana and InfluxDB are the same namespace, InfluxDB can be added as http://
 
 In my test environment InfluxDB Data Source was added like so ("WSP" comes from Web Services Proxy, the name from upstream EPA). Notice that if authentication was not configured (in InfluxDB secrets), it would not be necessary to configure it for the source.
 
-![Create Grafana Data Source for InfluxDB v1](./images/kubernetes-01-influxdb-datasource.png)
+![Create Grafana Data Source for InfluxDB v1](images/kubernetes-01-influxdb-datasource.png)
 
 Also notice that EPA by default uses the `eseries` database. If Grafana can connect to InfluxDB, but the DB is missing, this is good enough because the database is created later (by collector).
 
-![Database missing until created](./images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
+![Database missing until created](images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
 
 Alternatively, use the Influx API or CLI to create the database. Then Save & Test will show that Data Source is working.
 
-![Database available after created](./images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
+![Database available after created](images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
 
 #### Import Grafana dashboards
 
@@ -199,9 +199,9 @@ Grafana needs a PV to keep dashboards, settings and such, so provision it with a
 
 Visit http://${GRAFANA_IP}:3000/dashboard/import. Find dashboards in `./epa/plugins/eseries_monitoring/dashboards` and import them. 
 
-At this time dashboard can be visited, but they will be empty. If you see a blank page (like [this](./images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start a collector and see if data will be sent to InfluxDB, and then refresh a dashboard view. In in this screenshot we can see that dbmanager started earlier is sending data to InfluxDB.
+At this time dashboard can be visited, but they will be empty. If you see a blank page (like [this](images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start a collector and see if data will be sent to InfluxDB, and then refresh a dashboard view. In in this screenshot we can see that dbmanager started earlier is sending data to InfluxDB.
 
-![dbmanager data in Explorer](./images/kubernetes-05-grafana-explore-dbmanager-data.png)
+![dbmanager data in Explorer](images/kubernetes-05-grafana-explore-dbmanager-data.png)
 
 If Grafana > Explore shows nothing while collector is sending data to InfluxDB, Data Source is probably misconfigured.
 
