@@ -23,9 +23,11 @@ kubectl config set-context --current --namespace=epa
 
 EPA v3.1.0 uses InvluxDB v1.
 
-Port 8086/tcp is used for client connections and should be open to all *external* collector and dbmanager clients as well as Grafana. Collectors do not use authentication so either create firewall rules or run collectors in the same namespace as InfluxDB to eliminate the need for external ingress to InfluxDB.
+Port 8086/tcp is used for client connections and should be open to all *external* collector and dbmanager clients as well as Grafana (if it's external). 
 
-This walk-through doesn't run external collectors, so it is not required to expose InfluxDB.
+Collector does not use authentication, so either create firewall rules to allow only external collector by IP, or run collector in the same namespace as InfluxDB to eliminate the need for external access to InfluxDB.
+
+This walk-through doesn't run external collectors, so it wasn't necessary to allow external access. But I did try it for Grafana, and it worked.
 
 One, two or three PVs (in increasing order of resilience) may be used for InfluxDB storage.
 
@@ -90,26 +92,27 @@ kubectl get services
 
 ### collector and dbmanager
 
-These containers don't need any service ports, TLS certificates and such. They can run in the same namespace as InfluxDB.
+In their current form these containers don't need any service ports, TLS certificates and such. They can run in the same namespace as InfluxDB.
 
-Main things to decide:
+Things to decide:
 
-- where to keep the monitor account password. Collector needs read-only access E-Series, so it's probably okay to use Kubernetes Secrets for that.
-- whether to run collectors - in the same namespace, in the same cluster, or externally (in which ase InfluxDB requires externally available 8086/tcp)
-
-Collector sends data to InfluxDB.
+- where to keep the monitor account password. Collector needs read-only access E-Series, so having it in YAML file is fine, but you can rework YAML files to store passwords in Kubernetes secrets.
+- where to run collectors: in the same namespace, in the same Kubernetes cluster, or externally and close to E-Series arrays (in which case InfluxDB 8086/tcp must be exposed and (should be) secured by firewall rules)
 
 To build and deploy these containers:
 
-- edit config.json and run "make build" to build containers
-- edit dbmanager*.yaml and collector*.yaml to tell Kubernetes where to get the container image (internal registry, etc.)
-- for each E-Series system, make a copy of sample collector file and create per-array YAML file(s). **NOTE:** similarly to docker-compose, if collector runs in the same namespace as InfluxDB, `DB_ADDRESS` can be `influxdb`.
+- edit `config.json` and run `make build` to build containers
+  - upload container images to all worker nodes or to a container registry
+- edit `dbmanager*.yaml` and `collector*.yaml` to tell Kubernetes where to get the container image (internal registry, etc.)
+- for each E-Series system, make a copy of the sample collector file and create per-array YAML file(s) with correct values for `SYSNAME` and other parameters. Note that just like when we run EPA using docker-compose, when collector runs in the same namespace as InfluxDB `DB_ADDRESS` can be `influxdb` rather than external IP.
 
 ```sh
+# one collector per each E-Series array
 cp collector-collector-sample.yml collector-${SYSNAME}.yml
 vim collector-${SYSNAME}.yml
 kubectl apply -f collector-${SYSNAME}.yaml
 
+# one dbmanager per each InfluxDB database
 kubectl apply -f collector-dbmanager.yaml
 ```
 
@@ -127,25 +130,27 @@ kubectl get pods
 # influxdb-f4bb6575d-z44wt                  1/1     Running   0          176m
 ```
 
-Observe container logs to see if there are any issues. Collector and dbmanager should be sending data to InfluxDB.
+Observe container logs to see if there are any issues. Collector and dbmanager should be sending data to InfluxDB. I don't have any E-Series on my network, so I will use dbmanager.
 
-Even without E-Series present, dbmanager in v3.1.0 works because all it does is read config.json and push the array names to InfluxDB. Let's see:
+dbmanager in v3.1.0 works without E-Series storage present because all it does is read config.json and push the array names to InfluxDB. Let's see:
 
 ```sh
-$ kubectl logs collector-dbmanager-5b5b6945c8-zpf64
-2023-01-13 13:51:11,491 - collector - INFO - Reading config.json...
-2023-01-13 13:51:11,501 - collector - INFO - Uploading folders to InfluxDB: [{'measurement': 'folders', 'tags': {'folder_name': 'All Storage Systems', 'sys_name': 'R26U25-EF600'}, 'fields': {'dummy': 0}}, {'measurement': 'folders', 'tags': {'folder_name': 'All Storage Systems', 'sys_name': 'R24U04-E2824'}, 'fields': {'dummy': 0}}]
-2023-01-13 13:51:11,545 - collector - INFO - Update loop evaluation complete, awaiting next run...
-2023-01-13 13:51:11,545 - collector - INFO - Time interval: 300.0000 Time to collect and send: 00.0538 Iteration: 1
+kubectl logs collector-dbmanager-5b5b6945c8-zpf64
+# 2023-01-13 13:51:11,491 - collector - INFO - Reading config.json...
+# 2023-01-13 13:51:11,501 - collector - INFO - Uploading folders to InfluxDB: [{'measurement': 'folders', 'tags': {'folder_name': 'All Storage Systems', 'sys_name': 'R26U25-EF600'}, 'fields': {'dummy': 0}}, {'measurement': 'folders', 'tags': {'folder_name': 'All Storage Systems', 'sys_name': 'R24U04-E2824'}, 'fields': {'dummy': 0}}]
+# 2023-01-13 13:51:11,545 - collector - INFO - Update loop evaluation complete, awaiting next run...
+# 2023-01-13 13:51:11,545 - collector - INFO - Time interval: 300.0000 Time to collect and send: 00.0538 Iteration: 1
 ```
+
+We can now use Grafana to query InfluxDB and see if this data is in there.
 
 ### Grafana v8
 
 Use [the official instructions](https://grafana.com/docs/grafana/latest/setup-grafana/installation/kubernetes/) or [one](https://medium.com/starschema-blog/monitor-your-infrastructure-with-influxdb-and-grafana-on-kubernetes-a299a0afe3d2) [of](https://iceburn.medium.com/build-from-scratch-grafana-and-prometheus-on-minikube-228d4e9cfda0) the many community guides for version 8.
 
-Grafana can be setup to use Kubernetes secrets, similarly to how we did it with InfluxDB, but I haven't done that here and admin/admin can be used to log in.
+Grafana deployment can be setup to use Kubernetes secrets, similarly to how we did it with InfluxDB, but I haven't done that here and admin/admin can be used to log in.
 
-In production Grafana would be behind a reverse proxy, but there are too many combinations and that's out of scope of this document in any case, so I'll just assume this was done the way you want it. Feel free to modify grafana.yaml if you can't find any better examples.
+In production, Grafana would be behind a reverse proxy. There are too many ways to do that and that's out of scope here, so I'll just assume this was done the way you want it. Feel free to modify grafana.yaml if you can't find any better examples.
 
 ```sh
 kubectl apply -f grafana.yaml
@@ -179,19 +184,21 @@ If Grafana and InfluxDB are the same namespace, InfluxDB can be added as `http:/
 }
 ```
 
-In my test environment InfluxDB Data Source was added like so ("WSP" comes from Web Services Proxy, the name from upstream EPA). Notice that if authentication was not configured (in InfluxDB secrets), it would not be necessary to configure it for the source.
+In my test environment InfluxDB was available on External IP, and Grafana Data Source was added like so ("WSP" comes from Web Services Proxy, the name from upstream EPA). 
 
 ![Create Grafana Data Source for InfluxDB v1](../images/kubernetes-01-influxdb-datasource.png)
 
-Also notice that EPA by default uses the `eseries` database. If Grafana can connect to InfluxDB while the DB is missing, Grafana will complain about the missing database but that's not a problem because the database is created later (by collector).
+If authentication was not configured (in InfluxDB secrets above), it would not be necessary to configure Basic Auth and provide the details. But if your InfluxDB is accessible on LAN, it's better to protect it and use a read-only account in Grafana.
+
+Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is missing, Grafana will complain about the missing database (as in screenshot below), but that's not a problem because the database will be created later (by collector).
 
 ![Database missing until created](../images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
 
-Alternatively, use the Influx API or CLI to create the database. Then Save & Test will show that Data Source is working.
+Alternatively, Influx API or CLI can be used create the database before that. Then Save & Test will show that Data Source is working.
 
 ![Database available after created](../images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
 
-It's easier to let collector do it automatically.
+Either way is fine, unless additional authentication and authorization settings are required on InfluxDB. It's easier to let collector do it automatically later.
 
 #### Import Grafana dashboards
 
@@ -199,15 +206,21 @@ Grafana needs a PV to keep dashboards, settings and other data, so provision it 
 
 Visit `http://${GRAFANA_IP}:3000/dashboard/import` and login. Find the dashboards in `./epa/plugins/eseries_monitoring/dashboards` and import them. 
 
-At this time dashboard can be visited, but they will be empty. If you see a blank page (like [this](../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start a collector and see if data will be sent to InfluxDB, and then refresh a dashboard view. In in this screenshot we can see that dbmanager started earlier is sending data to InfluxDB.
+At this time dashboard can be viewed, but without anything to see. If you get a blank page (like [this](../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start the collector and then refresh a dashboard view. In this screenshot dbmanager we started earlier is sending data to InfluxDB.
 
 ![dbmanager data in Explorer](../images/kubernetes-05-grafana-explore-dbmanager-data.png)
 
-If Grafana > Explore shows nothing while collector is sending data to InfluxDB, Data Source is probably misconfigured.
+If Grafana > Explore shows nothing while collector is successfully sending data to InfluxDB, Data Source is probably misconfigured.
 
 If Grafana > Explore shows E-Series data from Influx data source but dashboards show nothing, dashboards may be messed up or there's a mismatch between the name expected by the dashboards vs. the InfluxDB data source name that exists in Grafana. Fix data source name or change dashboards (perform a search & replace on the dashboard files).
 
-### Restore default context to kubectl 
+### Wrap-up
+
+Verify correct functioning of Grafana and all deployments. This screenshot shows dbmanager with a different container name to what's in YAML file. (The reason is I rebuilt it to check if it can send data to InfluxDB, as explained earlier in text). The container names can be changed to anything that suits your environment, of course.
+
+![EPA deployments in Kubernetes dashboard](../images/kubernetes-06-dashboard.png)
+
+Finally, restore the original context.
 
 ```sh
 kubectl config set-context --current --namespace=default

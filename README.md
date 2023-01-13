@@ -15,11 +15,15 @@ Additionally, minor differences include:
 - Unit tests and Makefile in the EPA directory for collector plugin no longer work
 - The SANtricity Web Services Proxy container has been removed in this fork's version v3.0.1. Fork v3.0.0 still has WSP (newer version than upstream v3.0.0!), but it doesn't run (it can be started independently and used on port 8443/tcp by those who need it).
 
+In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB. We view them from Grafana. dbmanager doesn't do much - it periodically sends some config tags to InfluxdDB.
+
+![E-Series Performance Analyzer](/images/epa-eseries-perf-analyzer)
+
 ## How to use this fork
 
 ### Requirements
 
-- SANtricity OS >= 11.52 (soft; 11.52 and 11.74 have been tested 11.6* not yet)
+- SANtricity OS >= 11.70 (soft requirement; 11.74 is recommendfed; 11.52 and 11.74 have been tested and work, 11.6[0-9] not yet)
 - Docker CE 20.10.22 (soft; recent Docker CE or Podman should work)
 - Docker Compose v1 or v2 (soft; both v1 and v2 should work)
 - Ubuntu 22.04 (soft; other recent Linux OS should work)
@@ -28,7 +32,7 @@ Additionally, minor differences include:
 
 - `epa`: Build and run InfluxDB and Grafana in the `epa` sub-directory. These containers are from the original EPA and include Grafana dashboards.
 - `collector`: in the `collector` sub-directory, build and run collector(s) (one per E-Series array) and a "helper" container called `dbmanager` (one per InfluxDB).
-- Makefiles in these two directories still require Docker Compose v1 as of v3.1.0
+- Makefiles in these two directories still require Docker Compose v1 as of v3.1.0. Once built with v1 (or manually), they can be started with Docker Compose v2
 
 ### Build containers and create configuration files
 
