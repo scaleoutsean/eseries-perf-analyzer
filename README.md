@@ -21,14 +21,14 @@ Additionally, minor differences include:
 
 - SANtricity OS >= 11.52 (soft; 11.52 and 11.74 have been tested 11.6* not yet)
 - Docker CE 20.10.22 (soft; recent Docker CE or Podman should work)
-- Docker Compose (soft; both v1 and v2 should work)
+- Docker Compose v1 or v2 (soft; both v1 and v2 should work)
 - Ubuntu 22.04 (soft; other recent Linux OS should work)
 
 ### Summary
 
 - `epa`: Build and run InfluxDB and Grafana in the `epa` sub-directory. These containers are from the original EPA and include Grafana dashboards.
 - `collector`: in the `collector` sub-directory, build and run collector(s) (one per E-Series array) and a "helper" container called `dbmanager` (one per InfluxDB).
-- The makefiles currently still require Docker Compose v1
+- Makefiles in these two directories still require Docker Compose v1 as of v3.1.0
 
 ### Build containers and create configuration files
 
