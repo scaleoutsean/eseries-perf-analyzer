@@ -17,7 +17,7 @@ Additionally, minor differences include:
 
 In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB. We view them from Grafana. dbmanager doesn't do much - it periodically sends some config tags to InfluxdDB.
 
-![E-Series Performance Analyzer](/images/epa-eseries-perf-analyzer)
+![E-Series Performance Analyzer](images/epa-eseries-perf-analyzer)
 
 ## How to use this fork
 
