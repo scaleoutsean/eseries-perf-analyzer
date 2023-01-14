@@ -242,9 +242,15 @@ CONTAINER ID   IMAGE                                               NAMES
 61d3cb5e83bc   ntap-grafana-plugin/eseries_monitoring/dbmanager    dbmanager
 ```
 
-- Stop any existing collector collectors and start new (or updated) containers
+- Stop any existing collectors and dbmanager and start new (or updated) containers
 
 ```sh
+
+$ pwd
+/home/sean/eseries-perf-analyzer/collector
+
+$ # note the location. Don't do this in /home/sean/eseries-perf-analyzer/epa and wipe your InfluxDB!
+
 $ docker-compose down && docker-compose up 
 ```
 
