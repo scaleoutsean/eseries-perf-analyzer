@@ -34,7 +34,7 @@ Each of the light-blue rectangles can be in a different location (host, network,
 ## Quick start
 
 - `epa`: go to that subdirectory, run `make run` to build and run InfluxDB and Grafana
-- `collector`: in the `collector` sub-directory, edit `docker-compose.yml` and `config.json` (array names must be consistent between two files), and `make build && docker-compose up`.
+- `collector`: in the `collector` sub-directory, edit `docker-compose.yml` and `config.json` (every `SYSNAME` value in docker-compose.yml must be present and identical to `name` value in `config.json`), and `make build && docker-compose up`.
 
 ## Slow start
 
@@ -58,7 +58,7 @@ vim config.json
 #     container_name, specifically , must be the same as array name in config.json.
 vim docker-compose.yml
 # We are still in ./collector subdirectory.
-# InfluxDB and Grafana are already running, start collector(s) and dbmanager:
+# InfluxDB and Grafana are already running. Start collector(s) and dbmanager:
 docker-compose up
 # Check Grafana and if OK, hit CTRL+C, restart with:
 docker-compose up -d
@@ -69,18 +69,18 @@ docker-compose up -d
 
 Environment variables and configuration files:
 
-- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two.
-- `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
+- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two
+- `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - `USERNAME` - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - `PASSWORD` - SANtricity password for the account used to monitor
-  - `SYSNAME` - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`! An example can be viewed [in this image](/images/sysname-in-santricity-manager.png)
-  - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - an example can be viewed [here](/images/sysid-in-santricity-manager.png)
+  - `SYSNAME` - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`. If you want to make the name identical to actual E-Series array name, [this image](/images/sysname-in-santricity-manager.png) shows where to look them up
+  - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - see [this image](/images/sysid-in-santricity-manager.png) on where to find it.
   - `API` - SANtricity controller's IP address such as 6.6.6.6
   - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
-  - `DB_ADDRESS` - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
+  - `DB_ADDRESS` - external IPv4 of InfluxDB (if the host IP where InfluxDB is running is remote that could be something like 7.7.7.7, if collector and InfluxDB are on the same host then 127.0.0.1, or if they're in the same Kubernetes namespace then `influxdb`)
 - Where to find the correct values for API, SYSNAME and SYSID? The API addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above
-  - For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent, or otherwise array metrics and events may get collected, but the name won't appear in array drop-down list in Grafana dashboard
+  - For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent; otherwise array metrics and events may get collected but correct array names name won't appear in array drop-down lists in Grafana dashboards
 
 - `container_name` to match the name in `./collector/config.json`:
 
@@ -108,7 +108,7 @@ services:
       - DB_PORT=8086
 ```
 
-- `SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json`. `config.json` is replicated by collector's `make build` to `./collector/dbmanager/config.json` for dbmanager to use:
+- `SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json`. `config.json` is replicated by collector's `make build` to `./collector/dbmanager/config.json` for dbmanager to use. Here the `name` matches `environment:SYSNAME` value in `docker-compose.yml` above.
 
 ```json
 {
@@ -120,7 +120,7 @@ services:
 }
 ```
 
-- To customize collector container images, the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `SYSNAME` is System Name given to each E-Series array) and `config.json` should be edited and dbmanager updated with `make build`.
+- To customize collector container images (not necessary, but possible), the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `SYSNAME` is System Name given to each E-Series array) and `config.json` should be edited to have the same name. Then dbmanager container has to be updated with `make build` and restarted.
 
 - `dbmanager` doesn't do much and doesn't yet make use of `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` parameter need to be correct, and the names in `config.json` need to match `SYSNAME` in `docker-compose.yml`.
 
