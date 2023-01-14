@@ -1,4 +1,4 @@
-# NetApp E-Series Performance Analyzer ("EPA") without SANtricity Web Services Proxy ("WSP")
+# NetApp E-Series Performance Analyzer ("EPA")
 
 ## What is this thing
 
@@ -19,27 +19,29 @@ In terms of services, collectors collects metrics from E-Series and sends them t
 
 ![E-Series Performance Analyzer](/images/epa-eseries-perf-analyzer.png)
 
+Each of the light-blue rectangles can be in a different location (host, network, Kubernetes namespace, etc.). But if you want to consolidate, that's still possible.
+
 ### Requirements
 
 - SANtricity OS >= 11.70 (11.74 is recommendfed; 11.52 and 11.74 have been tested and work, 11.6[0-9] not yet)
 - Docker CE 20.10.22 (recent Docker CE or Podman should work)
 - Docker Compose v1 or v2 (both v1 and v2 should work)
+  - In EPA v3.1.0 the two Makefiles still require Docker Compose v1. Once built with v1 (or manually), they can be started with Docker Compose v2 or Kubernetes
 - Ubuntu 22.04 (other recent Linux OS should work)
 
-This is a community fork without a variety of hardware and software to use and test. While the requirements are soft, try to stick to them if you can.
+ These requirements are soft but this is a community fork without a variety of hardware and software to use in testing and debugging.
 
-### Summary
+## Quick start
 
-- `epa`: Build and run InfluxDB and Grafana in the `epa` sub-directory. These containers are from the original EPA and include Grafana dashboards.
-- `collector`: in the `collector` sub-directory, build and run collector(s) (one per E-Series array) and a "helper" container called `dbmanager` (one per InfluxDB).
-- Makefiles in these two directories still require Docker Compose v1 as of v3.1.0. Once built with v1 (or manually), they can be started with Docker Compose v2
+- `epa`: go to that subdirectory, run `make run` to build and run InfluxDB and Grafana
+- `collector`: in the `collector` sub-directory, edit `docker-compose.yml` and `config.json` (array names must be consistent between two files), and `make build && docker-compose up`.
 
-### Build containers and create configuration files
+## Slow start
 
 - Older existing EPA, images, volumes and service ports may cause container name and port conflicts. Either use a new VM or run `make stop; docker-compose down; make rm` to stop and remove old containers before building new ones. Data (InfluxDB and Grafana) can be left in place.
-- Clone the repository
-- Descend to the `epa` directory, run `make run` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces so set up firewall accordingly.
-- Go to `collector` directory, edit two files (`config.json` and `docker-compose.yml`) and run `make build` to create containers and `docker-compose up` to start them.
+- Clone the repository to a new location
+- Descend to the `epa` directory, run `make run` to download, build and start InfluxDB v1 and Grafana v8. Both will listen on all public VM interfaces, so configure your firewall accordingly.
+- Go to `collector` directory, edit two files (`config.json` and `docker-compose.yml`) and run `make build` to create collector and dbmanager containers and then `docker-compose up` to start them.
 
 ```sh
 git clone github.com/scaleoutsean/eseries-perf-analyzer
@@ -65,9 +67,10 @@ docker-compose up -d
 # collector.py and db_manager.py can be started from the CLI for easier troubleshooting.
 ```
 
+Environment variables and configuration files:
+
 - `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two.
 - `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers.
-
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - `USERNAME` - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - `PASSWORD` - SANtricity password for the account used to monitor
@@ -77,7 +80,7 @@ docker-compose up -d
   - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
   - `DB_ADDRESS` - external IPv4 of host where EPA is running, such as 7.7.7.7, to connect to InfluxDB
 - Where to find the correct values for API, SYSNAME and SYSID? The API addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above
-  - For consistency's sake it is recommended that SYSNAME in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent, or otherwise array metrics and events may get collected, but the name won't appear in array drop-down list in Grafana dashboard
+  - For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent, or otherwise array metrics and events may get collected, but the name won't appear in array drop-down list in Grafana dashboard
 
 - `container_name` to match the name in `./collector/config.json`:
 
@@ -105,7 +108,7 @@ services:
       - DB_PORT=8086
 ```
 
-- Matching SYSNAME/name in `config.json` is replicated by Collector's `make build` to `./collector/dbmanager/config.json`:
+- `SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json`. `config.json` is replicated by collector's `make build` to `./collector/dbmanager/config.json` for dbmanager to use:
 
 ```json
 {
@@ -117,15 +120,13 @@ services:
 }
 ```
 
-- To customize collector container images, the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `$SYSNAME` is System Name given to each E-Series array).
+- To customize collector container images, the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `SYSNAME` is System Name given to each E-Series array) and `config.json` should be edited and dbmanager updated with `make build`.
 
-- `dbmanager` doesn't do much and doesn't yet make use `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` and syntax/names of `config.json` need to be correct.
+- `dbmanager` doesn't do much and doesn't yet make use of `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` parameter need to be correct, and the names in `config.json` need to match `SYSNAME` in `docker-compose.yml`.
 
 ```yaml
 version: '3.6'
-
 services:
-
   collector-dbmanager:
     image: ntap-grafana-plugin/eseries_monitoring/dbmanager:latest
     container_name: dbmanager
@@ -150,7 +151,7 @@ This fork does not have WSP. Grafana is the same (3000/tcp), but InfluxDB is now
 
 To protect InfluxDB service, you may use your OS settings to open 8086/tcp to hosts where Collector will run. Collector and dbmanager do not need open inbound ports - both only connect to InfluxDB.
 
-## Add or remove a monitored array
+### Add or remove a monitored array
 
 To add a SANtricity array, we don't need to do anything in the `epa` subdirectory.
 
@@ -163,11 +164,11 @@ To add a SANtricity array, we don't need to do anything in the `epa` subdirector
 
 To remove an array, remove it from `config.json` and `docker-compose.yml` and do the last three steps the same way.
 
-## Update password for the monitor account
+### Update password of a monitor account
 
-To change the monitor account password for `R11U01-EF300`, change it on the array as array admin, find this array in `docker-compose.yml`, change the password value in the `PASSWORD=` row for the array, run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`. 
+To change the monitor account password for one particular collector, say the one used for array `R11U01-EF300`, change it on the array first, find this array in `docker-compose.yml`, change the password value in the `PASSWORD=` row for the array, run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`.
 
-The array name has not changed, so it wasn't necessary to edit `./collector/config.json` and rebuild `./collector/dbmanager`. That's also why running `make build` wasn't necessary.
+The array name has not changed, so it wasn't necessary to edit `./collector/config.json` and rebuild `./collector/dbmanager`, so running `make build` wasn't necessary.
 
 ## Walk-through
 
@@ -247,7 +248,7 @@ CONTAINER ID   IMAGE                                               NAMES
 $ docker-compose down && docker-compose up 
 ```
 
-## Sample Grafana screenshots of EPA/Collector dashboards
+## Sample Grafana screenshots
 
 This fork's dashboards are identical to upstream v3.0.0, but upstream repository has no screenshots - in fact they're hard to find on the Internet - so a sample of each dashboard is provided below.
 
