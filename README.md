@@ -13,7 +13,8 @@ Additionally, minor differences include:
 - Expanded number of required arguments in `collector.py` to avoid unintentional mistakes
 - Collector container no longer shares Docker network with the two (InfluxDB, Grafana) EPA containers because the assumption is Collector probably runs on a different host or accesses InfluxDB over public host network
 - Unit tests and Makefile in the `epa` directory for collector plugin no longer work
-- SANtricity Web Services Proxy container has been removed
+- SANtricity Web Services Proxy (WSP) container has been removed
+- Collector script can poll both controlles of an array (in upstream EPA that was also possible, but was done through WSP)
 
 In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB. We view them from Grafana. dbmanager doesn't do much at this time - it periodically sends array name tags to InfluxdDB.
 
@@ -33,10 +34,16 @@ Each of the light-blue rectangles can be in a different location (host, network,
 
 ## Quick start
 
+Docker Compose users:
+
 - `epa`: go to that subdirectory, run `make run` to build and run InfluxDB and Grafana
-- `collector`: in the `collector` sub-directory, edit `docker-compose.yml` and `config.json` (every `SYSNAME` value in docker-compose.yml must be present and identical to `name` value in `config.json`), and `make build && docker-compose up`.
+- `collector`: in the `collector` sub-directory edit `docker-compose.yml` and `config.json` (every `SYSNAME` value in docker-compose.yml must be present and identical to a `name` value in `config.json`). Then run `make build && docker-compose up`.
+
+Kubernetes users should skim through this page and then see the [Kubernetes README](kubernetes/README.md) file.
 
 ## Slow start
+
+It is suggested to start with Docker Compose. There's also a [Kubernetes](kubernetes)-specific folder.
 
 - Older existing EPA, images, volumes and service ports may cause container name and port conflicts. Either use a new VM or run `make stop; docker-compose down; make rm` to stop and remove old containers before building new ones. Data (InfluxDB and Grafana) can be left in place.
 - Clone the repository to a new location
@@ -67,7 +74,7 @@ docker-compose up -d
 # collector.py and db_manager.py can be started from the CLI for easier troubleshooting.
 ```
 
-Environment variables and configuration files:
+### Environment variables and configuration files
 
 - `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two
 - `./collector`'s values are hard-coded into its Makefile. Use `docker-compose` to start/stop/remove collector and dbmanager containers
@@ -79,10 +86,12 @@ Environment variables and configuration files:
   - `API` - SANtricity controller's IP address such as 6.6.6.6
   - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
   - `DB_ADDRESS` - external IPv4 of InfluxDB (if the host IP where InfluxDB is running is remote that could be something like 7.7.7.7, if collector and InfluxDB are on the same host then 127.0.0.1, or if they're in the same Kubernetes namespace then `influxdb`)
-- Where to find the correct values for API, SYSNAME and SYSID? The API addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For SYSNAME and SYSID see the image links just above
-  - For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent; otherwise array metrics and events may get collected but correct array names name won't appear in array drop-down lists in Grafana dashboards
 
-- `container_name` to match the name in `./collector/config.json`:
+What are the correct values for `API`, `SYSNAME` and `SYSID`? The `API` addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For `SYSNAME` and `SYSID`, see the image links just above.
+
+For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`, if I remember correctly - if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent; otherwise array metrics and events may get collected, but drop-down lists with array names in Grafana dashboards won't match so dashboards will be empty.
+
+Example of `docker-compose.yml` with collector for one array:
 
 ```yaml
 services:
@@ -108,7 +117,7 @@ services:
       - DB_PORT=8086
 ```
 
-- `SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json`. `config.json` is replicated by collector's `make build` to `./collector/dbmanager/config.json` for dbmanager to use. Here the `name` matches `environment:SYSNAME` value in `docker-compose.yml` above.
+`SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json`. `config.json` is replicated by collector's `make build` to `./collector/dbmanager/config.json` for dbmanager to use. Here the `name` matches `environment:SYSNAME` value in `docker-compose.yml` above.
 
 ```json
 {
@@ -120,9 +129,7 @@ services:
 }
 ```
 
-- To customize collector container images (not necessary, but possible), the directory with collector's Docker files (`./collector/collector`) could be copied to multiple sub-directories (`./collector/$SYSNAME`), and docker-compose.yml could add containers with service names such as `collector-$SYSNAME` (where `SYSNAME` is System Name given to each E-Series array) and `config.json` should be edited to have the same name. Then dbmanager container has to be updated with `make build` and restarted.
-
-- `dbmanager` doesn't do much and doesn't yet make use of `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` parameter need to be correct, and the names in `config.json` need to match `SYSNAME` in `docker-compose.yml`.
+`dbmanager` doesn't do much and doesn't yet make use of `RETENTION_PERIOD` (just leave that value alone for now). Only `DB_ADDRESS` parameter need to be correct, and the names in `config.json` need to match `SYSNAME` in `docker-compose.yml`.
 
 ```yaml
 version: '3.6'
@@ -147,13 +154,13 @@ services:
 
 The original EPA exposes the SANtricity WSP (8080/tcp) and Grafana (3000/tcp) to the outside world.
 
-This fork does not have WSP. Grafana is the same (3000/tcp), but InfluxDB is now exposed on port 8086/tcp. The idea is you may run Collectors in various locations (closer to E-Series, for example) outside of the InfluxDB VM and send data to InfluxDB.
+This fork does not have WSP. Grafana is the same (3000/tcp), but InfluxDB is now exposed at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB.
 
-To protect InfluxDB service, you may use your OS settings to open 8086/tcp to hosts where Collector will run. Collector and dbmanager do not need open inbound ports - both only connect to InfluxDB.
+To protect InfluxDB service open 8086/tcp to IP's or FQDNs where collector, dbmanager and Grafana run.
 
 ### Add or remove a monitored array
 
-To add a SANtricity array, we don't need to do anything in the `epa` subdirectory.
+To add a new SANtricity array, we don't need to do anything in the `epa` subdirectory.
 
 - Go to `./collector`
 - Edit `docker-compose.yml` - if you copy-paste, make sure you get the variables and `container_name` right!
@@ -249,7 +256,7 @@ CONTAINER ID   IMAGE                                               NAMES
 $ pwd
 /home/sean/eseries-perf-analyzer/collector
 
-$ # note the location. Don't do this in /home/sean/eseries-perf-analyzer/epa and wipe your InfluxDB!
+$ # note the location. Don't do this in /home/sean/eseries-perf-analyzer/epa and wipe your InfluxDB
 
 $ docker-compose down && docker-compose up 
 ```
@@ -310,6 +317,10 @@ Below details are mostly related to this fork. For upstream details please check
 
 **A:** Just one dbmanager is needed if you have one InfluxDB. 
 
+**Q:** How to customize controller container code?
+
+**A:** To customize collector container image (not necessary, but possible), directory with collector's Docker files (`./collector/collector`) copy that to a new sub-directory (`./collector/$SYSNAME`), add new instance of collector (`collector-$SYSNAME`; make sure this container uses custom image name) to `docker-compose.yml`, and add new `SYSNAME` to `./collector/config.json`. Run `make build` to update dbmanager followed by `docker-compose up $SYSNAME -d` to start the custom container. 
+
 **Q:** What does dbmanager actually do?
 
 **A:** It sends the list of monitored arrays (`SYSNAME`s) to InfluxDB, that's all. This is used to create a drop-down list of arrays in EPA's Grafana dashboards. Prior to v3.1.0 EPA got its list of arrays from the Web Services Proxy so it "knew" which arrays are being monitored. In EPA v3.1.0 collector containers may be running in several places and none of them would know what other collectors exist out there. dbmanager maintains that list and periodically pushes it to InfluxDB, while dropping other folders (array names which no longer need to be monitored). If you have a better idea or know that's unnecessary, feel free to submit a pull request. InfluxDB v1 is old and this approach is simple and gets the job done.
@@ -317,6 +328,10 @@ Below details are mostly related to this fork. For upstream details please check
 **Q:** I have an existing intance of the upstream EPA v3.0.0. Can I add more E-Series arrays without using WSP?
 
 **A**: It could be done, but it's complicated because db_manager.py now drops folder tags for arrays it's not aware of so it'd be too much trouble. Best remove existing EPA and deploy EPA 3.1.0. Make a backup of InfluxDB and Grafana data, but you can probably retain all data without issues.
+
+**Q:** How can I customize Grafana options?
+
+**A**: EPA doesn't change Grafana in any way, so follow the official documentation. If ./epa/grafana/grafana.ini is replaced by ./epa/grafana/grafana.ini.alternative that may provide better privacy (but it also disables notifications related to security and other updates).
 
 **Q:** What if I run my own InfluxDB v1.8 and Grafana v8? Can I use this Collector without EPA?
 

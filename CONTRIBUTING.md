@@ -1,6 +1,6 @@
 # Contributing
 
-For v3.1.0 and above, please submit your request against `develop` if it exists, otherwise `master`.
+For v3.1.0 and above, please submit your request against `develop` if it exists (I delete it when I don't need it), otherwise `master`.
 
 You may also submit bugs in Issues.
 
