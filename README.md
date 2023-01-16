@@ -1,5 +1,19 @@
 # NetApp E-Series Performance Analyzer ("EPA")
 
+- [NetApp E-Series Performance Analyzer ("EPA")](#netapp-e-series-performance-analyzer-epa)
+  - [What is this thing](#what-is-this-thing)
+    - [Requirements](#requirements)
+  - [Quick start](#quick-start)
+  - [Slow start](#slow-start)
+    - [Environment variables and configuration files](#environment-variables-and-configuration-files)
+    - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
+    - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
+    - [Update password of a monitor account](#update-password-of-a-monitor-account)
+  - [Walk-through](#walk-through)
+  - [Sample Grafana screenshots](#sample-grafana-screenshots)
+  - [Tips and Q\&A](#tips-and-qa)
+
+
 ## What is this thing
 
 This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0 (see its README.md for additional information) created with the following objectives:

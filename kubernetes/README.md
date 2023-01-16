@@ -1,5 +1,21 @@
 ## E-Series Performance Analyzer on Kubernetes
 
+
+- [E-Series Performance Analyzer on Kubernetes](#e-series-performance-analyzer-on-kubernetes)
+  - [Create namespace](#create-namespace)
+  - [InfluxDB v1](#influxdb-v1)
+  - [collector and dbmanager](#collector-and-dbmanager)
+  - [Grafana v8](#grafana-v8)
+    - [Automatically deploy InfluxDB data source and Grafana dashboards](#automatically-deploy-influxdb-data-source-and-grafana-dashboards)
+      - [Run Ansible playbook in the same Kubernetes namespace as InfluxDB and Grafana](#run-ansible-playbook-in-the-same-kubernetes-namespace-as-influxdb-and-grafana)
+      - [Run Ansible playbook from client, VM or other location](#run-ansible-playbook-from-client-vm-or-other-location)
+    - [Manually add InfluxDB as Grafana Data Source](#manually-add-influxdb-as-grafana-data-source)
+    - [Manually import Grafana dashboards](#manually-import-grafana-dashboards)
+    - [Other ways to provision Grafana data sources and dashboards](#other-ways-to-provision-grafana-data-sources-and-dashboards)
+  - [Wrap-up](#wrap-up)
+  - [Video demo](#video-demo)
+
+
 Assumptions:
 
 - Kubernetes v1.25
@@ -7,9 +23,9 @@ Assumptions:
 - CSI plugin for persistent volumes
 - InfluxDB, collectors, dbmanager and Grafana in the same namespace, `epa`
 
-### Namespace
+### Create namespace
 
-Examples and YAML files use the `epa` namespace.
+Examples and YAML files use the `epa` namespace. Many seem to standardize on `monitoring`, but you may have production monitoring applications there, so I use `epa` instead.
 
 Search & replace `namespace: epa` in the provided YAML files to use a different namespace.
 
@@ -296,9 +312,9 @@ If possible, make the WSP data source your default data source - that seems to c
 
 #### Manually import Grafana dashboards
 
-The EPA dashboards are in `./epa/plugins/eseries_monitoring/dashboards` 
+The EPA dashboards can be found in `./epa/plugins/eseries_monitoring/dashboards`, but importing them manually is another problem.
 
-Visit `http://${GRAFANA_IP}:3000/dashboard/import` and login. and import them. You'll probably have problems here and should take another look at trying with Ansible instead.
+Visit `http://${GRAFANA_IP}:3000/dashboard/import` to import them. You'll probably have problems here and should take another look at Ansible instead.
 
 At this time dashboard can be viewed, but without anything to see. If you get a blank page (like [this](../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start the collector and then refresh a dashboard view. In this screenshot dbmanager we started earlier is sending data to InfluxDB.
 
@@ -312,11 +328,45 @@ If Grafana > Explore shows E-Series data from Influx data source but dashboards 
 
 Grafana also lets you use its provisioning features to automatically provision [data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources) and [dashboards](https://grafana.com/docs/grafana/latest/administration/provisioning/#reusable-dashboard-urls).
 
-I found these to be buggy and frustratingly hard to use.
+I found these to be buggy and frustratingly hard to use. 
 
-Maybe Grafana Helm charts work better. I haven't tried those.
+In theory, all it takes is to build a Grafana container with the `/etc/grafana/provisioning/dashboards` path pre-populated with a dashboard source defnition (YAML) and EPA dashboards. This is how Grafana container subdirectory would look like before `docker build`:
 
-Recreating dashboards from scratch is time-consuming.
+```raw
+.
+├── Dockerfile
+└── provisioning
+    ├── dashboards
+    │   ├── dashboards.yaml
+    │   ├── system.json
+    │   └── interface.json
+    │   └── disk.json
+    │   └── volume.json
+    └── datasources
+        └── influxd.yaml
+```
+
+dashboards.yaml would look something like this:
+
+```yaml
+apiVersion: 1
+providers:
+  - name: 'EPA'
+    folder: ''
+    type: file
+    orgId: 1
+    folderUid: ''
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+```
+
+Grafana Dockerfile would copy this to the container with `ADD ./provisioning /etc/grafana/` and Grafana would load JSON files after startup. But I couldn't get this to work, maybe due to small errors in the exported EPA dashboard files or some other reason.
+
+Maybe Grafana Helm charts work better. I haven't tried.
+
+Recreating dashboards from scratch is possible, but very time-consuming.
 
 ### Wrap-up
 
