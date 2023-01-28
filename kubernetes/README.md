@@ -47,7 +47,7 @@ You may deploy InfluxDB v1 (v1.8, for example) and Grafana version 8 any way you
 - InfluxDB is reachable by collector and dbmanager containers, and by Grafana container
 - Grafana is reachable by your browser
 
-You can find plenty of details about these deployments and services in [samples/README](../README.md), but the configuration of these services is out of scope here - please use community guides or the official documentation to figure it out.
+You can find plenty of details about these deployments and services in the [samples](samples/README.md) directory, but the configuration of these services is out of scope here - please use community guides or the official documentation to figure it out.
 
 Even if you know how to deploy Grafana, pay attention to that README file in the samples directory because it shows how to create data source and import EPA dashboards (which have the data source name hard-coded). If you want to create own dashboards or import EPA dashboards on your own, then you can skip it.
 
