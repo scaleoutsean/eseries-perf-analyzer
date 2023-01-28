@@ -1,0 +1,47 @@
+blank_issues_enabled: false
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug", "triage", "discussions", "feature-request"]
+assignees:
+  - scaleoutsean
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us about your SANtricity OS, Docker/Kubernetes/Nomad version and provide relevant logs.
+      placeholder: Tell us what you see!
+      value: "A bug happened!"
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: Version
+      description: What EPA code are you running?
+      options:
+        - master (Default)
+        - 3.2.0
+        - 3.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+      render: shell
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: I demand to be forced to comply with this project's Code of Conduct just so that I can submit this issue
+      options:
+        - label: No
+          required: true
+

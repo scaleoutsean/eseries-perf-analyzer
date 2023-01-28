@@ -80,7 +80,7 @@ else:
 
 def get_configuration():
     try:
-        with open("config.json") as config_file:
+        with open("/config/config.json") as config_file:
             config_data = json.load(config_file)
             if config_data:
                 return config_data

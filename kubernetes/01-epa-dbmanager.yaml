@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2023-01-26T07:05:56Z"
+  name: collector-db-config
+  namespace: epa
+data:
+  config.json: |
+    {
+        "storage_systems": [
+            {
+                "name": "R26U25-EF600"
+            },
+            {
+                "name": "R24U04-E2824"
+            }
+        ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kubernetes.io/description: "EPA configuration manager"
+    a8r.io/owner: "scaleoutSean"
+    a8r.io/documentation: "https://github.com/scaleoutsean/eseries-perf-analyzer/tree/master/kubernetes"
+    a8r.io/chat: "https://github.com/scaleoutsean/eseries-perf-analyzer/discussions"
+    a8r.io/bugs: "https://github.com/scaleoutsean/eseries-perf-analyzer/issues"
+    a8r.io/repository: "https://github.com/scaleoutsean/eseries-perf-analyzer"
+    a8r.io/dependencies: "Python 3 with module for InfluxDB v1"
+  creationTimestamp: null
+  labels:
+    kubernetes.io/os: "linux"
+    app.kubernetes.io/version: "3.2.0"
+    app.kubernetes.io/name: dbmanager
+    # app.kubernetes.io/instance: dc1-dbmanager
+    service: collector-dbmanager
+  name: collector-dbmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: collector-dbmanager
+  template:
+    metadata:
+      annotations:
+      labels:
+        service: collector-dbmanager
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: dbmanager
+          # image: epa/epa-dbmanager:3.2.0
+          image: ghcr.io/scaleoutsean/epa-dbmanager:v3.2.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: 0.1
+            limits:
+              memory: "64Mi"
+              cpu: 0.2
+          env:
+            - name: DB_ADDRESS
+              value: 7.7.7.7
+            - name: DB_PORT
+              value: "8086"
+            - name: RETENTION_PERIOD
+              value: 52w
+          volumeMounts:
+            - name: collector-db-config-vol
+              mountPath: "/config"
+              readOnly: true
+      volumes:
+        - name: collector-db-config-vol
+          configMap:
+            name: collector-db-config
+status: {}
