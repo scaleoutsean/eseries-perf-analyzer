@@ -47,7 +47,7 @@ You may deploy InfluxDB v1 (v1.8, for example) and Grafana version 8 any way you
 - InfluxDB is reachable by collector and dbmanager containers, and by Grafana container
 - Grafana is reachable by your browser
 
-You can see plenty of details about these deployments and services in [./samples/README.md](this README.md), but the configuration of these services is out of scope here - please use community guides or the official documentation to figure it out.
+You can see plenty of details about these deployments and services in [samples/README.md](this README.md), but the configuration of these services is out of scope here - please use community guides or the official documentation to figure it out.
 
 Even if you know how to deploy Grafana, pay attention to that README file in the samples directory because it shows how to create data source and import EPA dashboards (which have the data source name hard-coded). If you want to create own dashboards or import EPA dashboards on your own, then you can skip it.
 
@@ -115,7 +115,7 @@ Because the JSON example above uses two arrays, two sample YAML files (02 and 03
 
 Change at least the following:
 
-- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the main [../README.md](README), and username/password pair for the SANtricity API user (best use the `monitor` user because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
+- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the main [/README.md](README)), and username/password pair for the SANtricity API user (best use the `monitor` user because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
 
 ```yaml
 data:
