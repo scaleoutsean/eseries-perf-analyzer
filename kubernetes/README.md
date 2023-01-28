@@ -115,12 +115,12 @@ Because the JSON example above uses two arrays, two sample YAML files (02 and 03
 
 Change at least the following:
 
-- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the main [../README.md](README)), and username/password pair for the SANtricity API user (best use the `monitor` user because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
+- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the main [../README.md](README), and username/password pair for the SANtricity API user (best use the `monitor` user because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
 
 ```yaml
 data:
   API: "5.5.5.5"
-  SYSNAME: "R26U25-EF600" # note uppercase letters consistent with dbmanager
+  SYSNAME: "R26U25-EF600" # note uppercase letters, consistent with dbmanager
   SYSID: "600A098000F63714000000005E791234"
   DB_ADDRESS: "192.168.1.127"
   PASSWORD: "monitor123"
