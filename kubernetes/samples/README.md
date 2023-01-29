@@ -205,7 +205,7 @@ docker images | grep ansible
 # run this in the same namespace where InfluxDB and Grafana are (example: epa)
 kubectl run ansible --restart=Never --image=ntap-grafana/ansible:3.1 -n epa
 
-# the image hasn't changed, so you can use one of earlier versions as well
+# the image hasn't changed since v3.0.0, so you can use one of the earlier versions as well
 # kubectl run ansible --restart=Never --image=docker.io/ntap-grafana/ansible:3.0 -n epa
 
 # check that the ansible pod is running
@@ -386,5 +386,5 @@ In this section InfluxDB and Grafana were deployed to the same namespace (`epa`)
 ### Video demo
 
 - EPA 3.2.0: TODO
-- [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) - uses the provided YAML files and the automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes
+- [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) - uses YAML files and automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes.
 

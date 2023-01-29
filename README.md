@@ -29,22 +29,24 @@ In terms of services, collectors collects metrics from E-Series and sends them t
 
 Each of the light-blue rectangles can be in a different location (host, network, Kubernetes namespace, etc.). But if you want to consolidate, that's still possible.
 
-Changelog and additional details are at the bottom of this page.
+Changelog and additional details are at the bottom of this page and in the Releases tab.
 
 ## Requirements
 
-- SANtricity OS >= 11.70 (11.74 is recommended; 11.52 and 11.74 have been tested and work, 11.6[0-9] not yet)
-- Docker CE 20.10.22 (recent Docker CE or Podman should work)
-- Docker Compose v1 or v2 (both v1 and v2 should work)
-  - In EPA v3.1.0 and v3.2.0 Makefile in the `epa` directory may require Docker Compose v1
-- Ubuntu 22.04 (other recent Linux OS on the AMD64 or ARM64 architecture should work)
+- NetApp SANtricity OS: >= 11.70 (11.74 is recommended; 11.52 and 11.74 have been tested and work, 11.6[0-9] not yet)
+- Containers:
+  - Docker: Docker CE 20.10.22 (recent Docker CE or Podman should work) and Docker Compose v1 or v2 (both v1 and v2 should work) 
+  - Kubernetes: dbmanager and collector should work on any
+  - Nomad: dbmanager and collector should work on any
+- CLI: 
+  - dbmanager and collector should work on any Linux with recent Python 3, possibly other Operating Systems
+- Architecture: dbmanager and collector work on (at least) AMD64 and ARM64 systems that support Python 3
 
 These requirements are soft but this is a community fork without a variety of hardware and software to use in testing and debugging.
 
 ## Quick start
 
 Docker Compose users:
-
 
 - Clone and enter the `epa` subdirectory:
 ```sh
@@ -53,10 +55,10 @@ cd eseries-perf-analyzer/epa
 ```
 - in the `epa` subdirectory, run `make run` to build and run InfluxDB and Grafana
   - Unless these containers need a change or update, going back to this folder is generally not necessary
-- go to the `collector` sub-directory edit `docker-compose.yml` and `config.json`: `SYSNAME` docker-compose.yml must be present and identical to `name` value(s) in `config.json`). Then run `docker-compose build && docker-compose up`
+- go to the `collector` sub-directory edit `docker-compose.yml` and `config.json`: `SYSNAME` in docker-compose.yml must be present and identical to `name` value(s) in `config.json`. Then run `docker-compose build && docker-compose up` to start dbmanager and collector(s)
   - When E-Series arrays are added or removed, edit the same files and run `docker-compose build && docker-compose down && docker-compose up` to update
 
-Kubernetes users should skim through this page to get the idea how this works, and then work by [Kubernetes README](kubernetes/README.md).
+Kubernetes users should skim through this page to get the idea how this works, and then follow [Kubernetes README](kubernetes/README.md).
 
 ## Slow start
 
@@ -72,39 +74,41 @@ git clone github.com/scaleoutsean/eseries-perf-analyzer
 cd eseries-perf-analyzer
 # make and run Grafana and InfluxDB
 cd epa; make run
+# go to the collector subdirectory
 cd ..; cd collector
-# Enter name of E-Series array (or arrays) to show in Grafana drop-down list.
-# This file will be copied to dbmanager container with "docker-comose build".
+# Enter names of E-Series array (or arrays) to show in Grafana drop-down list.
+# "docker-comose build" will copy this file to dbmanager.
 vim config.json
 # Edit docker-compose file leave dbmanager unchanged. Collector containers should reflect config.json:
-#     container_name, specifically , must be the same as array name in config.json.
+#     container_name, specifically , must be the same as storage array name in config.json.
 vim docker-compose.yml
-# We are still in the ./collector subdirectory.
-# InfluxDB and Grafana are already running. Start collector(s) and dbmanager:
+# We are still in the ./collector subdirectory. InfluxDB and Grafana are already running. 
+# Build and start collector(s) and dbmanager:
+docker-compose build
 docker-compose up
 # Check Grafana and if OK, hit CTRL+C, restart with:
 docker-compose up -d
 # If not OK, CTRL+C and "docker-compose down". 
 # Then review config.json and docker-compose.yml.
-# collector.py and db_manager.py can be started from the CLI for easier troubleshooting.
+# collector.py and db_manager.py can be started from the CLI for easier troubleshooting without containers.
 ```
 
 ### Environment variables and configuration files
 
 - `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two
-- `./collector` is simpler: use `docker-compose` to build/start/stop/remove collector and dbmanager containers
+- `./collector` is simpler: use `docker-compose` to build/start/stop/remove collector and dbmanager containers and don't forget `config.json`
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - `USERNAME` - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
   - `PASSWORD` - SANtricity password for the account used to monitor
-  - `SYSNAME` - SANtricity array name, such as R26U25-EF600 - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`. If you want to make the name identical to actual E-Series array name, [this image](/images/sysname-in-santricity-manager.png) shows where to look them up
-  - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - see [this image](/images/sysid-in-santricity-manager.png) on where to find it.
-  - `API` - SANtricity controller's IP address such as 6.6.6.6
+  - `SYSNAME` - SANtricity array name, such as `R26U25-EF600` - get this from the SANtricity Web UI, but you can use your own - just keep it consistent with the name in `./collector/config.json`. If you want to make the name identical to actual E-Series array name, [this image](/images/sysname-in-santricity-manager.png) shows where to look it up
+  - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - see [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI.
+  - `API` - SANtricity controller's IP address such as 6.6.6.6. Port number (`:8443`) is automatically set in scripts
   - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
-  - `DB_ADDRESS` - external IPv4 of InfluxDB (if the host IP where InfluxDB is running is remote that could be something like 7.7.7.7, if collector and InfluxDB are on the same host then 127.0.0.1, or if they're in the same Kubernetes namespace then `influxdb`)
+  - `DB_ADDRESS` - external IPv4 of the InfluxDB host. If the host IP where InfluxDB is running is remote that could be something like 7.7.7.7. If dbmanager, collector and InfluxDB are on the same host then it can be 127.0.0.1; if they're in the same Kubernetes namespace then `influxdb`, etc.)
 
-What are the correct values for `API`, `SYSNAME` and `SYSID`? The `API` addresses are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. For `SYSNAME` and `SYSID`, see the image links just above.
+Where to find the `API` value(s)? `API` address (or addresses) are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. 
 
-For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be. It can consist of arbitrary alphanumeric characters (and `_` and `-`; if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are consistent; otherwise array metrics and events may get collected, but drop-down lists with array names in Grafana dashboards won't match so the dashboards will be empty.
+For consistency's sake it is recommended that `SYSNAME` in EPA is the same as the actual E-Series system name, but it doesn't have to be - it can consist of arbitrary alphanumeric characters (and `_` and `-`; if interested please check the Docker Compose documentation). Just make sure the array names in `./collector/docker-compose.yml` and `./collector/config.json` are identical; otherwise array metrics and events may get collected, but drop-down lists with array names in Grafana dashboards won't match so the dashboards will be empty even though the InfluxDB is not.
 
 Example of `docker-compose.yml` with collector for one array:
 
@@ -132,7 +136,7 @@ services:
       - DB_PORT=8086
 ```
 
-`SYSNAME` from docker-comopose.yml should be the same as `name` in `config.json` used by dbmanager. Here the `name` matches `environment:SYSNAME` value in `docker-compose.yml` above.
+`SYSNAME` from `./collector/docker-comopose.yml` should be the same as `name` in `config.json` used by dbmanager. Here the `name` matches `environment:SYSNAME` value in `docker-compose.yml` above.
 
 ```json
 {
@@ -308,11 +312,11 @@ This screenshot shows *aggregate* values for all arrays (useful in HPC environme
 
 ![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
-This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are collected from just one of two arrays.
+This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying it to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are collected from just one of two arrays.
 
 ## Tips and Q&A
 
-Below details are mostly related to this fork. For upstream details please check their read-me file.
+Below details are mostly related to this fork. For upstream details please check their README.
 
 **Q:** Why do I need to fill in so many details in Collector's YAML file?
 
@@ -400,10 +404,11 @@ python3 ./collector/collector/collector.py \
 ## Changelog
 
 - 3.2.0 (Jan 30, 2023):
+  - No new features vs. v3.1.0
   - No changes to Grafana container, Grafana charts, and InfluxDB container
-  - collector and dbmanager are now completely independent of containers built by InfluxDB and Grafana Makefile
-  - New Kubernetes folder with Kubernetes-related instructions and sample YAML files
-  - Collector and dbmanager can be built for AMD64 and ARM64 architecture
+  - collector and dbmanager are now completely independent of containers built by InfluxDB and Grafana Makefile 
+  - New kubernetes folder with Kubernetes-related instructions and sample YAML files
+  - collector and dbmanager can work on both AMD64 and ARM64 systems
 
 - 3.1.0 (Jan 12, 2023):
   - No changes to Grafana dashboards

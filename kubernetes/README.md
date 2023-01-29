@@ -3,17 +3,18 @@
 
 - [Deploy EPA dbmanager and collector(s)](#deploy-epa-dbmanager-and-collectors)
   - [Assumptions](#assumptions)
-    - [Deployment decisions](#deployment-decisions)
-  - [Create namespace and deploy InfluxDB and Grafana](#create-namespace-and-deploy-influxdb-and-grafana)
+  - [Deployment decisions](#deployment-decisions)
+  - [Create a namespace and deploy InfluxDB and Grafana](#create-a-namespace-and-deploy-influxdb-and-grafana)
     - [Create a namespace](#create-a-namespace)
-  - [Deploy InfluxDB version 1 and Grafana version 8](#deploy-influxdb-version-1-and-grafana-version-8)
+    - [Deploy InfluxDB version 1 and Grafana version 8](#deploy-influxdb-version-1-and-grafana-version-8)
   - [Prepare configuration files and deploy EPA dbmanager and collector](#prepare-configuration-files-and-deploy-epa-dbmanager-and-collector)
     - [dbmanager](#dbmanager)
     - [collector(s)](#collectors)
-  - [Result:](#result)
+  - [Result](#result)
   - [Common mistakes](#common-mistakes)
   - [Summary](#summary)
 
+If you'd prefer to watch a 3 minute deployment video rather than read a lot of text, see it [here](samples/README.md#video-demo).
 
 ## Assumptions
 
@@ -22,15 +23,15 @@
 - CSI plugin for persistent volumes
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
-### Deployment decisions
+## Deployment decisions
 
 In their current form dbmanager and collector don't use any service ports, TLS certificates and such. They can run in the same namespace as InfluxDB (and Grafana).
 
 The main thing to decide is where to run collectors: in the same namespace, in the same Kubernetes cluster, or externally and closer to each E-Series array (in which case InfluxDB 8086/tcp must be exposed at `EXTERNAL-IP` and (should be) secured by firewall rules).
 
-Another concern is whether you want to encrypt the monitor account password (used by both dbmanager and collector). If you use the monitor account, which is read-only, the risk of password being exposed is fairly low.
+Another concern is whether you want to encrypt the monitor account password (used by collector). If the SANtricity (read-only) monitor account is used, the consequence of its password being exposed is that someone could see your E-Series metrics, capacity and such - in other words, very limited impact. Additionally, each collector can run in a different location, be secured by respective E-Series "owner", and use a different password. The risk is low and that's why collector still stores credentials in deployment's ENV variables. But collector deployment YAML can be modified and password stored elsewhere similarly to what we do for InfluxDB.
 
-## Create namespace and deploy InfluxDB and Grafana
+## Create a namespace and deploy InfluxDB and Grafana
 
 ### Create a namespace
 
@@ -40,7 +41,7 @@ Examples and YAML files use the `epa` namespace. Many how-to's seem to standardi
 kubectl create namespace epa
 ```
 
-## Deploy InfluxDB version 1 and Grafana version 8
+### Deploy InfluxDB version 1 and Grafana version 8
 
 You may deploy InfluxDB v1 (v1.8, for example) and Grafana version 8 any way you want. Just make sure that:
 
@@ -60,16 +61,18 @@ The YAML samples in here are set to use ready-made imags from Docker Hub, e.g. d
 ```sh
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/collector
-docker-compose build # prefix with "sudo " if need be
+docker-compose build             # prefix with "sudo " if need be
 ```
 
 Using collector image as an example, image location in YAML file needs to be edited if you don't want to use Docker Hub:
 
-|Approach      |Image location|
-|:--------     |: ----------  |
-|Local build   | epa/collector:v3.2.0                           | 
+|Approach      |Image location (example)|
+|:-------------|:-------------|
+|Local build   | epa/collector:v3.2.0                           |
 |Docker Hub    | docker.io/scaleoutsean/epa-collector:v3.2.0    |
 |Local registry| reg.istry.local/myaccount/epa-collector:latest |
+
+Go to `./collector/kubernetes` and make appropriate image source (and other) changes to all YAML files.
 
 ### dbmanager
 
@@ -93,17 +96,23 @@ To deploy, edit `01-epa-dbmanager.yaml` in at least the following places:
     }
 ```
 
-- InfluxDB address or host name (can be as simple as `influxdb` if dbmanager will be running in the same namespace):
+- InfluxDB IPv4 address or host name (can be as simple as `influxdb` if dbmanager will be running in the same namespace as InfluxDB):
 
 ```yaml
           env:
             - name: DB_ADDRESS
-              value: 192.168.1.127
+              value: 7.7.7.7
 ```
 
-- Optionally edit image source as explained earlier
+- Optionally edit container image source as explained earlier
 
-When that's all done, start it in the namespace of your choosing:
+|Approach      |Image location (example)|
+|:-------------|:-------------|
+|Local build   | epa/dbmanager:v3.2.0                           |
+|Docker Hub    | docker.io/scaleoutsean/epa-dbmanager:v3.2.0    |
+|Local registry| reg.istry.local/myaccount/epa-dbmanager:latest |
+
+When that's all done, deploy it in the namespace of your choosing:
 
 ```sh
 kubectl -n epa apply -f 01-epa-dbmanager.yaml
@@ -115,21 +124,21 @@ Because the JSON example above uses two arrays, two sample YAML files (02 and 03
 
 Change at least the following:
 
-- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the [main README](../README.md)), and username/password pair for the SANtricity API user (best use the `monitor` user because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
+- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the [main README](../README.md)), and username/password pair for the SANtricity API user (best use the `monitor` account because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
 
 ```yaml
 data:
   API: "5.5.5.5"
   SYSNAME: "R26U25-EF600" # note uppercase letters, consistent with dbmanager
   SYSID: "600A098000F63714000000005E791234"
-  DB_ADDRESS: "192.168.1.127"
+  DB_ADDRESS: "7.7.7.7"
   PASSWORD: "monitor123"
   USERNAME: "monitor"
 ```
 
-- In all places where `r26u25-ef600` appears (container names and whatnot), search & replace that string with your `SYSNAME`, so that you can tell one collector container from another. These could probably be changed to uppercase
+- In all places where `r26u25-ef600` appears (container names and whatnot), search & replace that string with your `SYSNAME`, so that you can tell one collector container from another.
 
-- Change image source if you don't want to use the one from Docker Hub
+- Change the image source if you don't want to use the one from Docker Hub
 
 Then deploy each configuration file, or just one if you have one array: 
 
@@ -138,12 +147,12 @@ kubectl -n epa apply -f 02-epa-collector-EF600.yaml
 kubectl -n epa apply -f 03-epa-collector-E2824.yaml
 ```
 
-## Result:
+## Result
 
 One InfluxDB, one Grafana, one dbmanager and one or more collectors:
 
 ```sh
-kubectl get pods
+kubectl -n epa get pods
 # NAME                                      READY   STATUS    RESTARTS   AGE
 # dbmanager-5b5b6945c8-zpf64                1/1     Running   0          45s
 # collector-r24u04-e2824-5ffd5886-tmnpl     1/1     Running   0          4s
@@ -152,23 +161,23 @@ kubectl get pods
 # influxdb-f4bb6575d-z44wt                  1/1     Running   0          176m
 ```
 
-Grafana > Explore to see if this data is in there.
+Go to Grafana > Explore to see if InfluxDB database is available to Grafana, which would assure us that collector, InfluxDB and Grafana data source are working correctly.
 
 ![dbmanager data in Explorer](../images/kubernetes-05-grafana-explore-dbmanager-data.png)
 
 ## Common mistakes
 
-If you have a problem, it's probably due to using a wrong namespace or typos in YAML files.
+If you have a problem, it's probably due to using a wrong namespace or typos in one of the YAML files.
 
-Here's an example of what happens when `config.json` in dbmanager uses uppercase and `SYSNAME` in collector uses lowercase: data is collected and delivered to InfluxDB, but not visible in EPA dashboards.
+Here's an example of what happens when dbmanager's `config.json` uses uppercase, and `SYSNAME` in collector uses lowercase array names: data is collected and delivered to InfluxDB, but not visible in EPA dashboards.
 
 ![Mismatch in SYSID](../images/kubernetes-06-grafana-misconfigured-dbmanager.png)
 
-The result is Grafana > Explore (screenshot) shows the "same" name twice, but in dashboards don't show `r24u04-e2824` (which collector gathes based on its configuration) in drop-down menu, but only `R24U04-E2824` (because dbmanager is configured to create `SYSNAME` using uppercase).
+The result is Grafana > Explore (screenshot) shows the "same" name twice (lowercase and uppercase), but the dashboards don't show `r24u04-e2824` (which collector gathers based on its configuration) in dashboards' drop-down menu. Instead they show `R24U04-E2824`, because dbmanager's `config.json` is configured to create `SYSNAME`s using uppercase.
 
-This can be fixed by deleting one of the deployments and editing YAML file the names consistent.
+This can be fixed by deleting one of the deployments (either dbmanager or collector) and editing YAML file to make the names consistent.
 
-Collector and dbmanager pods can be observed the usual way:
+collector and dbmanager pods can be observed the usual way:
 
 ```sh
 kubectl -n epa logs dbmanager-5b5b6945c8-zpf64

@@ -51,6 +51,13 @@ spec:
           image: docker.io/scaleoutsean/epa-collector:v3.2.0
           # image: epa/collector:3.2.0
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: 0.2
+            limits:
+              memory: "64Mi"
+              cpu: 0.4            
           env:
             - name: API
               valueFrom:
