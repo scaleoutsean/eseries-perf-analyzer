@@ -53,6 +53,7 @@ vim config.json
 vim docker-compose.yml
 # We are still in ./collector subdirectory.
 # InfluxDB and Grafana are already running, start collector(s) and dbmanager:
+make build
 docker-compose up
 # Check Grafana and if OK, hit CTRL+C, restart with:
 docker-compose up -d
