@@ -4,7 +4,6 @@ services:
 
   collector-dbmanager:
     image: epa/dbmanager:v3.2.0
-    # build: ./dbmanager
     build:
           context: .
           dockerfile: ./dbmanager/Dockerfile
