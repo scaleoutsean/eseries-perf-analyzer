@@ -204,15 +204,17 @@ If EPA Grafana was built with `cd epa & make build` earlier, the Ansible contain
 InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively, otherwise Ansible won't be able to connect.
 
 ```sh
-# find the ansible container
+# find the ansible container buit in ./epa with make build
 docker images | grep ansible
 # ntap-grafana/ansible:3.1
 
 # run this in the same namespace where InfluxDB and Grafana are (example: epa)
 kubectl run ansible --restart=Never --image=ntap-grafana/ansible:3.1 -n epa
 
-# the image hasn't changed since v3.0.0, so you can use one of the earlier versions as well
-# kubectl run ansible --restart=Never --image=docker.io/ntap-grafana/ansible:3.0 -n epa
+# this image hasn't changed from upstream v3.0.0, so you can use v3.0.0 or v3.1 you already have it in your registry
+# kubectl run ansible --restart=Never --image=regi.istry.lan/ntap-grafana/ansible:3.0 -n epa
+# or (container image uploaded by me to Docker Hub)
+# kubectl run ansible --restart=Never --image=docker.io/scaleoutsean/epa-ansible:v3.2.0 -n epa
 
 # check that the ansible pod is running
 
@@ -227,7 +229,7 @@ kubectl get pods -n epa
 kubectl delete pod ansible -n epa
 ```
 
-Now Grafana should have two new Data Sources and EPA dashboards. If it doesn't, that means Ansible failed to connect to InfluxDB and Grafana in the `epa` namespace. You can fix that and run the pod again.
+Now Grafana should have two new Data Sources and EPA dashboards. If it doesn't, that means Ansible failed to connect to InfluxDB and Grafana in the `epa` namespace. You need to fix that and run the pod again.
 
 If you want to use this approach but Grafana and InfluxDB are *not* in the same namespace, maybe they can be deployed to the same namespace, and Grafana can be exported after Ansible has completed its configuration. See below for other approaches.
 
