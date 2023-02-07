@@ -316,7 +316,7 @@ This is the second example with physical disks and it's highlighted because this
 
 ## FAQs
 
-Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions).
+Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
 

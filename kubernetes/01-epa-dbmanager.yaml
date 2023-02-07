@@ -52,7 +52,7 @@ spec:
       containers:
         - name: dbmanager
           # image: epa/epa-dbmanager:3.2.0
-          image: ghcr.io/scaleoutsean/epa-dbmanager:v3.2.0
+          image: docker.io/scaleoutsean/epa-dbmanager:v3.2.0
           imagePullPolicy: IfNotPresent
           resources:
             requests:
