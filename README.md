@@ -12,7 +12,7 @@
   - [Walk-through](#walk-through)
     - [Using public Docker images](#using-public-docker-images)
   - [Sample Grafana screenshots](#sample-grafana-screenshots)
-  - [Tips and Q\&A](#tips-and-qa)
+  - [FAQs](#faqs)
   - [Changelog](#changelog)
 
 
@@ -58,11 +58,11 @@ cd eseries-perf-analyzer/epa
 - go to the `collector` sub-directory edit `docker-compose.yml` and `config.json`: `SYSNAME` in docker-compose.yml must be present and identical to `name` value(s) in `config.json`. Then run `docker-compose build && docker-compose up` to start dbmanager and collector(s)
   - When E-Series arrays are added or removed, edit the same files and run `docker-compose build && docker-compose down && docker-compose up` to update
 
-Kubernetes users should skim through this page to get the idea how this works, and then follow [Kubernetes README](kubernetes/README.md).
+Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
 
 ## Slow start
 
-It is suggested to start with Docker Compose. There's also a [Kubernetes](kubernetes)-specific folder.
+It is suggested to get EPA working in Docker Compose, unless you're good at Kubernetes. There's also a [Kubernetes](kubernetes)-specific folder.
 
 - Older existing EPA (v3.0.0, v3.1.0), images, volumes and services may cause container name, volume and port conflicts. Either use a new VM or find the existing (old) deployment and run `make stop; docker-compose down; make rm` to stop and remove old EPA pre-v3.2.0 containers before building new ones. Data (InfluxDB and Grafana) can be left in place.
 - Clone this repository to a new location
@@ -314,92 +314,9 @@ This screenshot shows *aggregate* values for all arrays (useful in HPC environme
 
 This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying it to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are collected from just one of two arrays.
 
-## Tips and Q&A
+## FAQs
 
-Below details are mostly related to this fork. For upstream details please check their README.
-
-**Q:** Why do I need to fill in so many details in Collector's YAML file?
-
-**A:** It's a one time activity that lowers the possibility of making a mistake.
-
-**Q:** It's not convenient for me to have multiple storage admins edit `./collector/docker-compose.yml` 
-
-**A:** The whole point of this fork (and separating collector from the rest) is that centralization can be avoided, so when there's no one "storage team" that manages all arrays, each admin can have their own collector and rotate (and protect) passwords as they see fit.
-
-**Q:** How to modify collector Docker image? 
-
-**A:** Any way you want. Example: `cp -pr ./collector/collector ./collector/mycollector-v1`, edit container config in the new location, build the container in the new directory using `docker build -t ${NEW_NAME} .`, change `./collector/docker-compose.yml` to use the new Docker image (under `epa/mycollector-v1`), change `./collector/config.json` to make sure dbmanager is aware of the new array name (`SYSNAME`). Finally, run `docker-compose build && docker-compose up $mycollector`. You may modify collector's Makefile to add the new directory.
-
-**Q:** This looks complicated!
-
-**A:** If you can't handle it, you don't even have to use containers. Install InfluxDB *any way you can/want*, and run collector and dbmanager from the CLI (use `python3 ./collector/collector/collector.py -h` and similar for db_manager.py to see how). Create a data source (InfluxDB) for Grafana, import EPA's dashboards or create your own.
-
-**Q:** Why can't we have one config.json for all monitored arrays?
-
-**A:** There may be different people managing different arrays. Each can run their own collector and not spend more than 5 minutes to learn what they need to do to get this to work. Each can edit their Docker environment parameters (say, change the password in docker-compose.yaml) without touching InfluxDB and Grafana. dbmanager (config.json) is the only "centralized" service which needs to maintain the list of array names that are being sent to InfluxDB and container no credentials (see `config.json`).
-
-**Q:** If I have three arrays, two VMs with collectors and these send data to one InfluxDB, do I need to run 1, 2 or 3 dbmanager containers?
-
-**A:** Just one dbmanager is needed if you have one InfluxDB. 
-
-**Q:** What does dbmanager actually do?
-
-**A:** It sends the list of monitored arrays (`SYSNAME`s) to InfluxDB, that's all. This is used to create a drop-down list of arrays in EPA's Grafana dashboards. Prior to v3.1.0 EPA got its list of arrays from the Web Services Proxy so it "knew" which arrays are being monitored. In EPA v3.1.0 and v3.2.0 collector containers may be running in several places and none of them would know what other collectors exist out there. dbmanager maintains a list of all monitored arrays and periodically pushes it to InfluxDB, while dropping other folders (array names which no longer need to be monitored). If you have a better idea or know that's unnecessary, feel free to submit a pull request. InfluxDB v1 is old and this approach is simple and gets the job done.
-
-**Q:** I have an existing intance of the upstream EPA v3.0.0. Can I add more E-Series arrays without using WSP?
-
-**A**: It could be done, but it's complicated because db_manager.py now drops folder tags for arrays it's not aware of so it'd be too much trouble. Best remove existing EPA and deploy EPA >= v3.1.0. You may be able to retain all InfluxDB data if you used just default folders in WSP and did not change array names (i.e. `SYSNAME` and `SYSID` remain the same as they were in v3.0.0). Grafana dashboards haven't been changed and I won't change them in any future v3, but if you've customized them or added your own, make a backup and make sure it can be restore it to the new deployment before old Grafana is deleted.
-
-**Q:** How can I customize Grafana's options?
-
-**A**: EPA doesn't change Grafana in any way, so follow the official documentation. If ./epa/grafana/grafana.ini is replaced by ./epa/grafana/grafana.ini.alternative that may provide better privacy (but it also disables notifications related to security and other updates).
-
-**Q:** What if I run my own InfluxDB v1.8 and Grafana v8? Can I use this Collector without EPA?
-
-**A**: Yes. That's another reason why I made collector.py a stand-alone script without dependencies on the WSP. Just build this fork of EPA and collector container, and then run just collector's docker-compose (no need to run `make run` in the `epa` subdirectory since you already have InfluxDB and Grafana). Or use `collector` and `dbmanager` from the CLI, without containers.
-
-**Q:** Where's my InfluxDB data?
-
-**A:** It is in the `epa/influx-database` sub-directory and created on first successful run of EPA (`make run`). 
-
-**Q:** Where's my Grafana data? I see nothing when I look at the dashboards!
-
-**A:** It uses a local Docker volume, see `epa/docker-compose.yml`. Grafana data can't be seen in dahboards until collector successfully runs, and sends data to the `eseries` database in InfluxDB. `dbmanager` also must run to create Influx "folders" (kind of tags) that let you select arrays in EPA's Grafana dashboards. Login to InfluxDB or go to Grafana > Explore to see if Grafana can access InfluxDB and see any data in it. Sometimes data is accessible to Grafana, but collector or dbmanager are misconfigured so dashboards show nothing. Other times the collector has a typo in the password or IP address and can't even access E-Series.
-
-**Q:** If I use my own Grafana, do I need to recreate EPA dashboards from scratch?
-
-**A:** It is possible to create an InfluxDB data source named "WSP" (name hard-coded in EPA dashboards) and import dashboards from `epa/plugins/eseries_monitoring/dashboards` - see the Kubernetes README for additional information. Grafana 9 users need to do the same, but may also have to [make minor edits](https://github.com/grafana/grafana/discussions/45230) to EPA's Grafana 8 dashboards.
-
-**Q:** How much memory does each collector container need? 
-
-**A:** It my testing, much less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
-
-**Q:** How much memory does the dbmanager container need? 
-
-**A:** We need just one container per InfluxDB and it needs less than 20 MiB. 32 MiB or 64 MiB is more than enough.
-
-**Q:** How to run collector and dbmanager from the CLI? 
-
-**A:** Run `db_manager.py - h` and `collector.py -h`. Example for the latter:
-
-```sh
-python3 ./collector/collector/collector.py \
-  -u ${USERNAME} -p ${PASSWORD} \
-  --api ${API} \
-  --dbAddress ${DB_ADDRESS}:8086 \
-  --retention ${RETENTION_PERIOD} \
-  --sysname ${SYSNAME} --sysid ${SYSID} \
-  -i -s
-```
-
-**Q:** What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? 
-
-**A:** You will notice it quickly because you'll stop getting metrics. Then fix the controller or change the setting to use the other controller and restart collector. It is also possible to use `--api 5.5.5.1 5.5.5.2` to round-robin collector requests to two controllers. If one fails you should get 50% less frequent metric delivery to Grafana, and get a hint. Or, set `API=5.5.5.1 5.5.5.2` in docker-compose.yaml. This hasn't been tested a lot, but it appears to work.
-
-**Q:** Can the E-Series' WWN change?
-
-**A:** Normally it can't, but it's theoretically [possible](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/E-Series_SANtricity_Software_Suite/WWNs_changed_after_offline_replacement_of_tray_0). Should that happen you'd have to update your configuration and restart collector container affected by this change.
-
+Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions).
 
 ## Changelog
 

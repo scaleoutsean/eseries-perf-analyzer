@@ -15,8 +15,8 @@
     - [Manually add InfluxDB as Grafana Data Source](#manually-add-influxdb-as-grafana-data-source)
       - [Manually import Grafana dashboards](#manually-import-grafana-dashboards)
       - [Other ways to provision Grafana data sources and dashboards](#other-ways-to-provision-grafana-data-sources-and-dashboards)
-    - [Wrap-up](#wrap-up)
-    - [Video demo](#video-demo)
+  - [Wrap-up](#wrap-up)
+  - [Video demo](#video-demo)
 
 
 ## Assumptions
@@ -28,16 +28,17 @@
 
 ## Sample configuration files 
 
-These are for reference only. Please use own files and best practices in production and remember to change the namespace if necessary.
+These are for reference only. Please use own files and best practices in production and remember to adjust the namespace if necessary.
 
 - 01-pvc-influxdb.yaml: production-style PVCs (three volumes) for InfluxDB. Maybe you want to increase the size of the largest volume to more than 10GB. Storage Class name can also be changed if you don't have the one used here.
 - 02-pvc-grafana.yaml: optional PVC for Grafana. Storage Class name can be changed if you don't have the one used here.
-- 03-svc-influxdb.yaml: InfluxDB service
+- 03-svc-influxdb.yaml: InfluxDB service 
 - 04-svc-grafana.yaml: Grafana service
-- 05-dep-influxdb.yaml: deployment for InfluxDB; it uses three volumes created in 01-pvc-influxdb.yaml
-- 07-dep-grafana.yaml: Grafana deployment that uses configmap from 06-configmap-grafana.yaml
+- 05-configmap-grafana.yaml: Grafana config map
+- 06-dep-grafana.yaml: Grafana deployment that uses configmap from 05-configmap-grafana.yaml and 02-pvc-grafana.yaml
+- 07-dep-influxdb.yaml: deployment for InfluxDB; it uses three volumes created in 01-pvc-influxdb.yaml
 
-**NOTE:** for deployment files, do not forget to edit image location (local build, Docker Hub, private registry, etc.)!
+**NOTE:** for deployment files, do not forget to edit the image location (local build, Docker Hub, private registry, etc.)!
 
 ## Create a namespace
 
@@ -84,13 +85,15 @@ Permissions:
 .../influxdb/wal/   700
 ```
 
+I because WAL and Meta aren't large, there isn't much disadvantage in using three separate PVCs, which is the approach taken by the sample YAML files. 
+
 ### Other configuration, secrets and standing up InfluxDB
 
 Various configuration options for InfluxDB may be viewed [here](https://docs.influxdata.com/influxdb/v1.8/introduction/install/).
 
 InfluxDB secrets can be complex or simple depending on needs. EPA collector has never used authentication (because it used to runs on the same network as InfluxDB), so we cannot simply create INFLUXDB_USER (that's why it's marked-out) without modifying collector and dbmanager scripts to add authentication. 
 
-If you will run collector and dbmanger as they are, create proper firewall rules for InfluxDB external IP, or run collector(s) and dbmanger in the same namespace.
+If you will run collector and dbmanger as they are, create proper firewall rules for the InfluxDB external IP (to allow only external collectors to connect to it), or run collector(s) and dbmanger in the same namespace.
 
 `influxdb.yaml` contains service configuration that listens on port 8086/tcp.
 
@@ -194,11 +197,12 @@ Both approaches work the same as they do in EPA with Docker Compose: Ansible con
 
 For this we need to execute EPA Ansible container **in the Kubernetes namespace where InfluxDB and Grafana run**.
 
-If EPA Grafana were built with `make build` earlier, the Ansible container should be already ready to use.
+If EPA Grafana was built with `cd epa & make build` earlier, the Ansible container should be already ready to use. If not, go to the top-level `epa` directory and run `make build`. Use `docker images | grep ansible` to find the container name and version.
 
 InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively, otherwise Ansible won't be able to connect.
 
 ```sh
+# find the ansible container
 docker images | grep ansible
 # ntap-grafana/ansible:3.1
 
@@ -301,17 +305,17 @@ In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Da
 
 ![Create Grafana Data Source for InfluxDB v1](../../images/kubernetes-01-influxdb-datasource.png)
 
-If authentication was not configured in the InfluxDB section, or you don't want to use it, it's unnecessary to enable Basic Auth and provide credentials for Grafana account on InfluxDB. But if your InfluxDB is open to LAN clients, it's better to protect it and use a read-only account in Grafana.
+If authentication was not configured in the InfluxDB section (`kubectl -n epa create secret generic influxdb-creds`), or you don't want to use authentication for Grafana, it's unnecessary to enable Basic Auth and provide credentials for Grafana account on InfluxDB. But if your InfluxDB is open to LAN clients, it's better to protect it and use a read-only account in Grafana.
 
-Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is missing, Grafana will complain about the missing database (screenshot below). That's not a problem because the database will be created later (by collector or by dbmanager).
+Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is still missing, Grafana will complain about the missing database (screenshot below). That's not a problem because the database will be created later (by collector or by dbmanager).
 
 ![Database missing until created](../../images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
 
-Alternatively, Influx API or CLI can be used create a database before that. Then Save & Test will show that Data Source is fully validated (below).
+The InfluxDB API or CLI can be used create a database before that. Then Save & Test will show that Data Source is fully validated (below).
 
 ![Database available after created](../../images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
 
-Either way is fine, unless additional authentication and authorization settings are required on InfluxDB. It's easier to let collector or dbmanager do it automatically later.
+Either way is fine. It's easier to ignore this and let dbmanager automatically create initial data.
 
 If possible, make the WSP data source your Default data source in Grafana. That seems to cause less problems when EPA dashboards are imported in various approaches.
 
@@ -373,7 +377,7 @@ Maybe Grafana Helm charts work better. I haven't tried.
 
 Recreating dashboards from scratch is possible, but could turn out to be time-consuming.
 
-### Wrap-up
+## Wrap-up
 
 Now the correct functioning of Grafana and InfluxDB can be checked.
 
@@ -383,8 +387,8 @@ This screenshot shows dbmanager with a different container name to what's in YAM
 
 In this section InfluxDB and Grafana were deployed to the same namespace (`epa`), exposed as services, and configured so that Grafana has access to InfluxDB databases and EPA dashboards.
 
-### Video demo
+## Video demo
 
-- EPA 3.2.0: TODO
+- EPA 3.2.0 on Kubernetes: TODO
 - [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) - uses YAML files and automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes.
 
