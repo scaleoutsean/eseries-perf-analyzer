@@ -1,7 +1,8 @@
 # Contributing
 
-Please contribute to upstream [here](https://github.com/NetApp/eseries-perf-analyzer/). 
-
-If you are sure to have a patch for this fork, please submit a request against `master`.
+For v3.1.0 and above, please submit your request against `develop` if it exists (I delete it when I don't need it), otherwise `master`.
 
 You may also submit bugs in Issues.
+
+For v3.0.0 it's better to submit against upstream, or try latest release of this fork and submit your pull request here.
+ 

@@ -1,0 +1,97 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2023-01-26T07:05:56Z"
+  name: collector-config-r26u25-ef600
+  namespace: epa
+data:
+  API: "5.5.5.5"
+  SYSNAME: "R26U25-EF600"
+  SYSID: "600A098000F63714000000005E79C17C"
+  DB_ADDRESS: "7.7.7.7"
+  PASSWORD: "monitor123"
+  USERNAME: "monitor"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kubernetes.io/description: "EPA metrics collector for E-Series"
+    a8r.io/owner: "scaleoutSean"
+    a8r.io/documentation: "https://github.com/scaleoutsean/eseries-perf-analyzer/tree/master/kubernetes"
+    a8r.io/chat: "https://github.com/scaleoutsean/eseries-perf-analyzer/discussions"
+    a8r.io/bugs: "https://github.com/scaleoutsean/eseries-perf-analyzer/issues"
+    a8r.io/repository: "https://github.com/scaleoutsean/eseries-perf-analyzer"
+    a8r.io/dependencies: "Python 3 with requests, InfluxDB and other modules"
+  creationTimestamp: null
+  labels:
+    kubernetes.io/os: "linux"
+    app.kubernetes.io/version: "3.2.0"
+    app.kubernetes.io/name: collector
+    # app.kubernetes.io/instance: dc1-collector-r26u25-ef600
+    service: collector-r26u25-ef600
+  name: collector-r26u25-ef600
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: collector-r26u25-ef600
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+      creationTimestamp: null
+      labels:
+        service: collector-r26u25-ef600
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: r26u25-ef600
+          image: docker.io/scaleoutsean/epa-collector:v3.2.0
+          # image: epa/collector:3.2.0
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: 0.2
+            limits:
+              memory: "64Mi"
+              cpu: 0.4            
+          env:
+            - name: API
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: API                             # The key to fetch.
+            - name: DB_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: DB_ADDRESS                      # The key to fetch.
+            - name: DB_PORT
+              value: "8086"
+            - name: USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: USERNAME                        # The key to fetch.
+            - name: PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: PASSWORD                        # The key to fetch.
+            - name: RETENTION_PERIOD
+              value: 52w
+            - name: SYSID
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: SYSID                           # The key to fetch.
+            - name: SYSNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: collector-config-r26u25-ef600  # The ConfigMap this value comes from.
+                  key: SYSNAME                          # The key to fetch.
+status: {}
+

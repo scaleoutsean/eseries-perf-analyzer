@@ -1,0 +1,49 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: epa
+  labels:
+    app: influxdb
+  name: influxdb-data-pvc
+spec:
+  # storageClassName: csi-hostpath-sc
+  storageClassName: standard
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: epa
+  labels:
+    app: influxdb
+  name: influxdb-wal-pvc
+spec:
+  # storageClassName: csi-hostpath-sc
+  storageClassName: standard
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  namespace: epa
+  labels:
+    app: influxdb
+  name: influxdb-meta-pvc
+spec:
+  # storageClassName: csi-hostpath-sc
+  storageClassName: standard
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+

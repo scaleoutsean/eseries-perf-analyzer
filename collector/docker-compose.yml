@@ -3,8 +3,10 @@ version: '3.6'
 services:
 
   collector-dbmanager:
-    image: ntap-grafana-plugin/eseries_monitoring/dbmanager:latest
-    container_name: dbmanager
+    image: epa/dbmanager:v3.2.0
+    build:
+          context: .
+          dockerfile: ./dbmanager/Dockerfile
     mem_limit: 32m
     restart: unless-stopped
     logging:
@@ -18,8 +20,9 @@ services:
       - DB_PORT=8086
 
   collector-R26U25-EF600:
-    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    image: epa/collector:v3.2.0
     container_name: R26U25-EF600
+    build: ./collector
     mem_limit: 64m
     restart: unless-stopped
     logging:
@@ -38,7 +41,7 @@ services:
       - DB_PORT=8086
 
   collector-R24U04-E2824:
-    image: ntap-grafana-plugin/eseries_monitoring/collector:latest
+    image: epa/collector:v3.2.0
     container_name: R24U04-E2824
     mem_limit: 64m
     restart: unless-stopped
