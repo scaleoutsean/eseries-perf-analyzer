@@ -393,6 +393,8 @@ In this section InfluxDB and Grafana were deployed to the same namespace (`epa`)
 
 ## Video demo
 
-- EPA 3.2.0 on Kubernetes: TODO
-- [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) - uses YAML files and automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes.
+- [EPA 3.2.0 on Kubernetes](https://rumble.com/v28mh6w-netapp-e-series-performance-analyzer-epa-v3.2.0-for-kubernetes.html)
+  - Docker Compose users may find this video useful, but make sure you work by the main README file
+- [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) 
+  - uses YAML files and automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes
 
