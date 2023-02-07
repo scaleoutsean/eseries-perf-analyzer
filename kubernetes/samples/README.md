@@ -136,7 +136,8 @@ With `influxdb-creds` ready, next we create PVCs, service and finally deployment
 ```sh
 kubectl -n epa apply -f 01-pvc-influxdb.yaml
 kubectl -n epa apply -f 03-svc-influxdb.yaml
-kubectl -n epa apply -f 05-dep-influxdb.yaml
+# 07-dep-influxdb.yaml uses influxdb-creds created with kubectl (see above)
+kubectl -n epa apply -f 07-dep-influxdb.yaml
 # persistentvolumeclaim/influxdb-data-pvc created
 # persistentvolumeclaim/influxdb-wal-pvc created
 # persistentvolumeclaim/influxdb-meta-pvc created
@@ -170,7 +171,8 @@ In production, Grafana service would be behind a reverse proxy. There are too ma
 ```sh
 kubectl -n epa apply -f 02-pvc-grafana.yaml
 kubectl -n epa apply -f 04-svc-grafana.yaml
-kubectl -n epa apply -f 07-dep-grafana.yaml
+kubectl -n epa apply -f 05-configmap-grafana.yaml
+kubectl -n epa apply -f 06-dep-grafana.yaml
 
 kubectl -n epa get services
 # NAME       TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
