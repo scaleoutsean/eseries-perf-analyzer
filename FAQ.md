@@ -22,6 +22,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?](#if-influxdb-is-re-installed-or-migrated-how-do-i-restore-influxdb-and-grafana-configuration)
   - [What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails?](#what-happens-if-the-controller-specified-by---api-ipv4-address-or-api-in-docker-composeyml-fails)
   - [Can the E-Series' WWN change?](#can-the-e-series-wwn-change)
+  - [How to backup and restore EPA or InfluxDB?](#how-to-backup-and-restore-epa-or-influxdb)
 
 
 ### Why do I need to fill in so many details in Collector's YAML file?
@@ -109,3 +110,8 @@ You will notice it quickly because you'll stop getting metrics. Then fix the con
 ### Can the E-Series' WWN change?
 
 Normally it can't, but it's theoretically [possible](https://kb.netapp.com/Advice_and_Troubleshooting/Data_Storage_Software/E-Series_SANtricity_Software_Suite/WWNs_changed_after_offline_replacement_of_tray_0). Should that happen you'd have to update your configuration and restart collector container affected by this change.
+
+### How to backup and restore EPA or InfluxDB?
+
+- Backup software: use software such as [Astra Control](https://docs.netapp.com/us-en/astra-control-center/) (if you run EPA on ONTAP), [Kasten K10](https://scaleoutsean.github.io/2023/02/10/backup-epa-data-on-kubernetes.html) or [Velero](https://scaleoutsean.github.io/2022/03/15/velero-18-with-restic-and-trident-2201.html). If there's no special application-aware snapshot integration, you may want to scale down InfluxDB to 0 in order to get a consistent PV snapshot, and then back to 1
+- Manual backup: considering that Grafana itself may not have a lot of data, and InfluxDB can be backed up with InfluxDB client, a shell script that uses InfluxDB client and the copy or rsync command can be used to dump data out and restore it later. Note that you may need to also dump/backup Grafana config, PVC configuration, InfluxDB secrets, and the rest

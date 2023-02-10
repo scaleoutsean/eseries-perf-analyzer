@@ -85,7 +85,9 @@ Permissions:
 .../influxdb/wal/   700
 ```
 
-I because WAL and Meta aren't large, there isn't much disadvantage in using three separate PVCs, which is the approach taken by the sample YAML files. 
+I because WAL and Meta aren't large, there isn't much disadvantage to using three separate PVCs, which is the approach taken by the sample YAML files. 
+
+If you need reliable InfluxDB backups and plan to snapshot PVs to get that, it's safer to use one larger volume for everything, unless you have a way to take multi-PV snapshots (aka "group snapshots", "consistency group snapshots").
 
 ### Other configuration, secrets and standing up InfluxDB
 
