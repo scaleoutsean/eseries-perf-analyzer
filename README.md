@@ -2,6 +2,7 @@
 
 - [NetApp E-Series Performance Analyzer ("EPA")](#netapp-e-series-performance-analyzer-epa)
   - [What is this thing](#what-is-this-thing)
+  - [What E-Series metrics does EPA collect](#what-e-series-metrics-does-epa-collect)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
   - [Slow start](#slow-start)
@@ -21,7 +22,7 @@
 This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0 (see its README.md for additional information) created with the following objectives:
 
 - Disentangle E-Series Collector from the rest of EPA and make it easy to run it anywhere (shell, Docker/Docker Compose, Kubernetes, Nomad)
-- Remove SANtricity Web Services Proxy (WSP) dependency so that one collector container or script captures data for one and only one E-Series array
+- Remove SANtricity Web Services Proxy (WSP) dependency from Collector and remove WSP from EPA, so that one collector container or script captures data for one and only one E-Series array
 
 In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB. dbmanager doesn't do much at this time - it periodically sends array names as folder tags to InfluxdDB.
 
@@ -29,11 +30,19 @@ In terms of services, collectors collects metrics from E-Series and sends them t
 
 Each of the light-blue rectangles can be in a different location (host, network, Kubernetes namespace, etc.). But if you want to consolidate, that's still possible.
 
-Changelog and additional details are at the bottom of this page and in the Releases tab.
+Change log and additional details are at the bottom of this page and in the Releases tab.
+
+## What E-Series metrics does EPA collect
+
+- System
+- Volumes
+- Interfaces
+- E-Series MEL events
+- Environmental (temperature and power consumption)
 
 ## Requirements
 
-- NetApp SANtricity OS: >= 11.70 (11.74 is recommended; 11.52 and 11.74 have been tested and work, 11.6[0-9] not yet)
+- NetApp SANtricity OS: >= 11.70 (11.80 is recommended; 11.52, 11.74, 11.80 have been tested and work, 11.6[0-9] not yet)
 - Containers:
   - Docker: Docker CE 20.10.22 (recent Docker CE or Podman should work) and Docker Compose v1 or v2 (both v1 and v2 should work) 
   - Kubernetes: dbmanager and collector should work on any
@@ -53,10 +62,12 @@ Docker Compose users:
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 ```
-- in the `epa` subdirectory, run `make run` to build and run InfluxDB and Grafana
+- the `epa` subdirectory: enter it, and use `make run` to build and run InfluxDB and Grafana
   - Unless these containers need a change or update, going back to this folder is generally not necessary
-- go to the `collector` sub-directory edit `docker-compose.yml` and `config.json`: `SYSNAME` in docker-compose.yml must be present and identical to `name` value(s) in `config.json`. Then run `docker-compose build && docker-compose up` to start dbmanager and collector(s)
-  - When E-Series arrays are added or removed, edit the same files and run `docker-compose build && docker-compose down && docker-compose up` to update
+- the `collector` subdirectory: go one level up from `epa`, and enter the `collector` sub-directory 
+  - edit `docker-compose.yml` and `config.json`: `SYSNAME` in docker-compose.yml must be present and identical to `name` value(s) in `config.json` 
+  - run `docker-compose build && docker-compose up` to start dbmanager and collector(s)
+  - if/when E-Series arrays are added or removed, edit the same files and run `docker-compose build && docker-compose down && docker-compose up` to update
 
 Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
 
@@ -95,7 +106,7 @@ docker-compose up -d
 
 ### Environment variables and configuration files
 
-- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two
+- `./epa/.env` has some env data used by its Makefile for InfluxDB and Grafana. Use `make` to start, stop, clean, remove, and restart these two containers
 - `./collector` is simpler: use `docker-compose` to build/start/stop/remove collector and dbmanager containers and don't forget `config.json`
 - When editing `./collector/docker-compose.yml`, provide the following for each E-Series array:
   - `USERNAME` - SANtricity account for monitoring such as `monitor` (read-only access to SANtricity)
@@ -104,7 +115,7 @@ docker-compose up -d
   - `SYSID` - SANtricity WWN for the array, such as 600A098000F63714000000005E79C888 - see [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI.
   - `API` - SANtricity controller's IP address such as 6.6.6.6. Port number (`:8443`) is automatically set in scripts
   - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
-  - `DB_ADDRESS` - external IPv4 of the InfluxDB host. If the host IP where InfluxDB is running is remote that could be something like 7.7.7.7. If dbmanager, collector and InfluxDB are on the same host then it can be 127.0.0.1; if they're in the same Kubernetes namespace then `influxdb`, etc.)
+  - `DB_ADDRESS` - external IPv4 of the InfluxDB host. If the host IP where InfluxDB is running is remote that could be something like 7.7.7.7. If dbmanager, collector and InfluxDB are on the same host then it can be 127.0.0.1; if they're in the same Kubernetes namespace then `influxdb`, etc.
 
 Where to find the `API` value(s)? `API` address (or addresses) are IPv4 addresses (or FQDNs) used to connect to the E-Series Web management UI. You can see them in the browser when you manage an E-Series array. 
 
@@ -175,7 +186,7 @@ The original EPA v3.0.0 exposes the SANtricity WSP (8080/tcp) and Grafana (3000/
 
 This fork does not use WSP. Grafana is the same (3000/tcp), but InfluxDB is now exposed externally at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB.
 
-To protect InfluxDB service open 8086/tcp to IP's or FQDNs where collector, dbmanager and Grafana run.
+To protect InfluxDB service open 8086/tcp to IP addresses or FQDNs where collector, dbmanager and Grafana run. If runs as one app on the same host or within Docker Compose/Kubernetes/Nomad, then no adjustments should be necessary.
 
 ### Add or remove a monitored array
 
@@ -194,7 +205,7 @@ To remove an array, remove it from `config.json` and `docker-compose.yml` and do
 
 To change the monitor account password for one particular collector, say the one used for array `R11U01-EF300`, change it on the array first, find this array in `docker-compose.yml`, change the password value in the `PASSWORD=` row for the array, run `docker-compose down R11U01-EF300` followed by `docker-compose up R11U01-EF300`.
 
-The array name has not changed, so it wasn't necessary to edit `./collector/config.json` and rebuild `./collector/dbmanager`, so running `docker-compose build` wasn't necessary.
+The array name has not changed, so it wasn't necessary to edit `./collector/config.json` and rebuild `./collector/dbmanager`, and running `docker-compose build` wasn't necessary either.
 
 ## Walk-through
 
@@ -290,6 +301,8 @@ Remember to edit Docker image location if you want to use local images or images
 
 This fork's dashboards are identical to upstream v3.0.0, but upstream repository has no screenshots - in fact they're hard to find on the Internet - so a sample of each dashboard is provided below.
 
+New metrics gathered by this EPA fork have *not* been added to the dashboards.
+
 - System view
 
 ![E-Series System](/images/sample-screenshot-epa-collector-system.png)
@@ -304,21 +317,37 @@ This screenshot shows *aggregate* values for all arrays (useful in HPC environme
 
 ![E-Series Physical Disks.png](/images/sample-screenshot-epa-collector-disks.png)
 
-- Logical volumes
-
-![E-Series Volumes.png](/images/sample-screenshot-epa-collector-volumes.png)
-
 - Physical disks - SSD wear level (%)
 
 ![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
-This is the second example with physical disks and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying it to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are collected from just one of two arrays.
+This is the second example for the same subsystem (physical disks) and it's highlighted because this data is collected by collector, but not shown in dashboards. In order to collect this data, an E-Series array with a recent SANtricity OS (11.74, for example) and at least one SSD is required. Visualization can then be done by duplicating one of the existing disk charts and modifying it to show "percentEnduranceUsed" values. This screenshot shows that SSD wear level metrics are collected from just one of two arrays.
+
+- Logical volumes
+
+![E-Series Volumes.png](/images/sample-screenshot-epa-collector-volumes.png)
+
+- Environmental indicators - total power consumption (W) and temperature (C)
+
+![E-Series Power and Temperature](/images/sample-screenshot-epa-collector-environmental.png)
+
+Like SSD wear level, these metrics are collected since v3.3.0, but you need to create new panels if you want to visualize them in Grafana. See the FAQs for query examples.
+
+- Environmental sensors - temperature (C) and power consumption (W)
+
+![E-Series Power and Temperature visualization](/images/sample-screenshot-epa-temp-and-power.png)
+
+Another example (with inlet mistakenly mislabelled as PSU). See the FAQs for more on these metrics.
 
 ## FAQs
 
 Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
+
+- 3.3.0 (Nov 10, 2023):
+  - collector now collects *controller shelf*'s total power consumption metric (sum of PSUs' consumption) and temperature sensors' values 
+  - Security-related updates of various components
 
 - 3.2.0 (Jan 30, 2023):
   - No new features vs. v3.1.0

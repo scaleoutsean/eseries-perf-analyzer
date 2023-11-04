@@ -1,5 +1,5 @@
-FROM python:3.10-alpine3.17
-ARG TAG=3.2.0
+FROM python:3.10.13-alpine3.18
+ARG TAG=3.3.0
 LABEL VERSION=${TAG}
 
 ADD ../config.json ./

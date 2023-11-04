@@ -166,6 +166,14 @@ MEL_PARAMS = [
     'location'
 ]
 
+SENSOR_PARAMS = [
+   'temp'
+]
+
+PSU_PARAMS = [
+   'totalPower'
+]
+
 
 #######################
 # PARAMETERS ##########
@@ -238,10 +246,14 @@ PARSER.add_argument('-e', '--showStateMetrics', action='store_true', default=0,
                     help='Outputs the state payload metrics from the SANtricity API to console. Optional. <switch>')
 PARSER.add_argument('-g', '--showInterfaceMetrics', action='store_true', default=0,
                     help='Outputs the interface payload metrics from the SANtricity API to console. Optional. <switch>')
+PARSER.add_argument('-pw', '--showPower', action='store_true', default=0,
+                    help='Outputs the PSU reading to console. Optional. <switch>')
+PARSER.add_argument('-en', '--showSensor', action='store_true', default=0,
+                    help='Outputs the readings from environmental sensors (temperature) to console. Optional. <switch>')
 PARSER.add_argument('-i', '--showIteration', action='store_true', default=0,
                     help='Outputs the current loop iteration. Optional. <switch>')
 PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
-                    help='Pull information from SANtricity, but do not send it to InfluxDB.  Optional. <swtich>')
+                    help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
 CMD = PARSER.parse_args()
 
 if CMD.sysname == '' or CMD.sysname == None:
@@ -263,6 +275,12 @@ if CMD.dbAddress == '' or CMD.dbAddress == None:
 else:
     influxdb_host = CMD.dbAddress.split(":")[0]
     influxdb_port = CMD.dbAddress.split(":")[1]
+
+if (CMD.retention == '' or CMD.retention == None):
+    LOG.warning("retention set to: %s", DEFAULT_RETENTION)
+    RETENTION_DUR = DEFAULT_RETENTION
+else:
+    RETENTION_DUR = CMD.retention
 
 
 #######################
@@ -343,9 +361,71 @@ def get_drive_location(sys_id, session):
     return drive_location
 
 
+def collect_symbol_stats(sys):
+    """
+    Collects temp sensor and PSU consumption (W) and posts them to InfluxDB
+    :param sys: The JSON object
+    """
+    try:
+        session = get_session()
+        client = InfluxDBClient(host=influxdb_host,
+                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        # PSU
+        psu_response = session.get(("{}/{}/symbol/getEnergyStarData").format(get_controller("sys"), sys_id),
+                                   params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
+        psu_total = psu_response['energyStarData']['totalPower']
+        if CMD.showPower:
+            LOG.info("PSU response (total): %s", psu_total)
+        json_body = list()
+        item = dict(
+            measurement="power",
+            tags=dict(
+                sys_id=sys_id,
+                sys_name=sys_name
+                ),
+            fields=dict(totalPower=psu_total)
+        )
+        json_body.append(item)
+        LOG.info("LOG: PSU data prepared")
+
+        # ENVIRONMENTAL SENSORS
+        response = session.get(("{}/{}/symbol/getEnclosureTemperatures").format(get_controller("sys"), sys_id),
+                                   params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
+        if CMD.showSensor:
+            LOG.info("Sensor response: %s", response['thermalSensorData'])
+        env_response = order_sensor_response_list(response)
+        i = 0
+        for sensor in env_response:
+            sensor_id = env_response[i]['thermalSensorRef']
+            sensor_order = "sensor_" + str(i)
+            item = dict(
+                measurement="temp",
+                tags=dict(
+                    sensor=sensor_id,
+                    sensor_seq=sensor_order,
+                    sys_id=sys_id,
+                    sys_name=sys_name
+                    ),
+                fields=dict(temp=env_response[i]['currentTemp'])
+            )
+            json_body.append(item)
+            i = i + 1
+        LOG.info("LOG: sensor data prepared")
+
+        if not CMD.doNotPost:
+            client.write_points(
+                json_body, database=INFLUXDB_DATABASE, time_precision="s")
+            LOG.info("LOG: SYMbol V2 PSU and sensor readings sent")
+    
+    except RuntimeError:
+        LOG.error(
+            ("Error when attempting to post tmp sensors data for {}/{}").format(sys["name"], sys["wwn"]))
+
+
 def collect_storage_metrics(sys):
     """
-    Collects all defined storage metrics and posts them to InfluxDB
+    Collects all defined storage metrics and posts them to InfluxDB: drives, system stats,
+    interfaces, and volumes
     :param sys: The JSON object of a storage system
     """
     try:
@@ -469,6 +549,7 @@ def collect_storage_metrics(sys):
         if not CMD.doNotPost:
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
+            LOG.info("LOG: storage metrics sent")
 
     except RuntimeError:
         LOG.error(
@@ -523,6 +604,7 @@ def collect_major_event_log(sys):
             json_body.append(item)
         client.write_points(
             json_body, database=INFLUXDB_DATABASE, time_precision="s")
+        LOG.info("LOG: MEL payload sent")
     except RuntimeError:
         LOG.error(
             ("Error when attempting to post MEL for {}/{}").format(sys["name"], sys["wwn"]))
@@ -552,6 +634,7 @@ def collect_system_state(sys, checksums):
     """
     Collects state information from the storage system and posts it to InfluxDB
     :param sys: The JSON object of a storage_system
+    :param checksums: The MD5 checksum of failure response from last time we checked
     """
     try:
         session = get_session()
@@ -647,8 +730,16 @@ def collect_system_state(sys, checksums):
 
 
 def create_continuous_query(params_list, database):
+    """
+    Creates a continuous data-pruning query for each metric in params_list
+    :param params_list: The list of metrics to create the continuous query for
+    :param database: The InfluxDB measurement to down-sample in EPA's database 
+    """
     try:
         for metric in params_list:
+            # temp measurements are not downsampled as averaging values from different sensors doesn't seem to work properly
+            if database == "temp":
+                LOG.info("Creation of continuous query on '{}' measurement skipped to avoid averaging values from different sensors".format(database))
             ds_select = "SELECT mean(\"" + metric + "\") AS \"ds_" + metric + "\" INTO \"" + INFLUXDB_DATABASE + \
                 "\".\"downsample_retention\".\"" + database + "\" FROM \"" + \
                 database + "\" WHERE (time < now()-1w) GROUP BY time(5m)"
@@ -657,6 +748,25 @@ def create_continuous_query(params_list, database):
     except Exception as err:
         LOG.info(
             "Creation of continuous query on '{}' failed: {}".format(database, err))
+
+
+def order_sensor_response_list(response):
+    """
+    Reorders the sensor readings list by ascending thermalSensorRef string for "stable" sensor ordering and tagging
+    :param response: the response from the SANtricity SYMbol v2 API with environmental sensor readings
+    ::return: returns a response dictionary with the sensor readings (thermalSensorRef) list items in ascending order
+    """
+    osensor = []
+    i=0
+    for item in response['thermalSensorData']:
+        pair = (item['thermalSensorRef'],i)
+        osensor.append(pair)
+        i = i+1
+    osensor.sort()
+    orderedResponse = []
+    for item in osensor:
+        orderedResponse.append(response['thermalSensorData'][item[1]])
+    return(orderedResponse)
 
 
 #######################
@@ -677,25 +787,25 @@ if __name__ == "__main__":
     try:
 
         try:
-            client.create_retention_policy(
-                "default_retention", "1w", "1", INFLUXDB_DATABASE, True)
+            client.create_retention_policy("default_retention", "1w", "1", INFLUXDB_DATABASE, True)
         except InfluxDBClientError:
             LOG.info("Updating retention policy to {}...".format("1w"))
             client.alter_retention_policy("default_retention", INFLUXDB_DATABASE,
                                           "1w", "1", True)
         try:
-            client.create_retention_policy(
-                "downsample_retention", DEFAULT_RETENTION, "1", INFLUXDB_DATABASE, False)
+            client.create_retention_policy("downsample_retention", RETENTION_DUR, "1", INFLUXDB_DATABASE, False)
         except InfluxDBClientError:
-            LOG.info("Updating retention policy to {}...".format(retention))
+            LOG.info("Updating retention policy to {}...".format(RETENTION_DUR))
             client.alter_retention_policy("downsample_retention", INFLUXDB_DATABASE,
-                                          DEFAULT_RETENTION, "1", False)
+                                          RETENTION_DUR, "1", False)
 
-        # set up continuous queries that will downsample our metric data periodically
+        # create continuous queries that downsample our metric data
         create_continuous_query(DRIVE_PARAMS, "disks")
         create_continuous_query(SYSTEM_PARAMS, "system")
         create_continuous_query(VOLUME_PARAMS, "volumes")
         create_continuous_query(INTERFACE_PARAMS, "interface")
+        create_continuous_query(PSU_PARAMS, "power")
+        create_continuous_query(SENSOR_PARAMS, "temp")
 
     except requests.exceptions.HTTPError or requests.exceptions.ConnectionError:
         LOG.exception("Failed to add configured systems!")
@@ -728,6 +838,10 @@ if __name__ == "__main__":
 
             collector = [executor.submit(
                 collect_major_event_log, sys)]
+            concurrent.futures.wait(collector)
+
+            collector = [executor.submit(
+                collect_symbol_stats, sys)]
             concurrent.futures.wait(collector)
 
         time_difference = time.time() - time_start

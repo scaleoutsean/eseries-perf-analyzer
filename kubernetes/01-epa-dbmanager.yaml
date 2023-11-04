@@ -32,7 +32,7 @@ metadata:
   creationTimestamp: null
   labels:
     kubernetes.io/os: "linux"
-    app.kubernetes.io/version: "3.2.0"
+    app.kubernetes.io/version: "3.3.0"
     app.kubernetes.io/name: dbmanager
     # app.kubernetes.io/instance: dc1-dbmanager
     service: collector-dbmanager
@@ -51,8 +51,8 @@ spec:
       restartPolicy: Always
       containers:
         - name: dbmanager
-          # image: epa/epa-dbmanager:3.2.0
-          image: docker.io/scaleoutsean/epa-dbmanager:v3.2.0
+          # image: epa/epa-dbmanager:3.3.0
+          image: docker.io/scaleoutsean/epa-dbmanager:v3.3.0
           imagePullPolicy: IfNotPresent
           resources:
             requests:
