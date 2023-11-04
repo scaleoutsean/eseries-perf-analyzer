@@ -27,6 +27,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails?](#what-happens-if-the-controller-specified-by---api-ipv4-address-or-api-in-docker-composeyml-fails)
   - [Can the E-Series' WWN change?](#can-the-e-series-wwn-change)
   - [How to backup and restore EPA or InfluxDB?](#how-to-backup-and-restore-epa-or-influxdb)
+  - [InfluxDB capacity and performance requirements](#influxdb-capacity-and-performance-requirements)
 
 
 ### Why do I need to fill in so many details in Collector's YAML file?
@@ -85,18 +86,26 @@ Copy one of existing EPA dashboard panels, then edit a panel to change from what
 
 ```sql
 # TEMP (Celsius)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000001000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000003000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000005000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000006000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000001000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000003000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000005000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000006000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
 # TEMP (128=OK, <>128=NG)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000002000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
-SELECT last("temp") FROM "sensors" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000004000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000002000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("temp") FROM "temp" WHERE ("sys_name" =~ /^$System$/ AND "sensor" = '0B00000000000000000004000000000000000000') AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
 # POWER (Watt, total consumption of controller shelf)
-SELECT last("power") FROM "power" WHERE ("sys_name" =~ /^$System$/) AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+SELECT last("totalPower") FROM "power" WHERE ("sys_name" =~ /^$System$/) AND $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
 ```
 
-See this [sample screenshot](images/sample-screenshot-epa-collector-environmental.png) for a possible visualization (the PSU label is wrong, it should say "inlet").
+See this [sample screenshot](images/sample-screenshot-epa-collector-environmental.png) for a possible visualization.
+
+In Grafana 10 with manual submission from the CLI the query may look slightly different. I didn't look closely but in any case, play in query editor until you see the metrics.
+
+```sql
+SELECT mean("temp") FROM "temp" WHERE ("sensor"::tag = '0B00000000000000000001000000000000000000') AND $timeFilter GROUP BY time($__interval) fill(null)
+SELECT mean("temp") FROM "temp" WHERE ("sensor"::tag = '0B00000000000000000002000000000000000000') AND $timeFilter GROUP BY time($__interval) fill(null)
+SELECT mean("totalPower") FROM "power" WHERE $timeFilter GROUP BY time($__interval) fill(null)
+```
 
 ### How to display SSD wear level?
 
@@ -166,3 +175,10 @@ WWN is required because E-Series array names change more frequently and can even
   - Velero: prepare your environment and use something like `velero backup create epa-influxdb-backup --include-namespaces epa`
 - Manual backup: considering that Grafana itself may not have a lot of data, and InfluxDB can be backed up with InfluxDB client, shell script that uses InfluxDB client and the copy or rsync command can be used to dump data out and restore it later. Note that you may need to also dump/backup Grafana config, PVC configuration, InfluxDB secrets, and the rest
 - Cold backup and single-volume InfluxDB: if your backup application does not support consistency group snapshots and you use multiple PVCs for InfluxDB, it is better to take a cold backup. Alternatively, take one cold backup using InfluxDB client, re-provision InfluxDB with a single PVC, restore data to it, and then hot crash-consistent backups will be more reliable
+
+
+### InfluxDB capacity and performance requirements
+
+Performance requirements should be insignificant even for several arrays. If InfluxDB is on flash storage, any will do.
+
+Capacity requirements depend on the number of arrays, disks and volumes (LUNs). With a small EF570 (24 disks, 10 volumes), InfluxDB grew 1 MB per day.

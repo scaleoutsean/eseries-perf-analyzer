@@ -333,12 +333,6 @@ This is the second example for the same subsystem (physical disks) and it's high
 
 Like SSD wear level, these metrics are collected since v3.3.0, but you need to create new panels if you want to visualize them in Grafana. See the FAQs for query examples.
 
-- Environmental sensors - temperature (C) and power consumption (W)
-
-![E-Series Power and Temperature visualization](/images/sample-screenshot-epa-temp-and-power.png)
-
-Another example (with inlet mistakenly mislabelled as PSU). See the FAQs for more on these metrics.
-
 ## FAQs
 
 Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
