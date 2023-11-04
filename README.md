@@ -57,7 +57,7 @@ These requirements are soft but this is a community fork without a variety of ha
 
 Docker Compose users:
 
-- Clone and enter the `epa` subdirectory:
+- Download and decompress latest release and enter the `epa` subdirectory:
 ```sh
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
@@ -76,7 +76,7 @@ Kubernetes users should skim through this page to get the idea how EPA works, an
 It is suggested to get EPA working in Docker Compose, unless you're good at Kubernetes. There's also a [Kubernetes](kubernetes)-specific folder.
 
 - Older existing EPA (v3.0.0, v3.1.0), images, volumes and services may cause container name, volume and port conflicts. Either use a new VM or find the existing (old) deployment and run `make stop; docker-compose down; make rm` to stop and remove old EPA pre-v3.2.0 containers before building new ones. Data (InfluxDB and Grafana) can be left in place.
-- Clone this repository to a new location
+- For latest (which may be broken or buggy) clone this repository to a new location; for more tested, download from Releases
 - Descend to the `epa` directory, run `make run` to download, build and start InfluxDB v1 and Grafana v8. You may move the pre-existing InfluxDB folder to the EPA directory if you want to keep the data. Both services will listen on all public VM interfaces, so configure your firewall accordingly.
 - Go to the `collector` directory, edit two files (`config.json` and `docker-compose.yml`) and run `docker-compose build` to create collector and dbmanager containers and then `docker-compose up` to start them.
 
