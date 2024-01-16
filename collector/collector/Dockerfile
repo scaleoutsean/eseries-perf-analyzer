@@ -1,6 +1,14 @@
 FROM python:3.10.13-alpine3.18
 ARG TAG=3.3.0
+
 LABEL VERSION=${TAG}
+LABEL org.opencontainers.image.authors="@scaleoutSean (Github)"
+LABEL org.opencontainers.image.url="https://github.com/scaleoutsean/eseries-perf-analyzer/"
+LABEL org.opencontainers.image.source="https://github.com/scaleoutsean/eseries-perf-analyzer/"
+LABEL org.opencontainers.image.version=${TAG}
+LABEL org.opencontainers.image.description="E-Series Performance Analyzer collector fetches performance metrics from NetApp E-Series storage arrays and sends them to InfluxDB."
+LABEL org.opencontainers.image.title="E-Series Performance Analyzer collector"
+LABEL org.opencontainers.image.vendor="@scaleoutSean (Github)"
 
 RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 ADD requirements.txt ./

@@ -297,6 +297,8 @@ Remember to edit Docker image location if you want to use local images or images
 - docker.io/scaleoutsean/epa-dbmanager:v3.2.0
 - docker.io/scaleoutsean/epa-collector:v3.2.0
 
+If the version you're looking for is not available, please build your own images.
+
 ## Sample Grafana screenshots
 
 This fork's dashboards are identical to upstream v3.0.0, but upstream repository has no screenshots - in fact they're hard to find on the Internet - so a sample of each dashboard is provided below.
@@ -339,7 +341,7 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
 
 ## Changelog
 
-- 3.3.0 (Nov 10, 2023):
+- 3.3.0 (Jan 17, 2024):
   - collector now collects *controller shelf*'s total power consumption metric (sum of PSUs' consumption) and temperature sensors' values 
   - Security-related updates of various components
 

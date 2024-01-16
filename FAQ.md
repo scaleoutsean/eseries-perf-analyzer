@@ -27,6 +27,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails?](#what-happens-if-the-controller-specified-by---api-ipv4-address-or-api-in-docker-composeyml-fails)
   - [Can the E-Series' WWN change?](#can-the-e-series-wwn-change)
   - [How to backup and restore EPA or InfluxDB?](#how-to-backup-and-restore-epa-or-influxdb)
+  - [How do temperature alarms work?](#how-do-temperature-alarms-work)
   - [InfluxDB capacity and performance requirements](#influxdb-capacity-and-performance-requirements)
 
 
@@ -113,7 +114,7 @@ The same as above - add a new dashboard or copy existing (this is easier), edit 
 
 ### What do temperature sensors measure?
 
-The ones I capture (EF570, E2800) represent the following:
+The ones we capture (EF570, E2800) represent the following:
 
 - CPU temperature in degrees C - usually >50C
 - Controller shelf's inlet temperature in degrees C - usually between 20-30C
@@ -176,9 +177,12 @@ WWN is required because E-Series array names change more frequently and can even
 - Manual backup: considering that Grafana itself may not have a lot of data, and InfluxDB can be backed up with InfluxDB client, shell script that uses InfluxDB client and the copy or rsync command can be used to dump data out and restore it later. Note that you may need to also dump/backup Grafana config, PVC configuration, InfluxDB secrets, and the rest
 - Cold backup and single-volume InfluxDB: if your backup application does not support consistency group snapshots and you use multiple PVCs for InfluxDB, it is better to take a cold backup. Alternatively, take one cold backup using InfluxDB client, re-provision InfluxDB with a single PVC, restore data to it, and then hot crash-consistent backups will be more reliable
 
+### How do temperature alarms work?
+
+For the inlet sensor a warning message should be sent at 35C, and a critical message should be sent at 40C. I don't know about the CPU temperature sensor.
 
 ### InfluxDB capacity and performance requirements
 
 Performance requirements should be insignificant even for several arrays. If InfluxDB is on flash storage, any will do.
 
-Capacity requirements depend on the number of arrays, disks and volumes (LUNs). With a small EF570 (24 disks, 10 volumes), InfluxDB grew 1 MB per day.
+Capacity requirements depend on the number of arrays, disks and volumes (LUNs). With a small EF570 (24 disks, 10 volumes) collected every 60s, InfluxDB grew 1 MB per day.

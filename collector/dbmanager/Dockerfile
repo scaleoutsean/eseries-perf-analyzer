@@ -1,6 +1,14 @@
 FROM python:3.10.13-alpine3.18
 ARG TAG=3.3.0
+
 LABEL VERSION=${TAG}
+LABEL org.opencontainers.image.authors="@scaleoutSean (Github)"
+LABEL org.opencontainers.image.url="https://github.com/scaleoutsean/eseries-perf-analyzer/"
+LABEL org.opencontainers.image.source="https://github.com/scaleoutsean/eseries-perf-analyzer/"
+LABEL org.opencontainers.image.version=${TAG}
+LABEL org.opencontainers.image.description="E-Series Performance Analyzer database manager sends storage array configuration to InfluxDB."
+LABEL org.opencontainers.image.title="E-Series Performance Analyzer databaase manager"
+LABEL org.opencontainers.image.vendor="@scaleoutSean (Github)"
 
 ADD ../config.json ./
 ADD dbmanager/requirements.txt ./
