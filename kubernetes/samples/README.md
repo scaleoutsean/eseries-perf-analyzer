@@ -128,6 +128,24 @@ kubectl -n epa create secret generic influxdb-creds \
   # --from-literal=INFLUXDB_USER_PASSWORD=monitor123collector01 \
 ```
 
+Alternatively use a credentials file.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: influxdb-creds
+  namespace: epa
+type: Opaque
+stringData: 
+  INFLUXDB_CONFIG_PATH: /etc/influxdb/influxdb.conf
+  INFLUXDB_ADMIN_USER: root
+  INFLUXDB_ADMIN_PASSWORD: NetApp123
+  INFLUXDB_DB: epa
+  # INFLUXDB_USER: grafana
+  # INFLUXDB_USER_PASSWORD: grafana
+```
+
 **NOTE** 
 
 - EPA v3.0.0 does not have database authentication for collector and Grafana, because they used to run in the same docker-compose deployment. EPA v3.1.0 and v3.2.0 did not change that, so authentication options are marked out. If user authentication is used, dbmanager and collector will not be able to access InfluxDB. 
