@@ -1,9 +1,7 @@
-version: '3.6'
-
 services:
 
   collector-dbmanager:
-    image: epa/dbmanager:v3.3.0
+    image: epa/dbmanager:v3.3.1
     build:
           context: .
           dockerfile: ./dbmanager/Dockerfile
@@ -20,7 +18,7 @@ services:
       - DB_PORT=8086
 
   collector-R26U25-EF600:
-    image: epa/collector:v3.3.0
+    image: epa/collector:v3.3.1
     container_name: R26U25-EF600
     build: ./collector
     mem_limit: 64m
@@ -41,7 +39,7 @@ services:
       - DB_PORT=8086
 
   collector-R24U04-E2824:
-    image: epa/collector:v3.3.0
+    image: epa/collector:v3.3.1
     container_name: R24U04-E2824
     mem_limit: 64m
     restart: unless-stopped

@@ -341,6 +341,9 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
 
 ## Changelog
 
+- 3.3.1 (June 1, 2024):
+  - Dependency update (requests library)
+
 - 3.3.0 (April 15, 2024):
   - collector now collects *controller shelf*'s total power consumption metric (sum of PSUs' consumption) and temperature sensors' values 
   - Security-related updates of various components
