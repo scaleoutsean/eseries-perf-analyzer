@@ -16,6 +16,7 @@ import hashlib
 from datetime import datetime
 import random
 from datetime import datetime
+from datetime import timezone
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError
 
@@ -687,7 +688,7 @@ def collect_system_state(sys, checksums):
                     LOG.info("Failure payload T1: %s", item)
                 json_body.append(create_failure_dict_item(sys_id, sys_name,
                                                           r_fail_type, r_obj_ref, r_obj_type,
-                                                          True, datetime.utcnow().isoformat()))
+                                                          True, datetime.now(timezone.utc).isoformat()))
 
         # take care of failures that are no longer active
         for point in failure_points:
@@ -717,7 +718,7 @@ def collect_system_state(sys, checksums):
                     LOG.info("Failure payload T2: %s", item)
                 json_body.append(create_failure_dict_item(sys_id, sys_name,
                                                           p_fail_type, p_obj_ref, p_obj_type,
-                                                          False, datetime.utcnow().isoformat()))
+                                                          False, datetime.now(timezone.utc).isoformat()))
 
         # write failures to InfluxDB
         if CMD.showStateMetrics:
