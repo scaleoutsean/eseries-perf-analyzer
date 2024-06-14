@@ -598,7 +598,7 @@ def collect_major_event_log(sys):
                     (metric, mel.get(metric)) for metric in MEL_PARAMS
                 ),
                 time=datetime.fromtimestamp(
-                    int(mel["timeStamp"])).isoformat()
+                    int(mel["timeStamp"]), timezone.utc).isoformat()
             )
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
