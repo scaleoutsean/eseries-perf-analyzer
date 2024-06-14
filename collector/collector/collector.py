@@ -597,7 +597,7 @@ def collect_major_event_log(sys):
                 fields=dict(
                     (metric, mel.get(metric)) for metric in MEL_PARAMS
                 ),
-                time=datetime.utcfromtimestamp(
+                time=datetime.fromtimestamp(
                     int(mel["timeStamp"])).isoformat()
             )
             if CMD.showMELMetrics:
