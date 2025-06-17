@@ -17,8 +17,9 @@ from datetime import datetime
 import random
 from datetime import datetime
 from datetime import timezone
-from influxdb import InfluxDBClient
-from influxdb.exceptions import InfluxDBClientError
+# from influxdb import InfluxDBClient
+# from influxdb.exceptions import InfluxDBClientError
+from influxdb_client_3 import InfluxDBClient3, Point , InfluxDBError
 
 DEFAULT_USERNAME = 'monitor'
 DEFAULT_PASSWORD = 'monitor123'
@@ -369,7 +370,7 @@ def collect_symbol_stats(sys):
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
+        client = InfluxDBClient3(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         # PSU
         psu_response = session.get(("{}/{}/symbol/getEnergyStarData").format(get_controller("sys"), sys_id),
@@ -431,7 +432,7 @@ def collect_storage_metrics(sys):
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
+        client = InfluxDBClient3(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
         drive_stats_list = session.get(("{}/{}/analysed-drive-statistics").format(
@@ -564,7 +565,7 @@ def collect_major_event_log(sys):
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
+        client = InfluxDBClient3(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
         start_from = -1
@@ -639,7 +640,7 @@ def collect_system_state(sys, checksums):
     """
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
+        client = InfluxDBClient3(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
 
         sys_id = sys["wwn"]
@@ -781,7 +782,7 @@ if __name__ == "__main__":
     SESSION = get_session()
     loopIteration = 1
 
-    client = InfluxDBClient(host=influxdb_host,
+    client = InfluxDBClient3(host=influxdb_host,
                             port=influxdb_port, database=INFLUXDB_DATABASE)
     client.create_database(INFLUXDB_DATABASE)
 
@@ -789,13 +790,13 @@ if __name__ == "__main__":
 
         try:
             client.create_retention_policy("default_retention", "1w", "1", INFLUXDB_DATABASE, True)
-        except InfluxDBClientError:
+        except InfluxDBError:
             LOG.info("Updating retention policy to {}...".format("1w"))
             client.alter_retention_policy("default_retention", INFLUXDB_DATABASE,
                                           "1w", "1", True)
         try:
             client.create_retention_policy("downsample_retention", RETENTION_DUR, "1", INFLUXDB_DATABASE, False)
-        except InfluxDBClientError:
+        except InfluxDBError:
             LOG.info("Updating retention policy to {}...".format(RETENTION_DUR))
             client.alter_retention_policy("downsample_retention", INFLUXDB_DATABASE,
                                           RETENTION_DUR, "1", False)
