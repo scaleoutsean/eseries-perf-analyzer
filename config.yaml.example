@@ -1,0 +1,12 @@
+# Example configuration for E-Series Collector (YAML format)
+# Copy to .config and edit as needed
+
+influxdb_database: "eseries"
+influxdb_token: "YOUR_INFLUXDB_TOKEN"
+tls_ca: "certs/influxdb/ca.crt"
+api_endpoints:
+  - "5.5.5.5"
+  - "6.6.6.6"
+interval_time: 60
+
+influxdb_url: "https://influxdb:8181"

@@ -176,7 +176,13 @@ InfluxDB has its data in `./data/influxdb`.
 
 ### InfluxDB Explorer (`influxdb3-ui`)
 
-This service has no built-in authentication. Once you configure it to access `influxdb` (or any other), anyone who accesses this container can access that database.
+If InfluxDB and InfluxExplorer run within same Docker Compose instance, you would connect to InfluxDB using its Docker name:
+
+![Docker Compose scenario: Connect from InfluxDB Explorer to InfluxDB](./images/influxdb3-explorer.png)
+
+InfluxDB Explorer has no account support or built-in authentication of its own. 
+
+Once you configure it to access `influxdb` (or other), anyone who accesses this container can access configured databases as well.
 
 It is exposed through Nginx, which may be risky. What to do? Some options:
 
@@ -187,11 +193,11 @@ It is exposed through Nginx, which may be risky. What to do? Some options:
 - change `nginx.conf` to configure authentication for InfluxDB Explorer service and/or limit access by client IP/FQDN
 - change `nginx.conf` to not expose InfluxDB to LAN users or disable/remove this service from Docker Compose
 
-If you're concerned about unauthorized access to InfluxDB, remove this service from Docker Compose. 
+If you're concerned about unauthorized access to InfluxDB from LAN, remove this service from Docker Compose. InfluxDB Explorer comes with no initial configuration at start, so nothing is configured and valid InfluxDB API token is required for configuration.
 
-If you still want to use it, deploy it on your client to run on `localhost` or use some secure environment, but you'll need to be able to reach `influxdb` through that `nginx` proxy unless you have alternative ways to connect to `influxdb`.
+If you want to use it it's safest to deploy it on your client or use some secure environment that can reach `influxdb` through that `nginx` proxy (unless you have alternative ways to connect to `influxdb`).
 
-Note that InfluxDB Explorer saves password on (persistent) Docker volume. It is not a plain text password, but it's stored on disk. Check their documentation for the information about that.
+Note that InfluxDB Explorer saves password on a (persistent) Docker volume required to avoid re-configuration after container start. Credentials are not stored as plain text, but they're on disk. Check their documentation for more information about that and service security.
 
 ### S3 (`s3`)
 
@@ -390,6 +396,8 @@ The same prompting works for InfluxDB Bearer Token. It too can live only in your
 EPA Collector can log to file. We aim to not log user's credentials or InfluxDB API toke to console or files, but you can check the source code or run EPA in debug mode with logging to file enabled for a few days and see if you can find anything that shouldn't be in the logs.
 
 Docker Compose networks aren't segregated because it doesn't have meaningful contribution to security. If you want to segregate services, split EPA services across different VMs (or Nomad nodes) or deploy them to different Kubernetes namespaces.
+
+![](./images/epa-v4-tls.png)
 
 ## Data collection and privacy policy 
 

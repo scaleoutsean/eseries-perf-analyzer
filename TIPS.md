@@ -850,5 +850,5 @@ influxdb3 query --language influxql \
 +------------------+---------------------+---------------------+-------------------------+
 ```
 
-Recall that EPA queries E-Series "analysed-<object>" statistics, so by the time those metrics get to InfluxDB they are already sliced and diced and calculating average or mean values for short periods such as 5 minutes is probably misleading at best. The FAQs may have a bit more on this.
+Recall that EPA queries E-Series' `analysed-<object>` statistics, so by the time those metrics get to InfluxDB they have been sliced and diced and calculating averages, means and similar values for short periods such as 5 minutes is probably misleading at best. The [FAQs](FAQ.md) have a bit more on this.
 
