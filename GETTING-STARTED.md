@@ -176,23 +176,24 @@ docker compose logs <service>
 
 ### Step 6: Access Web interfaces (optional)
 
-These are not "managed" in the sense that they're only properly deployed and ready to be configured, but EPA doesn't attempt to manage these systems.
+These are not "managed" in the sense that they're only properly deployed and ready to be configured, but EPA doesn't attempt to manage these systems. Assuming your proxy's external host name is `epa-proxy`:
 
 - **InfluxDB Explorer**: https://epa-proxy:18443
   - API token for InfluxDB 3 access
-  - Add your InfluxDB (https://influxdb:8181 Docker Compose environment, if you haven't changed service name)
+  - Add your InfluxDB (https://influxdb:8181 in a shared Docker Compose environment, if you haven't changed service name)
 - **S3 console**: https://epa-proxy:9001
   - Username: Value of MINIO_ROOT_USER in your .env file
   - Password: Value of MINIO_ROOT_PASSWORD in your .env file
 - **Grafana**: https://epa-proxy:3443
   - `admin`/`admin` as per Grafana defaults
 
-The reason there isn't much done about these is everyone should have these services elsewhere and not rely on a collector project for unrelated infrastructure services that should be actively managed for security and other reasons. 
+The reason there isn't much done about "fine-tuning" these is: everyone should have these shared services elsewhere and not rely on a collector project for unrelated infrastructure services that should be actively managed for security and other reasons. 
 
+These non-essential services in the EPA stack are meant for *production-ready* prototyping, testing, training, and evaluation, but the last 20% should be done by the folks who are supposed to manage them.
 
 ### Step 7: View metrics
 
-Once the system has collected data for a few minutes, you can create dashboards in the InfluxDB UI to visualize your E-Series performance metrics.
+Once the system has collected data for a few minutes, you can create dashboards in the InfluxDB Explorer UI to visualize your E-Series performance metrics.
 
 From **InfluxDB Explorer**:
 - add database (with InfluxDB running internally in Docker, http**s**://influxdb:8181, and if outside use the Nginx FQDN, such as https://nginx:8181)
