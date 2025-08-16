@@ -248,10 +248,10 @@ It recommended to delete this service from `docker-compose.yaml` and use your ow
 Some points related to Grafana's Data Source set up for InfluxDB 3.3 (see [this screenshot](././images/grafana-influxdb-3-data-source.png)):
 
 - Point (1): while you can use `InfluxQL` (to try to recycle the old EPA 3 dashboards, maybe?) use `SQL` as this is the new default
-- Point (2): if both are inside of same Docker Compose environment, InfluxDB will be at `https://influxdb:8181`. Otherwise use DB server's FQDN
-- Point (3): EPA v4 uses the `eseries` database by default
-- Point (4): this is where you can paste your InfluxDB API Token
-- Point (5): we want to use our CA certificate and validate and *not* Skip TLS Verify, but as of mid August 2025 Grafana has a bug that has been just fixed, but not yet released. TLS-related settings in the screenshot is what works in `:latest` Grafana as of August 16 2025
+- Point (2): if both are inside of same Docker Compose environment, InfluxDB will be at `https://influxdb:8181`. Otherwise use the included reverse proxy in front of your InfluxDB server (`https://nginx:8181` here just as an example, although in real life that would be something like `https://proxy.intra.lan:8181`).
+- Point (3): EPA v4 defaults to using the database name `eseries`. Adjust if you picked another
+- Point (4): this is the place where you can paste your InfluxDB API Token
+- Point (5): we want to use our CA certificate and validate and *not* Skip TLS Verify, but as of mid August 2025 Grafana has a bug that has been just fixed, but not yet released. TLS-related settings in the screenshot is what works in `:latest` Grafana as of August 16 2025. `Insecure connection` at the very bottom currently must be checked (which sort of implies `Skip TLS Verify` which is *not* checked, but that's what that bug is about - incorrect behavior)
 
 ## Maintenance
 
