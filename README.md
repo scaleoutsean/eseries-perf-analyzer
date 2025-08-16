@@ -60,22 +60,22 @@ The stack has just two key services:
 
 ![EPA 4 - Key Services](./images/epa-eseries-perf-analyzer.png)
 
-In the above diagram you can see EPA will normally run separately from the rest of the stack as (for example) InfluxDB has no reason to reach E-Series controllers.
+In the above diagram you can see EPA will normally run separately from the rest of the stack as (for example) InfluxDB has no reason to reach E-Series controllers on management LAN.
 
-This more busy version shows a slightly different take and dives deeper into security:
+This more busy version shows a slightly different take and dives deeper into how :
 
 - Docker-internal (or Kubernetes) CA issues certificates (yellow shield) to EPA stack and optionally E-Series (CA = yellow square)
 - Enterprise CA-signed certificate (green shield) should be issued for the reverse proxy and could be issued for E-Series as well. EPA Collector could access E-Series controllers via external-facing HTTPS proxy or directly as before
 
 ![EPA - Full Stack](./images/epa-v4-qrc-tls.svg)
 
-Although EPA doesn't use PQC to reverse-proxy E-Series' controllers (because they tend to live on a strictly controlled management network), it is possible to expose them through our front-end quantum-resistant proxy.
+Although EPA doesn't use PQC to reverse-proxy E-Series' controllers (because they tend to live on a strictly controlled management network), it is possible to expose them through our front-end quantum-resistant HTTPS proxy.
 
 With enterprise CA-issued certificates you can get trusted, quantum-resistant HTTPS proxy that works end-to-end (PQC on front-end proxy with verified, strong TLS 1.3 to upstream SANtricity).
 
 ![EPA - Full Stack with QRC on Web Proxy](./images/epa-v4-tls.png)
 
-While others are still thinking about dashboards, EPA 4 has dropped dashboards (some reference dashboards will be provided) and is focusing on AI- and MCP-assisted exploration. 
+While others are still thinking about dashboards, EPA 4 has dropped dashboards (some reference dashboards will be provided) and is focusing on AI- and MCP-assisted exploration and alerting.
 
 ![EPA for AI and MCP](./images/epa-storage-analytics-exploration.png)
 
@@ -92,7 +92,7 @@ See [GETTING-STARTED](./GETTING-STARTED.md) for that, but here's a summary:
 
 ### CLI
 
-If you don't use containers or want to use EPA for a short time, CLI is the way to go. Clone the repository (mind the branch of not cloning from `master`), install dependencies and you're good to go.
+If you don't use containers or want to use EPA for a short time, CLI is the way to go. Clone the repository (mind the branch if not cloning from `master`), install dependencies and you're good to go.
 
 ```sh
 pip3 install -r app/requirements.txt
