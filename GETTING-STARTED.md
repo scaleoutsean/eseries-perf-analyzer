@@ -203,11 +203,12 @@ From **the CLI**:
 - use InfluxDB CLI with environment variables or arguments to query InfluxDB and show tables with `SHOW MEASUREMENTS`
 - locally within Docker Compose environment you may use the `utils` container for this - see [TIPS](TIPS.md).
 
-From **Grafana* 
+From **Grafana**: 
 - add InfluxDB Data Source: 
   - use `SQL` language dialect for InfluxDB 3
   - if both Grafana and InfluxDB run in same Docker Compose, use https://influxdb:8181, if not, use Nginx FQDN, such as https://nginx:8181
 - you will need InfluxDB API token to access the DB. Paste the token near the bottom just below database name
+- [DOCUMENTATION](./DOCUMENTATION.md) has a screenshot with additional details about this
 
 ### Troubleshooting
 
