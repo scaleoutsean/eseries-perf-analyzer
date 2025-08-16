@@ -1,17 +1,78 @@
-# ignore the graphite database
-graphite-database/*
-.idea/*
-# ignore all array files except the example
-!ansible/arrays/example_array.json
-ansible/arrays/*
-# ignore the influxbdb database
-influx-database/*
-# ignore the web services working directory
-plugins/eseries_monitoring/webservices_working/*
-# ignore python test cache
-plugins/eseries_monitoring/collector/tests/__pycache__/*
-plugins/eseries_monitoring/collector/tests/collector.py
-# sample config files
-configs/*
-# venv dirs
-.venv
+# Default ignores for Python environments and VS Code
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Unit test / coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings folder
+.vscode/
+
+# IDE files
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+#### INCLUDE ####
+# basic stuff
+!/.gitignore
+!/README.md
+!/LICENSE
+
+# Python app
+!/app/*.py
+!/app/requirements.txt
+
+# Images
+!/images/epa-eseries-perf-analyzer.png
+!/images/epa-v4-qrc-tls.svg
+!/images/epa-v4-services-diagram.svg
+!/images/epa-v4-tls.png
+!/images/influxdb3-explorer.png
+!/images/sysid-in-santricity-manager.png
+!/images/sysname-in-santricity-manager.png
+
