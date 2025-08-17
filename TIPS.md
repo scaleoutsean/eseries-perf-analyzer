@@ -568,6 +568,22 @@ SELECT "system_name","physicalLocation_trayRef","physicalLocation_slot","manufac
     WHERE "softwareVersion" <> '\''NA54\'''
 ```
 
+Finally, one **Grafana** example:
+
+```sql
+SELECT
+  "manufacturer",
+  "productID",
+  "serialNumber",
+  "softwareVersion"
+FROM
+  "drives"
+WHERE
+  "time" >= $__timeFrom
+  AND "time" <= $__timeTo
+  AND manufacturer == 'Samsung'
+```
+
 ## `failures` - failure events
 
 Fields:

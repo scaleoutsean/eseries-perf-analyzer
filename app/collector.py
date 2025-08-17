@@ -397,8 +397,7 @@ if __name__ == "__main__":
                 os.path.join(json_dir, 'power_*.json'),
                 os.path.join(json_dir, 'temp_*.json'),
                 os.path.join(json_dir, 'mel_*.json'),
-                os.path.join(json_dir, 'controller_*.json'),
-                os.path.join(json_dir, 'storage_*.json'),  # Keep legacy patterns
+                os.path.join(json_dir, 'controller_*.json')
             ]
             files = []
             for pat in file_patterns:
