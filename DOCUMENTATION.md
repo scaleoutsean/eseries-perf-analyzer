@@ -251,7 +251,7 @@ Some points related to Grafana's Data Source set up for InfluxDB 3.3 (see [this 
 - Point (2): if both are inside of same Docker Compose environment, InfluxDB will be at `https://influxdb:8181`. Otherwise use the included reverse proxy in front of your InfluxDB server (`https://nginx:8181` here just as an example, although in real life that would be something like `https://proxy.intra.lan:8181`).
 - Point (3): EPA v4 defaults to using the database name `eseries`. Adjust if you picked another
 - Point (4): this is the place where you can paste your InfluxDB API Token
-- Point (5): we want to use our CA certificate and validate and *not* Skip TLS Verify, but as of mid August 2025 Grafana has a bug that has been just fixed, but not yet released. TLS-related settings in the screenshot is what works in `:latest` Grafana as of August 16 2025. `Insecure connection` at the very bottom currently must be checked (which sort of implies `Skip TLS Verify` which is *not* checked, but that's what that bug is about - incorrect behavior)
+- Point (5): we want to use our CA certificate and validate and *not* Skip TLS Verify, but as of mid August 2025 Grafana has a [bug](https://github.com/grafana/grafana/pull/105586) that has been fixed last week, but not yet released. The screenshot shows a *temporary workaround for testing purposes* using `Insecure connection` (HTTP) at the very bottom currently, as we created a temporary HTTP-to-HTTPS reverse proxy on NGINX to get around this problem until Grafana fixes HTTPS with self-issued CA. With this workaround API  token is transmitted to Nginx completely unencrypted.
 
 ## Maintenance
 
@@ -355,7 +355,10 @@ In Docker Compose environments containers have a ready-to-go /data mount point w
 
 `--fromJson` may store failed writes to InfluxDB (if any) `/data/failed` inside of the `collector` container, which can be accessed from the host (try `sudo ls ./data/collector`, for example). It is therefore recommended to not use `--toJson /data/failed` unless you want to create a mess for yourself.
 
-Remember that some fields' data types are ultimately changed on insertion (when `--fromJson` is used) by Collector. If you're doing your own thing (such as using those JSON files in a different destination such as MongoDB), field types may differ from what you'd get if you inserted them to InfluxDB 3 using EPA Collector's `--fromJson`. EPA Collector's schema documents EPA's insertion-time overrides in detail.
+There are two main things to remember about `--fromJson`:
+
+- Some fields' data types are ultimately changed on insertion (when `--fromJson` is used) by Collector. If you're doing your own thing (such as using those JSON files in a different destination such as MongoDB), field types may differ from what you'd get if you inserted them to InfluxDB 3 using EPA Collector's `--fromJson`. EPA Collector's schema documents EPA's insertion-time overrides in detail.
+- When `--fromJson` is used, records' timestamps come from JSON filename, not from JSON documents'`time` property. The reason is not all JSON files have internal timestamp. That's also the reason `--toJson` uses time-stamped filenames.
 
 If you let EPA Collector create a ton of junk in container's `/data` volume, you can delete the junk from the host or recreate the container/volume.
 

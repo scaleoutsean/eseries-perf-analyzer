@@ -18,18 +18,16 @@ from datetime import datetime, timezone
 
 from app.controllers import get_controller
 from app.utils import get_json_output_path
-from app.metrics_schemas import MEASUREMENT_SCHEMAS
 
 LOG = logging.getLogger(__name__)
 
 # Get configuration
 try:
-    from app.config import EnvConfig, INFLUXDB_WRITE_PRECISION
+    from app.config import EnvConfig
     DRIVES_COLLECTION_INTERVAL = EnvConfig().DRIVES_COLLECTION_INTERVAL
 except Exception:
     # Fallback to default if config import fails
     DRIVES_COLLECTION_INTERVAL = 604800  # 1 week in seconds
-    INFLUXDB_WRITE_PRECISION = 's'  # Default precision fallback
 
 # Track last collection time globally
 last_collection_time = 0
@@ -213,7 +211,13 @@ def collect_drives_data(sys_info, session, san_headers, api_endpoints, database_
                     tags = p["tags"]
                     fields = p["fields"]
                     timestamp = p.get("time", datetime.now(timezone.utc))
-                    record = {**tags, **fields, "timestamp": timestamp}
+                    # Ensure timestamp is a datetime object for proper InfluxDB3 handling
+                    if isinstance(timestamp, str):
+                        try:
+                            timestamp = datetime.fromisoformat(timestamp.replace(" ", "T"))
+                        except Exception:
+                            timestamp = datetime.now(timezone.utc)
+                    record = {**tags, **fields, "time": timestamp}  # Use "time" not "timestamp"
                     records.append(record)
 
                 # Write to InfluxDB if we have points
@@ -221,13 +225,7 @@ def collect_drives_data(sys_info, session, san_headers, api_endpoints, database_
                     LOG.info(f"[DRIVES_COLLECTOR] Sample record: {records[0]}")
                     LOG.info(f"[DRIVES_COLLECTOR] Total drive records to write: {len(records)}")
 
-                    # Get integer fields from schema for field_types parameter
-                    int_fields = set()
-                    if "drives" in MEASUREMENT_SCHEMAS:
-                        int_fields = {k for k, v in MEASUREMENT_SCHEMAS["drives"].get('fields', {}).items() if v.startswith('int')}
-                    field_types = {k: "int" for k in int_fields}
-
-                    # Use centralized database client
+                    # Use centralized database client (handles integer field conversion internally)
                     database_client.write(records, "drives")
                     LOG.info(f"[DRIVES_COLLECTOR] Successfully wrote {len(records)} drive records to InfluxDB via database client")
                 else:

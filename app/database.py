@@ -55,14 +55,21 @@ def create_database(influxdb_url, auth_token, database_name, tls_ca=None):
         LOG.error("Error when creating/verifying database: %s", e)
         return False
 
-def create_measurement_tables(influxdb_url, auth_token, database_name, tls_ca=None):
+def create_measurement_tables(influxdb_url, auth_token, database_name, tls_ca=None, tls_validation='strict'):
     """Create measurement tables with proper field type schemas."""
     headers = {
         "Authorization": f"Bearer {auth_token}",
         "Accept": "application/json", 
         "Content-Type": "application/json"
     }
-    verify = tls_ca if tls_ca else True
+    
+    # Configure TLS verification based on validation mode
+    if tls_validation == 'none':
+        verify = False
+    elif tls_ca:
+        verify = tls_ca
+    else:
+        verify = True
     success_count = 0
     
     for measurement_name, schema in MEASUREMENT_SCHEMAS.items():
@@ -139,7 +146,7 @@ def create_measurement_tables(influxdb_url, auth_token, database_name, tls_ca=No
     LOG.info(f"Table creation completed: {success_count}/{total_tables} successful")
     return success_count == total_tables
 
-def validate_measurement_schemas(influxdb_url, auth_token, database_name, tls_ca=None):
+def validate_measurement_schemas(influxdb_url, auth_token, database_name, tls_ca=None, tls_validation='strict'):
     """Validate that measurement tables have the expected field types."""
     headers = {
         "Authorization": f"Bearer {auth_token}",
@@ -147,13 +154,13 @@ def validate_measurement_schemas(influxdb_url, auth_token, database_name, tls_ca
         "Content-Type": "application/json"
     }
     
-    # Handle TLS verification properly
-    if tls_ca:
-        # Use the provided CA certificate file
+    # Configure TLS verification based on validation mode
+    if tls_validation == 'none':
+        verify = False
+    elif tls_ca:
         verify = tls_ca
     else:
-        # For now, skip TLS verification to match the working CLI approach
-        verify = False
+        verify = True
         
     validation_results = {}
     

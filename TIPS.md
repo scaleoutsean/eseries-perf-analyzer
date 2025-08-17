@@ -3,7 +3,7 @@
 - [TIPS](#tips)
   - [General tips](#general-tips)
     - [Difference between E-Series and InfluxDB metrics](#difference-between-e-series-and-influxdb-metrics)
-    - [InfluxDB 3 client](#influxdb-3-client)
+    - [InfluxDB 3 client tips](#influxdb-3-client-tips)
     - [Storage management](#storage-management)
   - [Measurements, fields, tags](#measurements-fields-tags)
   - [`controllers` - controller performance](#controllers---controller-performance)
@@ -22,14 +22,9 @@
 
 `influxdb3` is the InfluxDB client/server binary. It's pre-installed in the `utils` container, but you can download your own and deploy to a client of your choosing. See [the InfluxDB 3 Core documentation](https://docs.influxdata.com/influxdb3/core/install/).
 
-If you get lost, use the provided InfluxDB Explorer which has an MCP plugin for Natural Language queries, or simply switch to Grafana and poke around until you get something useful done.
+If you're looking for easier options, try InfluxDB Explorer which has a plugin for Natural Language queries (currently commercial chat clients only, so one of their API tokens is required), or try InfluxDB MCP (separate installation) or switch to Grafana for a nicer UI and more AI options.
 
-- We always have to assume InfluxDB data may be outdated or even wrong, so verify independently before performing destructive actions
-- These example aren't exhaustive. There will always be a query or example that's someone needs and isn't here. RTFM:
-  - [InfluxDB SQL reference documentation](https://docs.influxdata.com/influxdb3/core/reference/sql/)
-  - [InfluxQL reference documentation](https://docs.influxdata.com/influxdb3/core/query-data/influxql/)
-  - [InfluxDB API reference documentation](https://docs.influxdata.com/influxdb3/core/api/v3/)
-- InfluxDB captures records multiple times. In `SQL`, use `LAST`, `DISTINCT` and/or filter by time, tags (such as `system_id`). In `InfluxQL`, the same queries may not work, so it's often useful to make sure you're using the right interface rather than try to restructure your queries 
+We always have to assume InfluxDB data may be outdated or even wrong, so verify independently before performing destructive actions.
 
 **NOTE:** fields and tags may change by the time v4.0.0 is released. These commands were created on an early v4.0.0 beta.
 
@@ -40,41 +35,76 @@ This is important to know:
 - E-Series sometimes uses decimals where it doesn't make sense. It's not just wrong, but also annoying and wasteful
 - EPA Collector fixes it "close to source": the most ridiculous examples of this type abuse are dealt with before writing to InfluxDB
 
-In EPA v3 that was not the case, so you'd have a disk drive in slot `12.0`. Well, no more.
+In EPA v3 that was not the case, so you'd have a disk drive in slot `12.0`. EPA v4 eliminates a lot of that nonsense.
 
-### InfluxDB 3 client 
+### InfluxDB 3 client tips
 
-**NOTE:** examples further bellow assume your shell or environment is ready,.
+- Use the `influxdb3` CLI (pre-installed in the `utils` container) or install your own from https://docs.influxdata.com/influxdb3/core/install/.
 
-```sh
-export PATH="/root/influxdb3-core-3.3.0:$PATH"     # Use the correct version and path
-export INFLUXDB3_HOST_URL="https://in.fl.ux:8181"  # InfluxDB in EPA uses HTTPS only
-export INFLUXDB3_DATABASE_NAME="eseries"     
-export INFLUXDB3_AUTH_TOKEN="apiv3_..."
-export INFLUXDB3_TLS_CA="/root/.mc/certs/CAs/ca.crt"  # in the utils container I also have Minio Client so I use CA that I have for it
-```
+- Configure your shell for convenience (the `utils` container has this pre-configured):
+  ```sh
+  export INFLUXDB3_HOST_URL="https://influxdb:8181"
+  export INFLUXDB3_DATABASE_NAME="eseries"
+  export INFLUXDB3_AUTH_TOKEN="apiv3_..."
+  export INFLUXDB3_TLS_CA="/path/to/ca.crt"
+  ```
 
-If you don't have that or environment variables (`.bashrc`, Docker `.env` file, etc.), then you have to prefix each command with those variables or pass these annoying parameters which will drive you nuts.
+   If you don't have that or environment variables (`.bashrc`, Docker `.env` file, etc.), then you have to prefix each command with those variables or pass these annoying parameters which will drive you nuts.
 
-```sh
--H, --host <HOST_URL>           The host URL of the running InfluxDB 3 Core server [env: INFLUXDB3_HOST_URL=https://influxdb:8181]
--d, --database <DATABASE_NAME>  The name of the database to operate on [env: INFLUXDB3_DATABASE_NAME=eseries]
---token <AUTH_TOKEN>        The token for authentication with the InfluxDB 3 Core server [env: INFLUXDB3_AUTH_TOKEN=apiv3_...]
---tls-ca <CA_CERT> The CA certificate that signed the TLS certificate of InfluxDB server [env: INFLUXDB3_TLS_CA="...."]
-```
+   ```sh
+   -H, --host <HOST_URL>           The host URL of the running InfluxDB 3 Core server [env: INFLUXDB3_HOST_URL=https://influxdb:8181]
+   -d, --database <DATABASE_NAME>  The name of the database to operate on [env: INFLUXDB3_DATABASE_NAME=eseries]
+   --token <AUTH_TOKEN>        The token for authentication with the InfluxDB 3 Core server [env: INFLUXDB3_AUTH_TOKEN=apiv3_...]
+   --tls-ca <CA_CERT> The CA certificate that signed the TLS certificate of InfluxDB server [env: INFLUXDB3_TLS_CA="...."]
+   ```
+
+- Get quick help:
+  ```sh
+  influxdb3 --help
+  influxdb3 query --help
+  ```
+
+- Field and tag names are case-sensitive. Always double-quote mixed-case identifiers:
+  ```sql
+  SELECT "softwareVersion", "physicalLocation_slot"
+    FROM drives
+    WHERE "softwareVersion" <> 'NA54'
+    ORDER BY "physicalLocation_slot" ASC
+  ```
+
+- Escape single-quotes inside a single-quoted shell string:
+  ```sh
+  influxdb3 query \
+    'SELECT * FROM drives WHERE "softwareVersion" != '\''NA54'\'''
+  ```
+
+- Default query language is **SQL**. To use InfluxQL add `--language influxql`.  
+  - SQL docs: https://docs.influxdata.com/influxdb3/core/reference/sql/  
+  - InfluxQL docs: https://docs.influxdata.com/influxdb3/core/query-data/influxql/
+  - [InfluxDB API reference documentation](https://docs.influxdata.com/influxdb3/core/api/v3/)
+
+- Control output for scripting:
+  ```sh
+  influxdb3 query --language sql --output csv 'SELECT ...'   # CSV, no headers
+  influxdb3 query --language sql --output json 'SELECT ...'  # JSON array
+  ```
+
+- Always filter by time, tags or use `LIMIT` to avoid scanning massive datasets (this applies to queries in Grafana dashboards, too!):
+  ```sql
+  SELECT * 
+    FROM volumes 
+   WHERE time >= now() - interval '1d'
+   LIMIT 100
+  ```
+
+- De-duplicate repeated points:  
+  - In SQL use `DISTINCT()` or `LAST()`  
+  - In InfluxQL use `DISTINCT` or `LAST()` (and/or `GROUP BY time(...)`)
 
 ### Storage management
 
 - Down-sampling: use the [official plugin](https://docs.influxdata.com/influxdb3/core/plugins/library/official/downsampler/) or write your own
-- Expiration: use a down-sampling plugin to down-sample to 1 record per month or something like that - that's the easiest way that can use the same down-sampling approach you will likely have in place anyway. If you *must not* have older data (i.e. in the case of government overreach), you may try something this.
-
-```sh
-influx delete \
-  --bucket eseries \
-  --start 2025-07-01T00:00:00Z \
-  --stop 2025-08-01T00:00:00Z \
-  --predicate '_measurement="temp"'
-```
+- Expiration: use a down-sampling plugin to down-sample to 1 record per month or something like that - that's the easiest way that can use the same down-sampling approach you will likely have in place anyway. If you *must not* have older data (i.e. in the case of government overreach).
 
 ## Measurements, fields, tags
 
@@ -172,6 +202,85 @@ This may be just one in singleton systems or if a single controller's API addres
 
 Another special thing about this measurement is these are less frequent (see the docs) as per-controller metrics aren't that useful in minute-level intervals.
 
+Fields:
+
+```sh
+influxdb3 query --language influxql 'SHOW FIELD KEYS FROM controllers'
++------------------+---------------------------------+-----------+
+| iox::measurement | fieldKey                        | fieldType |
++------------------+---------------------------------+-----------+
+| controllers      | averageReadOpSize               | float     |
+| controllers      | averageWriteOpSize              | float     |
+| controllers      | cacheHitBytesPercent            | float     |
+| controllers      | combinedHitResponseTime         | float     |
+| controllers      | combinedHitResponseTimeStdDev   | float     |
+| controllers      | combinedIOps                    | float     |
+| controllers      | combinedResponseTime            | float     |
+| controllers      | combinedResponseTimeStdDev      | float     |
+| controllers      | combinedThroughput              | float     |
+| controllers      | cpuAvgUtilization               | float     |
+| controllers      | ddpBytesPercent                 | float     |
+| controllers      | fullStripeWritesBytesPercent    | float     |
+| controllers      | maxCpuUtilization               | float     |
+| controllers      | maxPossibleBpsUnderCurrentLoad  | float     |
+| controllers      | maxPossibleIopsUnderCurrentLoad | float     |
+| controllers      | mirrorBytesPercent              | float     |
+| controllers      | otherIOps                       | float     |
+| controllers      | raid0BytesPercent               | float     |
+| controllers      | raid1BytesPercent               | float     |
+| controllers      | raid5BytesPercent               | float     |
+| controllers      | raid6BytesPercent               | float     |
+| controllers      | randomIosPercent                | float     |
+| controllers      | readHitResponseTime             | float     |
+| controllers      | readHitResponseTimeStdDev       | float     |
+| controllers      | readIOps                        | float     |
+| controllers      | readOps                         | float     |
+| controllers      | readPhysicalIOps                | float     |
+| controllers      | readResponseTime                | float     |
+| controllers      | readResponseTimeStdDev          | float     |
+| controllers      | readThroughput                  | float     |
+| controllers      | writeHitResponseTime            | float     |
+| controllers      | writeHitResponseTimeStdDev      | float     |
+| controllers      | writeIOps                       | float     |
+| controllers      | writeOps                        | float     |
+| controllers      | writePhysicalIOps               | float     |
+| controllers      | writeResponseTime               | float     |
+| controllers      | writeResponseTimeStdDev         | float     |
+| controllers      | writeThroughput                 | float     |
++------------------+---------------------------------+-----------+
+
+```
+
+Tags:
+
+```sh
+influxdb3 query --language influxql 'SHOW tag KEYS FROM controllers'   
++------------------+---------------------+
+| iox::measurement | tagKey              |
++------------------+---------------------+
+| controllers      | controllerId        |
+| controllers      | controller_endpoint |
+| controllers      | sourceController    |
+| controllers      | system_id           |
+| controllers      | system_name         |
++------------------+---------------------+
+
+```
+
+In **InfluxDB Explorer**, to find six most recent data from `5.5.5.5`.
+
+```sql
+SELECT "time",
+         "system_id",
+         "controller_endpoint",
+         "readIOps",
+         "writeIOps",
+         "otherIOps",
+         "maxPossibleIopsUnderCurrentLoad"
+    FROM controllers WHERE controller_endpoint='5.5.5.5'
+  ORDER BY "time" DESC
+    LIMIT 6
+```
 
 ## `disks` - disk-level performance 
 
@@ -335,16 +444,48 @@ $ influxdb3 query --language influxql '
     '
 ```
 
+A CLI query with **InfluxQL**:
+
 ```sh
-$ influxdb3 query --language influxql 'SELECT manufacturer,serialNumber,productID,softwareVersion,physicalLocation_slot FROM drives'
-+------------------+-------------------------------+--------------+----------------+------------------+-----------------+-----------------------+
-| iox::measurement | time                          | manufacturer | serialNumber   | productID        | softwareVersion | physicalLocation_slot |
-+------------------+-------------------------------+--------------+----------------+------------------+-----------------+-----------------------+
-| drives           | 1970-01-01T00:00:01.755106260 | Samsung      | S5D9NE0MA00043 | MZWLJ15THALA-0G5 | NA54            | 12                    |
-| drives           | 1970-01-01T00:00:01.755106260 | Samsung      | S6CWNE0R600024 | MZWLR15THBLA-0G5 | NQ02            | 2                     |
-| drives           | 1970-01-01T00:00:01.755106260 | Samsung      | S6CWNE0R600036 | MZWLR15THBLA-0G5 | NQ02            | 3                     |
-| drives           | 1970-01-01T00:00:01.755117300 | Samsung      | S6CWNE0R600183 | MZWLR15THBLA-0G5 | NQ02            | 21                    |
-+------------------+-------------------------------+--------------+----------------+------------------+-----------------+-----------------------+
+$ influxdb3 query --language influxql 'SELECT softwareVersion,physicalLocation_slot FROM drives'
++------------------+---------------------+-----------------+-----------------------+
+| iox::measurement | time                | softwareVersion | physicalLocation_slot |
++------------------+---------------------+-----------------+-----------------------+
+| drives           | 2025-08-13T17:31:42 | NA54            | 12                    |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 2                     |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 3                     |
+| drives           | 2025-08-13T17:31:42 | NA50            | 11                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 15                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 16                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 13                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 24                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 18                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 8                     |
+| drives           | 2025-08-13T17:31:42 | NA50            | 19                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 10                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 23                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 14                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 4                     |
+| drives           | 2025-08-13T17:31:42 | NA50            | 20                    |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 22                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 21                    |
+| drives           | 2025-08-13T17:31:42 | NA50            | 17                    |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 6                     |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 9                     |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 1                     |
+| drives           | 2025-08-13T17:31:42 | NA50            | 7                     |
+| drives           | 2025-08-13T17:31:42 | NQ02            | 5                     |
++------------------+---------------------+-----------------+-----------------------+
+
+```
+
+Also using **InfluxQL**, to find all disk drives with outdated SSD firmware (assuming `NA54` is the latest for this particular disk):
+
+```sql
+influxdb3 query --language influxql \
+  'SELECT "softwareVersion","physicalLocation_slot"
+     FROM drives
+    WHERE "softwareVersion" != '\''NA54'\'''
 ```
 
 
@@ -369,10 +510,63 @@ influxdb3 query 'SELECT "serialNumber" FROM drives WHERE "ssdWearLife_isWearLife
 $ influxdb3 query 'SELECT serialNumber FROM drives WHERE "ssdWearLife_isWearLifeMonitoringSupported"=TRUE ORDER BY "ssdWearLife_spareBlocksRemainingPercent"'
 ```
 
-In short, it can be frustrating. 
+Similar CLI queries with **SQL**:
 
-One has to build a collection of useful, known-to-work commands and expand from there, or otherwise use Grafana or MCP.
+```sql
+influxdb3 query --language sql \
+  'SELECT "softwareVersion", "physicalLocation_slot" 
+     FROM drives'
++-----------------+-----------------------+
+| softwareVersion | physicalLocation_slot |
++-----------------+-----------------------+
+| NA54            | 12                    |
+| NQ02            | 2                     |
+| NQ02            | 3                     |
+| NA50            | 11                    |
+| NA50            | 15                    |
+| NA50            | 16                    |
+| NA50            | 13                    |
+| NA50            | 24                    |
+| NA50            | 18                    |
+| NA50            | 8                     |
+| NA50            | 19                    |
+| NA50            | 10                    |
+| NA50            | 23                    |
+| NA50            | 14                    |
+| NA50            | 4                     |
+| NA50            | 20                    |
+| NQ02            | 22                    |
+| NA50            | 21                    |
+| NA50            | 17                    |
+| NQ02            | 6                     |
+| NQ02            | 9                     |
+| NQ02            | 1                     |
+| NA50            | 7                     |
+| NQ02            | 5                     |
++-----------------+-----------------------+
 
+influxdb3 query --language sql \
+  'SELECT "softwareVersion","physicalLocation_slot"
+     FROM drives
+    WHERE "softwareVersion" <> '\''NA54'\'''
+
+```
+
+In SQL and hence **InfluxDB Explorer** ), we'd probably pick more details and sort by certain properties (E-Series' `system_id`, slot, etc.).
+
+```sql
+SELECT "system_name","manufacturer","productID", "physicalLocation_slot","softwareVersion"
+     FROM drives
+    WHERE "softwareVersion" <> '\''NA54\'''  ORDER BY "physicalLocation_slot" ASC
+```
+
+That would work fine for 2U controllers without expansion enclosures, but if you have multi-shelf or multi-tray systems, maybe  you want to add additional column.
+
+```sh
+SELECT "system_name","physicalLocation_trayRef","physicalLocation_slot","manufacturer","productID", "softwareVersion"
+     FROM drives
+    WHERE "softwareVersion" <> '\''NA54\'''
+```
 
 ## `failures` - failure events
 
@@ -850,5 +1044,5 @@ influxdb3 query --language influxql \
 +------------------+---------------------+---------------------+-------------------------+
 ```
 
-Recall that EPA queries E-Series' `analysed-<object>` statistics, so by the time those metrics get to InfluxDB they have been sliced and diced and calculating averages, means and similar values for short periods such as 5 minutes is probably misleading at best. The [FAQs](FAQ.md) have a bit more on this.
+Recall that EPA queries E-Series' `analysed-<object>` statistics, so by the time those metrics get to InfluxDB they have been sliced and diced and because of that calculating averages, means and similar for short intervals such as 5 minutes is probably misleading at best. The [FAQs](FAQ.md) have a bit more on this.
 

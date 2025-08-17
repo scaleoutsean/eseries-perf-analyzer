@@ -11,7 +11,6 @@ import hashlib
 from datetime import datetime, timezone
 from collections.abc import Iterable
 from app.config import INFLUXDB_WRITE_PRECISION
-from app.connection import get_session
 from app.controllers import get_controller
 from app.utils import create_failure_dict_item, get_json_output_path
 

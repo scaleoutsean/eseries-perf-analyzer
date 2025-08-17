@@ -13,7 +13,7 @@ and sends it to InfluxDB 3
 """
 import argparse
 import concurrent.futures
-from datetime import datetime
+from datetime import datetime, timezone
 import glob
 from itertools import groupby
 import json
@@ -172,7 +172,11 @@ else:
     # Using Settings imported at the top of the file
     settings = None
     if need_influx or not CMD.api:  # Load settings if we need config for API endpoints or InfluxDB
-        settings = Settings(config_file=CMD.config, from_env=False)
+        # Use environment variables if no config file is provided (containerized mode)
+        if CMD.config is None:
+            settings = Settings(from_env=True)
+        else:
+            settings = Settings(config_file=CMD.config, from_env=False)
 
     # Override CLI defaults only when not provided
     if not CMD.api and not CMD.fromJson:  # Don't require API endpoints when reading from JSON
@@ -256,7 +260,8 @@ if __name__ == "__main__":
         # Create measurement tables with proper field type schemas
         print("Creating measurement tables with proper field type schemas...")
         try:
-            tables_success = create_measurement_tables(influxdb_url, influxdb_auth_token, influxdb_database)
+            tables_success = create_measurement_tables(influxdb_url, influxdb_auth_token, influxdb_database, 
+                                                     CMD.tlsCa, CMD.tlsValidation)
             if tables_success:
                 print("All measurement tables created successfully")
             else:
@@ -268,7 +273,8 @@ if __name__ == "__main__":
         # Validate measurement schemas
         print("Validating measurement schemas...")
         try:
-            validation_results = validate_measurement_schemas(influxdb_url, influxdb_auth_token, influxdb_database)
+            validation_results = validate_measurement_schemas(influxdb_url, influxdb_auth_token, influxdb_database, 
+                                                            CMD.tlsCa, CMD.tlsValidation)
             if not validation_results:
                 print("ERROR: Schema validation failed - could not query measurements")
                 sys.exit(1)
@@ -342,7 +348,9 @@ if __name__ == "__main__":
         import re
         # Helper to extract minute from filename
         def extract_minute_from_filename(filename):
-            match = re.search(r'_(\d{8,})', filename)
+            # Try to match timestamp at the end of filename before .json extension
+            # Pattern matches YYYYMMDDHHMM or unix timestamp at end of filename
+            match = re.search(r'_(\d{10,12})(?:\.json)?$', filename)
             if match:
                 try:
                     val = match.group(1)
@@ -357,21 +365,23 @@ if __name__ == "__main__":
 
         # Helper to extract timestamp from filename for InfluxDB (second precision)
         def extract_timestamp_from_filename(filename):
-            match = re.search(r'_(\d{8,})', filename)
+            # Try to match timestamp at the end of filename before .json extension
+            # Pattern matches YYYYMMDDHHMM or unix timestamp at end of filename
+            match = re.search(r'_(\d{10,12})(?:\.json)?$', filename)
             if match:
                 try:
                     val = match.group(1)
                     if len(val) == 10:
                         # Unix timestamp - already in seconds
-                        return val
+                        return int(val)
                     elif len(val) == 12:
                         # YYYYMMDDHHMM format - convert to unix timestamp
                         dt = datetime.strptime(val, '%Y%m%d%H%M')
-                        return str(int(dt.timestamp()))
+                        return int(dt.timestamp())
                 except Exception:
                     pass
             # Fall back to file modification time (seconds)
-            return str(int(os.path.getmtime(filename)))
+            return int(os.path.getmtime(filename))
 
         # Function to replay JSON files
         def replay_json_dir(json_dir):
@@ -379,6 +389,7 @@ if __name__ == "__main__":
             # Collect matching JSON files for all data types
             file_patterns = [
                 os.path.join(json_dir, 'system_*.json'),
+                os.path.join(json_dir, 'system_failures_*.json'),  # Add missing system_failures pattern
                 os.path.join(json_dir, 'drive_*.json'),
                 os.path.join(json_dir, 'drives_*.json'),
                 os.path.join(json_dir, 'volume_*.json'),
@@ -450,6 +461,18 @@ if __name__ == "__main__":
 
                             # Extract timestamp from filename (second precision)
                             file_timestamp = extract_timestamp_from_filename(fname)
+                            
+                            # Validate file timestamp and log issues (use INFO level to ensure visibility)
+                            if file_timestamp is None:
+                                LOG.info(f"TIMESTAMP DEBUG: extract_timestamp_from_filename returned None for {fname}")
+                                file_timestamp = int(time.time())  # Use current time as fallback
+                                LOG.info(f"TIMESTAMP DEBUG: Using current time fallback: {file_timestamp}")
+                            elif not isinstance(file_timestamp, (int, float)) or file_timestamp <= 0:
+                                LOG.info(f"TIMESTAMP DEBUG: Invalid file timestamp {file_timestamp} (type: {type(file_timestamp)}) from {fname}")
+                                file_timestamp = int(time.time())  # Use current time as fallback
+                                LOG.info(f"TIMESTAMP DEBUG: Using current time fallback: {file_timestamp}")
+                            else:
+                                LOG.info(f"TIMESTAMP DEBUG: Valid file timestamp {file_timestamp} extracted from {fname}")
 
                             # Convert JSON data to InfluxDB Point format for InfluxDB3 client
                             records = []
@@ -458,16 +481,44 @@ if __name__ == "__main__":
                                     measurement = point['measurement']
                                     tags = point.get('tags', {})
                                     fields = point['fields']
-                                    # Use filename timestamp (second precision) for all data points
-                                    timestamp = int(file_timestamp)
+                                    
+                                    # Use JSON timestamp if available, otherwise use filename timestamp
+                                    json_time = point.get('time')
+                                    if json_time:
+                                        # Parse JSON timestamp string to datetime, then to Unix timestamp
+                                        try:
+                                            if isinstance(json_time, str):
+                                                # Handle ISO format with space or T separator
+                                                json_time_clean = json_time.replace(" ", "T")
+                                                dt = datetime.fromisoformat(json_time_clean)
+                                                timestamp = int(dt.timestamp())
+                                            else:
+                                                timestamp = int(json_time)
+                                        except Exception as e:
+                                            LOG.warning(f"Failed to parse JSON timestamp '{json_time}' in {fname}: {e}")
+                                            timestamp = int(file_timestamp)  # Fallback to filename timestamp
+                                    else:
+                                        # Use filename timestamp (second precision) for data points without JSON time
+                                        timestamp = int(file_timestamp)
+                                    
+                                    # Final timestamp validation before creating record
+                                    if not isinstance(timestamp, int) or timestamp <= 0:
+                                        LOG.warning(f"TIMESTAMP DEBUG: Invalid final timestamp {timestamp} (type: {type(timestamp)}) for {fname}")
+                                        timestamp = int(time.time())  # Emergency fallback
+                                        LOG.warning(f"TIMESTAMP DEBUG: Using emergency current time fallback: {timestamp}")
+                                    else:
+                                        LOG.info(f"TIMESTAMP DEBUG: Final valid timestamp {timestamp} for {fname}")
 
                                     # Create record dictionary for InfluxDB3 client
+                                    # Use datetime object for proper timestamp handling
+                                    timestamp_dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
                                     record = {
                                         'measurement': measurement,
                                         'tags': tags,
                                         'fields': fields,
-                                        'time': timestamp
+                                        'time': timestamp_dt
                                     }
+                                    LOG.info(f"TIMESTAMP DEBUG: Created record with timestamp {timestamp_dt} (datetime) for measurement {measurement}")
                                     records.append(record)
 
                             if records:
@@ -545,7 +596,8 @@ if __name__ == "__main__":
             # Create measurement tables with proper field types before data insertion
             try:
                 LOG.info("Creating measurement tables with proper field type schemas...")
-                tables_success = create_measurement_tables(influxdb_url, influxdb_auth_token, influxdb_database)
+                tables_success = create_measurement_tables(influxdb_url, influxdb_auth_token, influxdb_database, 
+                                                         CMD.tlsCa, CMD.tlsValidation)
                 if tables_success:
                     LOG.info("All measurement tables created successfully")
                 else:
@@ -553,7 +605,8 @@ if __name__ == "__main__":
 
                 # Immediately validate the schemas we just created
                 LOG.info("Validating measurement schemas...")
-                validation_results = validate_measurement_schemas(influxdb_url, influxdb_auth_token, influxdb_database)
+                validation_results = validate_measurement_schemas(influxdb_url, influxdb_auth_token, influxdb_database, 
+                                                                CMD.tlsCa, CMD.tlsValidation)
 
                 # Check if validation passed for critical measurements
                 critical_measurements = ['drives']  # Add more as needed

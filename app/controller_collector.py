@@ -8,9 +8,8 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from app.controllers import get_controller
 from app.utils import get_json_output_path
-from app.metrics_config import CONTROLLER_PARAMS, CONTROLLER_FIELDS_EXCLUDED
+from app.metrics_config import CONTROLLER_FIELDS_EXCLUDED
 
 LOG = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ except Exception:
     DEFAULT_TLS_VALIDATION = "strict"  # Match config.py default
 
 # Track last collection time globally
-last_collection_time = 0
+LAST_COLLECTION_TIME = 0
 
 def get_controller_token(controller_ip, username, password, tls_validation=None, tls_ca=None):
     """
@@ -87,7 +86,11 @@ def get_controller_token(controller_ip, username, password, tls_validation=None,
         LOG.warning(f"[CONTROLLER_COLLECTOR] Exception getting token from {controller_ip}: {e}")
         return None
 
-def collect_controller_data(sys_info, session, san_headers, api_endpoints, database_client, db_name, flags, loop_iteration, influxdb_url=None, auth_token=None, username=None, password=None, tls_validation=None, tls_ca=None, main_controller_endpoint=None, main_controller_token=None):
+def collect_controller_data(sys_info, session, san_headers, api_endpoints, 
+                           database_client, db_name, flags, loop_iteration, 
+                           influxdb_url=None, auth_token=None, username=None, 
+                           password=None, tls_validation=None, tls_ca=None, 
+                           main_controller_endpoint=None, main_controller_token=None):
     """
     Collects controller-specific performance metrics from E-Series controllers.
     This function runs at a lower frequency than normal metric collection.
@@ -110,7 +113,7 @@ def collect_controller_data(sys_info, session, san_headers, api_endpoints, datab
     :param main_controller_endpoint: IP/FQDN of controller used by main collector (to reuse token)
     :param main_controller_token: Bearer token from main collector session (to avoid re-auth)
     """
-    global last_collection_time
+    global LAST_COLLECTION_TIME
     
     # Use config default if not specified
     if tls_validation is None:
@@ -152,14 +155,19 @@ def collect_controller_data(sys_info, session, san_headers, api_endpoints, datab
     else:
         # For subsequent iterations, check if enough iterations have passed
         # Get actual intervalTime from flags instead of hardcoding
-        intervalTime = getattr(flags, 'intervalTime', 60)  # Use actual interval or 60 as fallback
-        iterations_per_controller_collection = max(1, CONTROLLER_COLLECTION_INTERVAL // intervalTime)
+        interval_time = getattr(flags, 'intervalTime', 60)  # Use actual interval or 60 as fallback
+        iterations_per_controller_collection = max(1, CONTROLLER_COLLECTION_INTERVAL // interval_time)
         
         if (iteration_num - 1) % iterations_per_controller_collection == 0:
-            print(f"[CONTROLLER_COLLECTOR DIAG] PROCEEDING: Time interval reached - iteration {iteration_num}, collecting every {iterations_per_controller_collection} iterations (intervalTime={intervalTime})")
+            print(f"[CONTROLLER_COLLECTOR DIAG] PROCEEDING: Time interval reached - "
+                  f"iteration {iteration_num}, collecting every {iterations_per_controller_collection} "
+                  f"iterations (interval_time={interval_time})")
         else:
-            print(f"[CONTROLLER_COLLECTOR DIAG] SKIPPING: Not time yet - iteration {iteration_num}, collecting every {iterations_per_controller_collection} iterations (intervalTime={intervalTime})")
-            LOG.info(f"[CONTROLLER_COLLECTOR] Skipping controller collection. Will collect every {iterations_per_controller_collection} iterations")
+            print(f"[CONTROLLER_COLLECTOR DIAG] SKIPPING: Not time yet - "
+                  f"iteration {iteration_num}, collecting every {iterations_per_controller_collection} "
+                  f"iterations (interval_time={interval_time})")
+            LOG.info(f"[CONTROLLER_COLLECTOR] Skipping controller collection. "
+                     f"Will collect every {iterations_per_controller_collection} iterations")
             return []
     
     LOG.info(f"[CONTROLLER_COLLECTOR] Starting controller collection (interval: {CONTROLLER_COLLECTION_INTERVAL} seconds, iteration: {iteration_num})")
@@ -353,8 +361,16 @@ def collect_controller_data(sys_info, session, san_headers, api_endpoints, datab
             for p in json_body:
                 tags = p["tags"]
                 fields = p["fields"]
-                timestamp = p.get("time", datetime.now(timezone.utc))
-                record = {**tags, **fields, "timestamp": timestamp}
+                timestamp = p.get("time")  # Get the actual time from JSON/API
+                if timestamp is None:
+                    timestamp = datetime.now(timezone.utc)  # Only fallback if missing
+                # If timestamp is a string (from JSON replay), parse it
+                elif isinstance(timestamp, str):
+                    try:
+                        timestamp = datetime.fromisoformat(timestamp.replace(" ", "T"))
+                    except Exception:
+                        timestamp = datetime.now(timezone.utc)
+                record = {**tags, **fields, "time": timestamp}   
                 records.append(record)
             
             # Write to InfluxDB if we have points
@@ -367,7 +383,7 @@ def collect_controller_data(sys_info, session, san_headers, api_endpoints, datab
                     database_client.write(database=db_name, 
                                         record=records,
                                         data_frame_measurement_name="controllers",
-                                        data_frame_timestamp_column="timestamp")
+                                        data_frame_timestamp_column="time")
                     LOG.info(f"[CONTROLLER_COLLECTOR] Successfully wrote {len(records)} controller records to InfluxDB")
                 else:
                     LOG.warning("[CONTROLLER_COLLECTOR] No database_client available for writing to InfluxDB")

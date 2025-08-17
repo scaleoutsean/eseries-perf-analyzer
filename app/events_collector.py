@@ -8,11 +8,9 @@ import logging
 import sys
 import hashlib
 import os
-import pickle
 from datetime import datetime, timezone
 from collections.abc import Iterable
 from app.config import INFLUXDB_WRITE_PRECISION
-from app.connection import get_session
 from app.controllers import get_controller
 from app.utils import get_json_output_path
 from app.metrics_config import MEL_PARAMS
@@ -49,7 +47,7 @@ def save_mel_checkpoint(influx_client, sys_id, sequence_id, checksum, db_name):
                 'last_sequence_id': int(sequence_id),
                 'content_checksum': str(checksum)
             },
-            'time': datetime.now(timezone.utc).isoformat()
+            'time': datetime.now(timezone.utc)  # Use datetime object, not ISO string
         }]
         influx_client.write(checkpoint_data, database=db_name, time_precision=INFLUXDB_WRITE_PRECISION)
         LOG.debug(f"Saved MEL checkpoint to InfluxDB for {sys_id}: seq={sequence_id}")
@@ -202,7 +200,7 @@ def collect_major_event_log(sys_info, session, san_headers, api_endpoints, influ
                 'asc': mel.get('asc')
             },
             'fields': {metric: mel.get(metric) for metric in MEL_PARAMS},
-            'time': datetime.fromtimestamp(int(mel.get('timeStamp', 0)), timezone.utc).isoformat()
+            'time': datetime.fromtimestamp(int(mel.get('timeStamp', 0)), timezone.utc)  # Use datetime object
         }
         json_body.append(item)
     LOG.info("DEBUG: collect_major_event_log built %d MEL items", len(json_body))

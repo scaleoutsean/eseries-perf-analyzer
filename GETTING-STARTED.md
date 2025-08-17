@@ -207,8 +207,8 @@ From **Grafana**:
 - add InfluxDB Data Source: 
   - use `SQL` language dialect for InfluxDB 3
   - if both Grafana and InfluxDB run in same Docker Compose, use https://influxdb:8181, if not, use Nginx FQDN, such as https://nginx:8181
+  - if Grafana cannot connect via HTTPS see [DOCUMENTATION](./DOCUMENTATION.md) for additional details about this
 - you will need InfluxDB API token to access the DB. Paste the token near the bottom just below database name
-- [DOCUMENTATION](./DOCUMENTATION.md) has a screenshot with additional details about this
 
 ### Troubleshooting
 

@@ -5,9 +5,6 @@
 
 import json
 import logging
-from datetime import timezone
-from app.config import INFLUXDB_WRITE_PRECISION
-from app.connection import get_session
 from app.controllers import get_controller
 from app.utils import order_sensor_response_list, get_json_output_path
 
