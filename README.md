@@ -4,7 +4,7 @@
   - [What is E-Series Perf Analyzer (EPA)?](#what-is-e-series-perf-analyzer-epa)
   - [What EPA does](#what-epa-does)
   - [Minimum requirements](#minimum-requirements)
-  - [Where and how to run it?](#where-and-how-to-run-it)
+  - [Where and how to run EPA?](#where-and-how-to-run-epa)
     - [CLI](#cli)
     - [Docker](#docker)
     - [Kubernetes](#kubernetes)
@@ -26,7 +26,7 @@ Version 4 is almost a complete re-write that continues in the same direction tha
 ## What EPA does
 
 - Metrics collection and more
-  - (Storage) system
+  - System
   - Controllers
   - Interfaces
   - Volumes  
@@ -34,19 +34,19 @@ Version 4 is almost a complete re-write that continues in the same direction tha
   - Disks (configuration/properties)
   - Power supplies (power consumption)  
   - Temperature (inlet, CPU)
-  - Events and MEL (major event logs)
+  - Events and MEL (major event log)
 - Security not an afterthought
   - Out-of-the-box HTTPS everywhere
   - TLS 1.3 with strong ciphers
   - Strict TLS certificate validation available, and regular TLS validation by default (invalid certificates rejected)
   - Quantum-Resistant Cryptography option for TLS key exchange
-  - Enables QRC proxying of SANtricity Web and API 
+  - Enables Quantum-Resistant proxying of Web and API access to SANtricity API
 - Future-proof design
   - Database back-end on InfluxDB 3 released in 2025 - good for years to come
-  - Python 3.10+ with InfluxDB3 client developed by InfluxDB community and no fancy modules
+  - Python 3.10+ with InfluxDB3 client developed by InfluxDB community and only the essential modules
   - InfluxDB Explorer - Web UI for data exploration using SQL or Natural Language Processing/AI
-  - Integration with InfluxDB MCP server possible
-- No-nonsense project
+  - External reverse HTTPS proxy for easy access by InfluxDB 3 MCP Server or other authorized clients
+- Agility and simplicity
   - Permissive MIT license
   - No Community Code of Conduct
   - No Contributor Agreement
@@ -60,44 +60,53 @@ The stack has just two key services:
 
 ![EPA 4 - Key Services](./images/epa-eseries-perf-analyzer.png)
 
-In the above diagram you can see EPA will normally run separately from the rest of the stack as (for example) InfluxDB has no reason to reach E-Series controllers on management LAN.
+EPA Collector can run separately from the rest of the EPA stack as (for example) InfluxDB has no reason to connect to E-Series controllers on management LAN. 
 
-This more busy version shows a slightly different take and dives deeper into how :
+This more busy version shows a slightly different take and dives deeper into CA and TLS certificates:
 
-- Docker-internal (or Kubernetes) CA issues certificates (yellow shield) to EPA stack and optionally E-Series (CA = yellow square)
-- Enterprise CA-signed certificate (green shield) should be issued for the reverse proxy and could be issued for E-Series as well. EPA Collector could access E-Series controllers via external-facing HTTPS proxy or directly as before
+- Docker-internal (or Kubernetes) CA issues certificates (yellow shield) to EPA stack services and optionally E-Series (CA = yellow square)
+- Enterprise CA-signed certificates (green shields) may be issued for the reverse HTTPS proxy and E-Series as well. EPA Collector could then access E-Series controllers via external-facing HTTPS proxy or directly as before
 
 ![EPA - Full Stack](./images/epa-v4-qrc-tls.svg)
 
 Although EPA doesn't use PQC to reverse-proxy E-Series' controllers (because they tend to live on a strictly controlled management network), it is possible to expose them through our front-end quantum-resistant HTTPS proxy.
 
-With enterprise CA-issued certificates you can get trusted, quantum-resistant HTTPS proxy that works end-to-end (PQC on front-end proxy with verified, strong TLS 1.3 to upstream SANtricity).
+With enterprise CA-issued certificates you can get trusted, quantum-resistant HTTPS proxy that works end-to-end (PQC on front-end proxy with verified, strong TLS 1.3 to upstream SANtricity) and is usable for secure access to other EPA stack services such as InfluxDB or InfluxDB explorer.
 
 ![EPA - Full Stack with QRC on Web Proxy](./images/epa-v4-tls.png)
 
-While others are still thinking about dashboards, EPA 4 has dropped dashboards (some reference dashboards will be provided) and is focusing on AI- and MCP-assisted exploration and alerting.
+Aside from focus on access security, the other major focus this release is AI.
 
-![EPA for AI and MCP](./images/epa-storage-analytics-exploration.png)
+EPA 4 has dropped dashboards as a low value-added component (although a basic dashboard will be provided) and even Grafana is drawn as an external service in EPA stack diagrams above. EPA v4 aims to provide easy access to AI- and MCP-assisted analysis and alerting. How?
 
-1. Use SQL trigger sophisticated alerts directly from InfluxDB in real-time
-2. Use Natural Language Processing to work out SQL with chatbot's help directly from InfluDB Explorer - just enter your access token for AI chatbot. InfluxDB has its official MCP server that can be added to EPA stack.
+1. Use built-in SQL triggers to create sophisticated alerts directly from InfluxDB in real-time using InfluxDB 3 plugins
+2. Use Natural Language Processing to create SQL queries in InfluxDB Explorer and export them to Grafana or use such queries to create built-in InfluxDB 3 alerts and data pipeline jobs. 
+3. Thanks to our secure, external-facing HTTPS proxy, InfluxDB 3 core is also ready for access by InfluxDB MCP server (more in [DOCUMENTATION](./DOCUMENTATION.md))
 
 ## Minimum requirements
 
 EPA Collector needs Python 3.10+ and requires less than 100 MB RAM and 0.5 vCPU.
 
-## Where and how to run it?
+If you want to store data in InfluxDB, you need an instance of InfluxDB 3 and a way to connect to it from EPA Collector.
 
-See [GETTING-STARTED](./GETTING-STARTED.md) for that, but here's a summary:
+## Where and how to run EPA?
+
+See [GETTING-STARTED](./GETTING-STARTED.md) for that, but here's a summary of options:
 
 ### CLI
 
-If you don't use containers or want to use EPA for a short time, CLI is the way to go. Clone the repository (mind the branch if not cloning from `master`), install dependencies and you're good to go.
+If you don't use containers or want to use EPA for a limited time, CLI is the way to go. Clone the repository (mind the branch if not cloning from `master`!), install dependencies and you're good to go.
 
 ```sh
-pip3 install -r app/requirements.txt
+# git clone ...
+cd eseries-perf-analyzer/app
+# create virtual environment in ./app/
+pip3 install -r requirements.txt
+cd ..
 python3 -m app.collector -h
 ```
+
+Note that this makes it possible to run EPA Collector, while the rest of the stack is an exercise for the user. You could install the rest in Docker (disable or remove `collector` service, and start `influxdb` and `influxdb-init`, for example) and have EPA Collector send data to it via the external-facing secure proxy.
 
 ### Docker
 
@@ -110,5 +119,6 @@ TODO during 4.0.0 beta
 ## Other resources
 
 - [DOCUMENTATION](./DOCUMENTATION.md)
+- [TIPS](./TIPS.md)
 - [FAQs](./FAQ.md)
 - [CHANGELOG](./CHANGELOG.md)

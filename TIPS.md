@@ -10,13 +10,14 @@
   - [`disks` - disk-level performance](#disks---disk-level-performance)
   - [`drives` - disk drive characteristics](#drives---disk-drive-characteristics)
   - [`failures` - failure events](#failures---failure-events)
-  - [`health_check`](#health_check)
   - [`interface` - interfaces' metrics](#interface---interfaces-metrics)
   - [`major_event_log` - MEL logs](#major_event_log---mel-logs)
   - [`power` - power supply units' readings](#power---power-supply-units-readings)
   - [`systems` - system-level performance metrics](#systems---system-level-performance-metrics)
   - [`temp` - temperature sensors](#temp---temperature-sensors)
   - [`volumes` - volume performance metrics](#volumes---volume-performance-metrics)
+  - [Various](#various)
+    - [Write to InfluxDB 3 using Line Protocol](#write-to-influxdb-3-using-line-protocol)
 
 ## General tips
 
@@ -121,7 +122,6 @@ $ influxdb3 query --language influxql "SHOW MEASUREMENTS"
 | measurements     | disks           |
 | measurements     | drives          |
 | measurements     | failures        |
-| measurements     | health_check    |
 | measurements     | interface       |
 | measurements     | major_event_log |
 | measurements     | power           |
@@ -341,16 +341,16 @@ $ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM drives'
 | iox::measurement | fieldKey                                                       | fieldType |
 +------------------+----------------------------------------------------------------+-----------+
 | drives           | available                                                      | boolean   |
-| drives           | blkSize                                                        | float     |
-| drives           | blkSizePhysical                                                | float     |
+| drives           | blkSize                                                        | integer   |
+| drives           | blkSizePhysical                                                | integer   |
 | drives           | cause                                                          | string    |
-| drives           | currentCommandAgingTimeout                                     | float     |
+| drives           | currentCommandAgingTimeout                                     | integer   |
 | drives           | currentSpeed                                                   | string    |
 | drives           | currentVolumeGroupRef                                          | string    |
-| drives           | defaultCommandAgingTimeout                                     | float     |
+| drives           | defaultCommandAgingTimeout                                     | integer   |
 | drives           | driveSecurityType                                              | string    |
-| drives           | driveTemperature_currentTemp                                   | float     |
-| drives           | driveTemperature_refTemp                                       | float     |
+| drives           | driveTemperature_currentTemp                                   | integer   |
+| drives           | driveTemperature_refTemp                                       | integer   |
 | drives           | dulbeCapable                                                   | boolean   |
 | drives           | fdeCapable                                                     | boolean   |
 | drives           | fdeEnabled                                                     | boolean   |
@@ -379,9 +379,8 @@ $ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM drives'
 | drives           | phyDriveType                                                   | string    |
 | drives           | phyDriveTypeData_phyDriveType                                  | string    |
 | drives           | physicalLocation_label                                         | string    |
-| drives           | physicalLocation_locationParent_refType                        | string    |
-| drives           | physicalLocation_locationPosition                              | float     |
-| drives           | physicalLocation_slot                                          | float     |
+| drives           | physicalLocation_locationPosition                              | integer   |
+| drives           | physicalLocation_slot                                          | integer   |
 | drives           | physicalLocation_trayRef                                       | string    |
 | drives           | productID                                                      | string    |
 | drives           | protectionInformationCapabilities_protectionInformationCapable | boolean   |
@@ -399,17 +398,18 @@ $ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM drives'
 | drives           | sanitizeCapable                                                | boolean   |
 | drives           | softwareVersion                                                | string    |
 | drives           | sparedForDriveRef                                              | string    |
-| drives           | spindleSpeed                                                   | float     |
-| drives           | ssdWearLife_averageEraseCountPercent                           | float     |
-| drives           | ssdWearLife_isWearLifeMonitoringSupported                      | boolean   |
-| drives           | ssdWearLife_percentEnduranceUsed                               | float     |
-| drives           | ssdWearLife_spareBlocksRemainingPercent                        | float     |
+| drives           | spindleSpeed                                                   | integer   |
+| drives           | ssdWearLife_averageEraseCountPercent                           | integer   |
+| drives           | ssdWearLife_isWearLifeMonitoringSupported                      | integer   |
+| drives           | ssdWearLife_percentEnduranceUsed                               | integer   |
+| drives           | ssdWearLife_spareBlocksRemainingPercent                        | integer   |
 | drives           | uncertified                                                    | boolean   |
 | drives           | usableCapacity                                                 | string    |
-| drives           | volumeGroupIndex                                               | float     |
-| drives           | workingChannel                                                 | float     |
+| drives           | volumeGroupIndex                                               | integer   |
+| drives           | workingChannel                                                 | integer   |
 | drives           | worldWideName                                                  | string    |
 +------------------+----------------------------------------------------------------+-----------+
+
 ```
 
 Tags:
@@ -644,39 +644,9 @@ influxdb3 query \
 Also in Bash but using `--language influxql`: I couldn't make any smart examples.
 
 
-## `health_check` 
-
-Fields:
-
-```sh
-$ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM health_check'
-+------------------+----------+-----------+
-| iox::measurement | fieldKey | fieldType |
-+------------------+----------+-----------+
-| health_check     | value    | float     |
-+------------------+----------+-----------+
-
-```
-
-Tags:
-
-```sh
-$ influxdb3 query --language influxql 'SHOW TAG KEYS FROM health_check'
-+------------------+--------+
-| iox::measurement | tagKey |
-+------------------+--------+
-| health_check     | source |
-| health_check     | test   |
-+------------------+--------+
-
-```
-
-
 ## `interface` - interfaces' metrics
 
-"Outbound" (host-facing) interfaces are useful to see and understand how well E-Series' clients are balancing workload across controller ports. 
-
-For load-balancing across controllers, see `controllers`.
+"Outbound" (host-facing) interfaces are useful to see and let us understand how well E-Series' clients are balancing workload across controller ports. For load-balancing across controllers, see `controllers`.
 
 Fields:
 
@@ -687,7 +657,7 @@ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM interface'
 +------------------+----------------------+-----------+
 | interface        | averageReadOpSize    | float     |
 | interface        | averageWriteOpSize   | float     |
-| interface        | channelErrorCounts   | float     |
+| interface        | channelErrorCounts   | integer   |
 | interface        | combinedIOps         | float     |
 | interface        | combinedResponseTime | float     |
 | interface        | combinedThroughput   | float     |
@@ -826,10 +796,10 @@ $ influxdb3 query --language influxql 'SHOW FIELD KEYS FROM power'
 | iox::measurement | fieldKey               | fieldType |
 +------------------+------------------------+-----------+
 | power            | calculatedTotalPower   | float     |
-| power            | numberOfTrays          | float     |
+| power            | numberOfTrays          | integer   |
 | power            | powerValidation        | string    |
 | power            | returnCode             | string    |
-| power            | totalPower             | float     |
+| power            | totalPower             | integer   |
 | power            | tray99_psu0_inputPower | float     |
 | power            | tray99_psu1_inputPower | float     |
 | power            | tray99_totalPower      | float     |
@@ -1061,4 +1031,20 @@ influxdb3 query --language influxql \
 ```
 
 Recall that EPA queries E-Series' `analysed-<object>` statistics, so by the time those metrics get to InfluxDB they have been sliced and diced and because of that calculating averages, means and similar for short intervals such as 5 minutes is probably misleading at best. The [FAQs](FAQ.md) have a bit more on this.
+
+## Various 
+
+### Write to InfluxDB 3 using Line Protocol
+
+Note `meseries&precision=s` in the link: we write to the `meseries` database (you may need to create it) using second-level precision (default in EPA Collector). The timestamp `1750000000` translates to `2025-06-15T15:06:40Z`.
+
+```sh
+curl --request POST "https://influxdb:8181/api/v3/write_lp?db=meseries&precision=s" \
+  --header "Authorization: Bearer DATABASE_TOKEN" \
+  --header "Content-Type: text/plain" \
+  --data-raw "cpu,host=beegfs01,os=rocky alpha=1.2,beta=3 1750000000
+cpu,host=beegfs02,os=rocky alpha=4,beta=5 1750000000
+"
+
+```
 

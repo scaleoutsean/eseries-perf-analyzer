@@ -22,6 +22,7 @@
     - [Storage](#storage)
       - [Storage capacity](#storage-capacity)
       - [Storage performance](#storage-performance)
+      - [Storage security](#storage-security)
   - [EPA Collector arguments](#epa-collector-arguments)
     - [`api`](#api)
     - [`showReachability`](#showreachability)
@@ -32,6 +33,10 @@
     - [`tlsCa` and `tlsValidation`](#tlsca-and-tlsvalidation)
   - [Security](#security)
   - [Data collection and privacy policy](#data-collection-and-privacy-policy)
+  - [Extras](#extras)
+    - [Natural Language Processing (NLP)](#natural-language-processing-nlp)
+    - [MCP Server for InfluxDB 3 Core](#mcp-server-for-influxdb-3-core)
+    - [Grafana dashboards](#grafana-dashboards)
 
 
 ## Introduction
@@ -170,9 +175,11 @@ InfluxDB 3 runs on the usual port 8181 using **HTTPS**. The same port is exposed
 - to access InfluxDB services you need an admin-issued token, so having the port exposed doesn't mean anyone can query or write to InfluxDB 
 - `/health` path does not require authentication. But it doesn't allow you to read or write anything. This makes it possible to monitor the DB from external services outside Docker Compose environment
 
-InfluxDB has no "administrator password" that can be recovered (although since 3.3 there's a way to recover it through the console but I haven't looked into that). The point is, there's no "username" and there's no "password" and it's not convenient if you lose the API token.
+InfluxDB has no "administrator password" that can be recovered (although since 3.3 there's a way to recover it through the console but I haven't looked into that). The point is, there's no "username" and there's no "password" and if you lose your API token there's no easy password reset.
 
-InfluxDB has its data in `./data/influxdb`.
+Regarding database name: EPA v4 defaults to `eseries`. Metrics are tagged with system WWN so you can store metrics from multiple arrays in the same database. If you need more isolation you can create multiple databases (in addition to, or instead of, `eseries`) and specify a different name in each EPA Collector.
+
+InfluxDB stores its data in `./data/influxdb`.
 
 ### InfluxDB Explorer (`influxdb3-ui`)
 
@@ -282,15 +289,18 @@ rm -rf certs/*
 ```
 
 To change E-Series or Nginx from enterprise CA to self-created CA or vice versa:
-- If CA changes, containers that access E-Series (just `collector`, in all likelihood) must 
+
+- Change CA.crt in ./certs and copy it over other locations (e.g. there may be a copy in ./certs/minio/ca.crt)
+- If CA changes, containers that access E-Series must get new TLS certificates and be rebuilt
 
 To change services' CA (S3, InfluxDB, Influx Explorer, etc), you need new TLS certificates as well, so this becomes like a new deployment.
 All containers that use those services will need a copy of the new CA certificate.
 
-To rotate passwords:
-- you may change them in the application and then, if necessary, in configuration files (or vault) as well
-- If you create a new InfluxDB key for some non-essential (e.g. `utils`, `influxdb3-ui`) or unrelated client, you don't need to touch any container configuration, but you need to update client-side (InfluxDB Explorer) settings or rebuild the container (since `utils` has the CA certificate built in)
+To have containers trust enterprise CA in addition self-generated CA, the easiest way is to replace the self-created one and reissue all TLS certificates for EPA containers. That's easier than adding another CA and if you already want to add enterprise CA there's no reason to use a weaker self-created CA in those containers.
 
+To rotate services' passwords or API keys:
+- you may change them in the application and then, if necessary, in configuration files (or vault) as well
+- if you create a new InfluxDB key for some non-essential (e.g. `utils`, `influxdb3-ui`) or unrelated client, you don't need to touch any container configuration, but you need to update client-side (InfluxDB Explorer) settings or rebuild the container (since `utils` has the CA certificate built in)
 
 ### Storage
 
@@ -303,11 +313,11 @@ There's nothing EPA-specific in how InfluxDB or its S3 extension should be manag
 The main way to ease the burden of growing InfluxDB database is to [tier it off to S3](https://docs.influxdata.com/influxdb3/core/object-storage/). This merely changes the location of the problem, but it also changes the cost because S3 is generally cheaper. But, if you use public S3 service with egress fees, this cost-saving trick can make it *more* expensive to run EPA, so consider where your S3 runs and the cost of each component.
 
 The main challenges for storage capacity management with EPA are probably:
-- Data down-sampling: as most metrics are collected every 60 seconds and you don't need that granularity for data older than 7 or 30 days, you may want to down-sample it. Fortunately, there are [tools](https://docs.influxdata.com/influxdb3/core/plugins/library/official/downsampler/) that can run as plugins directly on InfluxDB server. You could also load them in a persistent volume in the `utils` container and run from there
-- Data pruning: you may not need data older than 365 days. There are several workaround-ish ways to do it and the simplest is to down-sample old data to almost zero. For more, see [TIPS](TIPS.md).
 
-**NOTE:** this isn't EPA-specific, but we'll mention it anyway: when down-sampling or pruning, remember to qualify with tags. When averaging or down-sampling read IOPS, we may want to average or down-sample them by some property or combination of properties such as E-Series system ID (WWN), controller ID, or volume name (in the case of volumes) and not all together.
+- Data down-sampling: as most metrics are collected every 60 seconds and you don't need that granularity for data older than 7 or 30 days, you may want to down-sample it. Fortunately, there are official [tools](https://docs.influxdata.com/influxdb3/core/plugins/library/official/downsampler/) that can run as plugins directly on InfluxDB server. You could also load custom scripts to persistent volume in the `utils` container and run own down-sampling scripts from there
+- Data pruning: you may not need data older than 365 days. InfluxDB 3 has retention, but like in InfluxDB v1, it sucks. The simplest way to deal with this is to down-sample old data to nothing (e.g. 1 sample per week). For more, see [TIPS](TIPS.md) and InfluxDB 3 documentation.
 
+**NOTE:** this isn't EPA-specific, but we'll mention it anyway: when down-sampling or pruning, remember to qualify metrics with tags. When averaging or down-sampling read IOPS, we may want to average or down-sample them by some property or combination of properties such as E-Series system ID (WWN), controller ID, or volume name (in the case of volumes) and not all together. The other key argument is normally `offset` - as we may want down-sample data that's older than 14 days rather than `0` (current).
 
 #### Storage performance
 
@@ -317,6 +327,18 @@ If you query volume performance for all volumes on all E-Series for last 2 month
 
 What takes a bit more skill is database tuning when tiering to S3 is enabled. In that case all data files go to S3 and InfluxDB works with RAM-based cache and reads from S3 when it has to. This generally works fine, but if you have a very large environment or some special circumstances (e.g. thousands of volumes in one InfluxDB database), you can examine the InfluxDB 3 documentation for tuning and optimization recommendations. For example, it is possible to allocate more cache to specific tables (measurements) such as volumes and none to others (e.g. `mel`).
 
+#### Storage security
+
+You may have noticed [README](./README.md) shows LUKS, but there's no LUKS in here, is there? The reason is to make you think about storage security. General recommendations:
+
+- If you think your EPA stores confidential data, don't share the same DB instance and don't share the same EPA or Docker Compose instance
+- The same EPA instance allows users with valid keys to view databases from other users
+- The same Compose instance allows the user who can start `utils` container also access other containers
+- All container's data is in `./data/` sub-directory and accessible to any sudoer on the VM
+
+A simple way to split EPA among several VMs with LUKS disks is to generate valid TLS certificates, copy EPA repository to several VMs and simply enable selected containers on selected VMs. That way you get different VM admins, networks, disks and because TLS certificates are valid, secure reverse HTTPS proxy makes it easy to put it all together. 
+
+EPA containers could run as non-root user, but it would require Docker CE with rootless support and still wouldn't enable meaningful isolation and data confidentiality. 
 
 ## EPA Collector arguments
 
@@ -393,7 +415,7 @@ EPA aims for "security out of the box" and provides sane default sand sufficient
 
 We use end-to-end HTTPS for everything, default TLS version is v1.3 with strong ciphers and TLS certificate validation enabled by default. Advanced users can use existing setup to further enhance HTTPS with strict TLS validation and Post-Quantum ciphers on external gateway.
 
-E-Series SANtricity is suggested to use the basic "monitor" account which, even if its credentials get leaked, can result only in limited damage (exposure of SANtricity configuration, for example, but not leaked passwords).
+E-Series SANtricity suggests to use basic "monitor" account for tasks like ours. Even if these credentials leak or get stolen, they can result only in limited damage (exposure of SANtricity hardware configuration, for example).
 
 If you can't be bothered with "vaults" and aren't allowed to store password on disk either, you may choose to start EPA Collector manually:
 
@@ -404,14 +426,74 @@ The only main disadvantage is you have to manually restart it if it stops or cra
 
 The same prompting works for InfluxDB Bearer Token. It too can live only in your password manager.
 
+Users' API tokens aren't limited to just their databases, but it frees them from filtering by system ID or name, and it's easier to drop individual users' databases when they no longer need them. 
+
 EPA Collector can log to file. We aim to not log user's credentials or InfluxDB API toke to console or files, but you can check the source code or run EPA in debug mode with logging to file enabled for a few days and see if you can find anything that shouldn't be in the logs.
 
 Docker Compose networks aren't segregated because it doesn't have meaningful contribution to security. If you want to segregate services, split EPA services across different VMs (or Nomad nodes) or deploy them to different Kubernetes namespaces.
 
-![](./images/epa-v4-tls.png)
+![TLS Setup](./images/epa-v4-tls.png)
 
 ## Data collection and privacy policy 
 
 EPA only ever connects to SANtricity and InfluxD. It doesn't collect any user data (except for the obvious purpose), connect to the Internet or "phone home".
 
 Some 3rd party services (e.g. Grafana, InfluxDB Explorer, etc) may collect "anonymous" statistics. EPA doesn't go out of its way to identify and disable that and since those aren't essential EPA services it's also not in EPA's scope. You may choose to review those services make whatever  configuration changes you want.
+
+## Extras
+
+### Natural Language Processing (NLP) 
+
+It's an InfluxDB Explorer feature, so you can read about it in upstream documentation
+
+![EPA for AI and MCP](./images/epa-storage-analytics-exploration.png)
+
+But one thing worth highlighting is the NLP feature not only can help with SQL, but also with Grafana dashboards.
+
+- Configure your AI 
+- Query with NLP
+- Export SQL query to Grafana, where you can use Grafana's suggestions for visualization based on SQL query
+
+![NLP for Grafana dashboards](./images/influxdb3-explorer-ai-gen-dashboards.png)
+
+This should work even better if InfluxDB 3 has access to more than just `eseries` database, but other client data as well. You may register additional databases in InfluxDB Explorer to achieve that.
+
+### MCP Server for InfluxDB 3 Core 
+
+It is easy to add, but the challenge is there are four ways to do it which makes it unlikely that the average EPA user would be able to use any offered example out-of-box. 
+
+See the choices [here](https://github.com/influxdata/influxdb3_mcp_server?tab=readme-ov-file#c-docker) and pick one. InfluxDB3 MCP server is easy to add:
+
+```yaml
+services:
+  influxdb-mcp-server:
+    build: .
+    image: influxdb-mcp-server
+    env_file: .env
+    stdin_open: true
+    tty: true
+```
+
+If your MCP server runs elsewhere, the `.env` above would be unrelated to the `.env` file used by EPA.
+
+Also add the basic variables to `.env` or hard-code these in Docker Compose entry for MCP server's environment variables:
+```sh
+INFLUX_DB_INSTANCE_URL=https://influxdb:8181/
+INFLUX_DB_TOKEN=API_Token_for_MCP_user
+INFLUX_DB_PRODUCT_TYPE=core
+```
+
+EPA 4 comes with HTTPS reverse proxy, and InfluxDB 3 can be easily and securely made available to external clients. Inside of Docker, use https://influxdb:8181 as in `INFLUX_DB_INSTANCE_URL` above because EPA 4 defaults to HTTPS.
+
+The challenge with MCP is picking the right deployment type. Although there are "only" two approaches given for Docker, there's no reason to pick Docker if that's not what you need. 
+
+Another issue may be lack of HTTPS certificate integration, which is a good reason to run it on local system and use EPA's reverse HTTPS proxy to get to InfluxDB.
+
+### Grafana dashboards
+
+Even though Grafana may be included in EPA's Compose YAML, this is in the Extras section because the EPA 4.
+
+Basic Grafana-related material is in the `grafana` directory. It should have just 2-3 YAML files: one example Data Source, one dashboard with basic examples of charts and tables, and one meta file. These should be enough to get you started with dashboarding in a UI environment.
+
+If you prefer to start from SQL side, you may use NLP in InfluxDB Explorer to create ready-made SQL queries and export them to Grafana. 
+
