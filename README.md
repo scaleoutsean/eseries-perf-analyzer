@@ -102,6 +102,10 @@ docker-compose up -d
 # If not OK, CTRL+C and "docker-compose down". 
 # Then review config.json and docker-compose.yml.
 # collector.py and db_manager.py can be started from the CLI for easier troubleshooting without containers.
+# 
+# you can use the utils container to check the DB
+# docker exec -it influxdb-utils-test /bin/sh
+# cat README.txt # shows CLI examples
 ```
 
 ### Environment variables and configuration files
@@ -341,6 +345,12 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
 
 ## Changelog
 
+- 3.4.0 (Auguust 21, 2025)
+  - Docker chores: change 'docker-compose' to 'docker compose' in several scripts, update Dockerfile syntax
+  - Add 'utils' container with InfluxDB v1 client for easier management of InfluxDB
+  - Update version tag for InfluxDB container image to 1.11.8
+  - Minor improvements to epa/Makefile and epa/.env to avoid build errors when .env not sourced
+
 - 3.3.1 (June 1, 2024):
   - Dependency update (requests library)
 
@@ -352,7 +362,7 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
   - No new features vs. v3.1.0
   - No changes to Grafana container, Grafana charts, and InfluxDB container
   - collector and dbmanager are now completely independent of containers built by InfluxDB and Grafana Makefile 
-  - New kubernetes folder with Kubernetes-related instructions and sample YAML files
+  - New Kubernetes folder with Kubernetes-related instructions and sample YAML files
   - collector and dbmanager can work on both AMD64 and ARM64 systems
 
 - 3.1.0 (Jan 12, 2023):

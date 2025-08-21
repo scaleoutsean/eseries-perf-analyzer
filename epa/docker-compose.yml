@@ -1,4 +1,3 @@
-version: '2'
 services:
 
   influxdb:
@@ -20,6 +19,22 @@ services:
     volumes:
       - ./influx-database:/var/lib/influxdb
       - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+
+  utils:
+    image: ${PROJ_NAME}/utils:latest
+    container_name: utils
+    mem_limit: 512M
+    restart: unless-stopped
+    build:
+      context: ./utils
+      args:
+        BASE_IMAGE: ${PROJ_NAME}/influxdb:${TAG}
+    networks:
+      - eseries_perf_analyzer
+    volumes:
+      - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+    command: ["tail","-f","/dev/null"]    
+
 
   grafana:
     image: ${PROJ_NAME}/grafana:${TAG}
