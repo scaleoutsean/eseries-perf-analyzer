@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if command -v docker &>/dev/null; then
-    if command -v docker-compose &>/dev/null; then
+    if command -v docker compose &>/dev/null; then
         exit 0
     else
         echo "#########################################################################################################"

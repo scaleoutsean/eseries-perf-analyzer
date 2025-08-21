@@ -30,7 +30,7 @@ build-plugins: configure-plugins ## Build all plugins
 stop-plugins: ## Stop all plugins
 	@$(shell ./scripts/plugin_compose_info.sh "stop")
 
-down-plugins: ## Run docker-compose down on all plugins
+down-plugins: ## Run docker compose down on all plugins
 	@$(shell ./scripts/plugin_compose_info.sh "down")
 
 clean-plugins: ## Remove all images built by plugins
@@ -71,7 +71,7 @@ build: __docker-find __docker-version warn ## Build the container
 	docker build --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/ansible:${TAG} ansible
 	docker build --build-arg CONTAINER_INFLUXDB_TAG --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/influxdb:$(TAG) influxdb
 	docker build --build-arg CONTAINER_GRAFANA_TAG  --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/grafana:$(TAG) grafana
-	docker-compose build
+	docker compose build
 
 	# Build plugins
 	@$(MAKE) --no-print-directory build-plugins
@@ -95,14 +95,14 @@ build-nc: __docker-find __docker-version warn ## Build the container without cac
 	docker build --no-cache --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/ansible:${TAG} ansible
 	docker build --no-cache --build-arg CONTAINER_INFLUXDB_TAG --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/influxdb:$(TAG) influxdb
 	docker build --no-cache --build-arg CONTAINER_GRAFANA_TAG  --build-arg TAG=$(TAG) --build-arg PROJ_NAME=$(PROJ_NAME) -t $(PROJ_NAME)/grafana:$(TAG) grafana
-	docker-compose build --pull --no-cache
+	docker compose build --pull --no-cache
 
 	# Build plugins
 	@$(MAKE) --no-print-directory build-plugins
 
 run: build ## Build and run
 	# Start core services using our compose file and run in the background
-	docker-compose up -d 
+	docker compose up -d 
 
 	# Run plugins
 	@$(MAKE) --no-print-directory run-plugins
@@ -115,7 +115,7 @@ run: build ## Build and run
 
 run-nc: build-nc ## Build and run
 	# Start core services using our compose file and run in the background
-	docker-compose up -d 
+	docker compose up -d 
 
 	# Run plugins
 	@$(MAKE) --no-print-directory run-plugins
@@ -157,12 +157,12 @@ stop: __docker-find __docker-version ## Stop all of our running services
 	@$(MAKE) --no-print-directory stop-plugins
 
 	# Stop core componenets
-	docker-compose stop
+	docker compose stop
 
 restart: stop run ## 'stop' followed by 'run'
 
 rm: __docker-find __docker-version  ## Remove all existing containers defined by the project
-	docker-compose rm -s -f
+	docker compose rm -s -f
 	$(shell ./scripts/plugin_compose_info.sh "rm -s -f")
 
 clean: stop rm ## Remove all images and containers built by the project
