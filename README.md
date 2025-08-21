@@ -104,8 +104,9 @@ docker-compose up -d
 # collector.py and db_manager.py can be started from the CLI for easier troubleshooting without containers.
 # 
 # you can use the utils container to check the DB
-# docker exec -it influxdb-utils-test /bin/sh
-# cat README.txt # shows CLI examples
+# docker exec -it influxdb /bin/sh
+# once inside, you can show CLI examples that work and connection is already set up
+# cat README.txt
 ```
 
 ### Environment variables and configuration files
