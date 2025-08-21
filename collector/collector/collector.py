@@ -219,8 +219,9 @@ PARSER.add_argument('--sysid', default='', type=str, required=True,
 PARSER.add_argument('-t', '--intervalTime', type=int, default=60, choices=[60, 120, 300, 600],
                     help='Interval (seconds) to poll and send data from the SANtricity API '
                     ' to InfluxDB. Default: 60. <Integer>')
-PARSER.add_argument('--dbAddress', default='influxdb:8086', type=str, required=True,
-                    help='<Required> The hostname (IPv4 address or FQDN) and the port for InfluxDB. '
+PARSER.add_argument('--dbAddress', default='influxdb:8086', type=str, required=False,
+                    help='The hostname (IPv4 address or FQDN) and the port for InfluxDB. '
+                    'Required unless --doNotPost is used. '
                     'Default: influxdb:8086. Use public IPv4 of InfluxDB system rather than container name'
                     ' when running collector externally. In EPA InfluxDB uses port 8086. Example: 7.7.7.7:8086.')
 PARSER.add_argument('-r', '--retention', default=DEFAULT_RETENTION, type=str, required=False,
@@ -257,6 +258,10 @@ PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
 CMD = PARSER.parse_args()
 
+# Conditional validation: dbAddress is required unless doNotPost is used
+if not CMD.doNotPost and (CMD.dbAddress == '' or CMD.dbAddress is None):
+    PARSER.error("--dbAddress is required when --doNotPost is not used")
+
 if CMD.sysname == '' or CMD.sysname == None:
     LOG.warning("sysname not provided. Using default: %s", DEFAULT_SYSTEM_NAME)
     sys_name = DEFAULT_SYSTEM_NAME
@@ -270,7 +275,8 @@ else:
     sys_id = CMD.sysid
 
 if CMD.dbAddress == '' or CMD.dbAddress == None:
-    LOG.warning("InfluxDB server was not provided. Default setting (influxdb:8086) works only when collector and InfluxDB containers are on same host")
+    if not CMD.doNotPost:
+        LOG.warning("InfluxDB server was not provided. Default setting (influxdb:8086) works only when collector and InfluxDB containers are on same host")
     influxdb_host = INFLUXDB_HOSTNAME
     influxdb_port = INFLUXDB_PORT
 else:
