@@ -62,7 +62,7 @@ Docker Compose users:
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 ```
-- the `epa` subdirectory: enter it, and use `make run` to build and run InfluxDB and Grafana
+- the `epa` subdirectory: enter it, check `.epa` (if you want to change anything) and use `make run` to build and run InfluxDB and Grafana
   - Unless these containers need a change or update, going back to this folder is generally not necessary
 - the `collector` subdirectory: go one level up from `epa`, and enter the `collector` sub-directory 
   - edit `docker-compose.yml` and `config.json`: `SYSNAME` in docker-compose.yml must be present and identical to `name` value(s) in `config.json` 
