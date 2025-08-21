@@ -41,6 +41,7 @@ services:
   collector-R24U04-E2824:
     image: epa/collector:v3.3.1
     container_name: R24U04-E2824
+    build: ./collector
     mem_limit: 64m
     restart: unless-stopped
     logging:
