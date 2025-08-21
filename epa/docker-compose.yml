@@ -48,6 +48,7 @@ services:
     volumes:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - grafana_data:/var/lib/grafana
+      - grafana_dashboards:/var/lib/grafana/dashboards  # R/W: User-created dashboards
     logging:
       driver: "json-file"
       options:
@@ -56,9 +57,28 @@ services:
     networks:
       - eseries_perf_analyzer
 
+  grafana-init:
+    build: 
+      context: ./grafana-init
+      args:
+        TAG: ${TAG}
+        PROJ_NAME: ${PROJ_NAME}
+    container_name: grafana-init
+    mem_limit: 128M
+    depends_on:
+      - grafana
+    environment:
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_USER=admin
+      - GRAFANA_PASSWORD=admin
+    networks:
+      - eseries_perf_analyzer
+    restart: "no"  # Run once and exit
+
 networks:
   eseries_perf_analyzer:
     external: true
 
 volumes:
   grafana_data:
+  grafana_dashboards:
