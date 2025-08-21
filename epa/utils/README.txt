@@ -14,8 +14,8 @@ docker exec -u 0 -it <container> /bin/sh
 # list databases (InfluxDB v1 CLI)
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
 
-# create database (can help you avoid running dbmanager container) - change DB name in command!
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE me-series'
+# create database (can help you avoid running dbmanager container) - change the DB name in command. No dashes in DB names!
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE me_series'
 
 # list measurements for a database (InfluxDB v1 CLI)
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "${DB:-mydb}" -execute 'SHOW MEASUREMENTS'
