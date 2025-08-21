@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     ports:
       - 8086:8086
+      # remove if InfluxDB doesn't need to be reachable from the outside (e.g. newer Grafana on external network)
+      # we only need to reach it from internal Grafana in Docker, we can use http://inflxudb:8086
     logging:
       driver: "json-file"
       options:
