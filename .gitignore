@@ -15,3 +15,5 @@ plugins/eseries_monitoring/collector/tests/collector.py
 configs/*
 # venv dirs
 .venv
+# other
+workspace.code-workspace
