@@ -65,8 +65,8 @@ Download and decompress latest release and enter the `epa` sub-directory:
 ```sh
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
-vim .env
-vim docker-compose.yaml
+vim .env # you probably don't need to change anything here
+vim docker-compose.yaml  # see collector service sample on this page
 docker-compose build
 ````
 
