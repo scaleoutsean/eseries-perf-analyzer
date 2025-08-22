@@ -58,6 +58,8 @@ Note that you can't do much with just the CLI - you need a DB where data can be 
 
 ### Docker Compose users:
 
+**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require non-root UID/GID, and "named" volumes make that easier. If you are concerned about disk space for InfluxDB, you change `./epa/docker-compose.yaml` to a sub-directory before you deploy.
+
 Download and decompress latest release and enter the `epa` sub-directory:
 
 ```sh
