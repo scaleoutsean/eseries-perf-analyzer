@@ -16,6 +16,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [How much memory does each collector container need?](#how-much-memory-does-each-collector-container-need)
   - [How much memory does the dbmanager container need?](#how-much-memory-does-the-dbmanager-container-need)
   - [How to run collector and dbmanager from the CLI?](#how-to-run-collector-and-dbmanager-from-the-cli)
+  - [How to upgrade?](#how-to-upgrade)
   - [If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?](#if-influxdb-is-re-installed-or-migrated-how-do-i-restore-influxdb-and-grafana-configuration)
   - [What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails?](#what-happens-if-the-controller-specified-by---api-ipv4-address-or-api-in-docker-composeyml-fails)
   - [Can the E-Series' WWN change?](#can-the-e-series-wwn-change)
@@ -96,6 +97,12 @@ python3 ./epa/collector/collector.py \
   --sysname ${SYSNAME} --sysid ${SYSID} \
   -i -s
 ```
+
+### How to upgrade?
+
+From 3.[1,2,3] to 3.4, I wouldn't try since there aren't new features. But if you want to, then I recommend removing old setup and starting from scratch. Or, if you insist, you could transplant Collector from ./epa/collector/ and also copy its Docker Compose service to the "old" ./collector/collector/docker-compose.yaml, and leave InfluxDB and Grafana alone. That is quick, easy to do and easy to revert.
+
+EPA 3.4.0's new ./epa/docker-compose.yaml has quite a few changes, from versions to volumes and so on, that it's quite unlikely that older versions can be upgraded in place and without any trouble.
 
 ### If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
