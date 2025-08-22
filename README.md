@@ -26,8 +26,6 @@ This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://githu
 
 In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB.
 
-![E-Series Performance Analyzer](/images/epa-eseries-perf-analyzer.png)
-
 Each of the light-blue rectangles can be in a different location (host, network, Kubernetes namespace, etc.). But if you want to consolidate, that's still possible.
 
 Change log and additional details are at the bottom of this page and in the Releases tab.
