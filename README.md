@@ -71,7 +71,7 @@ vim docker-compose.yaml  # see collector service sample on this page
 docker-compose build
 ````
 
-Now that the containers have been built, three steps remain:
+Now that the containers have been built, several steps remain:
 - Start `influxdb`
 - Create a database (or several) for EPA Collector
 - Start `grafana`
@@ -94,17 +94,17 @@ We create one from the `utils` container.
 ```bash
 # enter the container
 docker exec -u 0 -it utils /bin/sh
-# Inside of the utils container
+# inside of the utils container
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# Create database (or several). EPA defaults to "eseries"
+# create database (or several). EPA defaults to "eseries"
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
-# Show again. 
+# show databases again
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# If OK, exit
+# if OK, exit
 exit
 ```
 
-Proceed with Grafana, `grafana-init` and finally start EPA Collector.
+Proceed with Grafana, `grafana-init` (configures Grafana Data Source, pushes dashboards) and finally start EPA Collector.
 
 ```bash
 docker compose up -d grafana
