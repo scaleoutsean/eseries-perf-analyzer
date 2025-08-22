@@ -20,6 +20,17 @@ influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'C
 # list measurements for a database (InfluxDB v1 CLI) - change DB name to whatever DB name you have in collector container(s)
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "${DB:-eseries}" -execute 'SHOW MEASUREMENTS'
 
-# same via HTTP API (curl)
-curl "http://${INFLUX_HOST:-influxdb}:${INFLUX_PORT:-8086}/query?db=${DB:-mydb}&q=SHOW
+# same via HTTP API (curl) - change DB name to your DB name
+curl "http://${INFLUX_HOST:-influxdb}:${INFLUX_PORT:-8086}/query?db=${DB:-eseries}&q=SHOW%20MEASUREMENTS"
+
+### Sample queries
+
+# Check SSD endurance data 
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT sys_name, sys_tray, sys_tray_slot, percentEnduranceUsed FROM disks WHERE percentEnduranceUsed IS NOT NULL ORDER BY time DESC LIMIT 10'
+
+# See what actual values are being stored
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT percentEnduranceUsed FROM disks WHERE percentEnduranceUsed IS NOT NULL ORDER BY time DESC LIMIT 5'
+
+# Check the interface measurement
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT * FROM interface LIMIT 3'
 

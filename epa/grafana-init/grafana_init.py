@@ -144,7 +144,8 @@ class GrafanaInitializer:
                 dashboard_payload = {
                     'dashboard': dashboard_json,
                     'overwrite': True,
-                    'message': f"Imported {dashboard_title} via grafana-init"
+                    'message': f"Imported {dashboard_title} via grafana-init",
+                    'allowUiUpdates': True  # Allow editing in Grafana UI
                 }
                 
                 result = self.grafana.dashboard.update_dashboard(dashboard_payload)

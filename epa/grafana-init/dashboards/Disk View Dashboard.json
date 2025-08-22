@@ -2096,7 +2096,7 @@
 		"dashLength": 10,
 		"dashes": false,
 		"datasource": "EPA",
-		"description": "SSD endurance wear level as percentage. Only shows data for SSD drives on SANtricity 11.52+ systems.",
+		"description": "SSD spare blocks remaining as percentage (100% = new, 0% = worn out). Only shows data for SSD drives on SANtricity 11.52+ systems.",
 		"editable": true,
 		"error": false,
 		"fill": 1,
@@ -2178,7 +2178,7 @@
 			    [
 				{
 				    "params": [
-					"percentEnduranceUsed"
+					"spareBlocksRemainingPercent"
 				    ],
 				    "type": "field"
 				},
@@ -2230,7 +2230,7 @@
 		"timeFrom": null,
 		"timeRegions": [],
 		"timeShift": null,
-		"title": "SSD Endurance Used (%)",
+		"title": "SSD Spare Blocks Remaining (%)",
 		"tooltip": {
 		    "msResolution": false,
 		    "shared": true,
@@ -2248,7 +2248,7 @@
 		"yaxes": [
 		    {
 			"format": "percent",
-			"label": "Endurance Used",
+			"label": "Spare Blocks Remaining",
 			"logBase": 1,
 			"max": 100,
 			"min": 0,

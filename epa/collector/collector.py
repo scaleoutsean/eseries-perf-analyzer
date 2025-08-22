@@ -14,6 +14,7 @@ import json
 import pickle
 import hashlib
 import os
+import subprocess
 from datetime import datetime
 import random
 from datetime import datetime
@@ -470,17 +471,17 @@ def collect_storage_metrics(sys):
             if minor_vers >= 70:
                 for pdrive in drive_phys_stats_list:
                     if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
-                        if isinstance(pdrive['ssdWearLife']['percentEnduranceUsed'], int): 
-                            pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
+                        if isinstance(pdrive['ssdWearLife']['spareBlocksRemainingPercent'], int): 
+                            pdict = dict({'spareBlocksRemainingPercent': pdrive['ssdWearLife']['spareBlocksRemainingPercent']})
             elif minor_vers >= 52 and minor_vers < 62:
                 for pdrive in drive_phys_stats_list:
                     if pdrive['driveMediaType'] == 'ssd' and pdrive['driveRef'] == stats['diskId']:
-                        if isinstance(pdrive['ssdWearLife']['percentEnduranceUsed'], int):
-                            pdict = dict({'percentEnduranceUsed': pdrive['ssdWearLife']['percentEnduranceUsed']})
+                        if isinstance(pdrive['ssdWearLife']['spareBlocksRemainingPercent'], int):
+                            pdict = dict({'spareBlocksRemainingPercent': pdrive['ssdWearLife']['spareBlocksRemainingPercent']})
             else:
                 LOG.warning("SANtricity version not tested - skipping")
             
-            if 'percentEnduranceUsed' in pdict.keys(): 
+            if 'spareBlocksRemainingPercent' in pdict.keys(): 
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
             else: 
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS)
@@ -874,7 +875,7 @@ if __name__ == "__main__":
 
         # Log memory consumption for container tuning
         try:
-            tot_m, used_m, free_m = map(int, os.popen('free -t -m').readlines()[-1].split()[1:])
+            tot_m, used_m, free_m = map(int, subprocess.check_output(['free', '-t', '-m']).decode().splitlines()[-1].split()[1:])
             LOG.info("Memory consumption: {:.2f} MB (Total: {} MB, Used: {} MB, Free: {} MB)"
                      .format(tot_m + used_m + free_m, tot_m, used_m, free_m))
         except Exception as e:
