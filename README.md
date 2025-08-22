@@ -239,6 +239,7 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
   - Small error handling improvements in EPA Collector noted in Issues
   - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues) 
   - See upgrade-related Q&A in the [FAQs](./FAQ.md). There are no new features or security fixes, so skip this version if your EPA is running fine
+  - Pre 3.4.0 versions have urllib3 v1 (vulnerable to redirects in scenarios unrelated to EPA) in collector or dbmanager. 3.4.0 removes urllib3 and lets requests use urllib3 v2
 
 - 3.3.1 (June 1, 2024):
   - Dependency update (requests library)
