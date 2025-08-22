@@ -80,7 +80,7 @@ class GrafanaInitializer:
                     logger.info("EPA datasource already exists")
                     return True
                     
-            # Create InfluxDB datasource
+            # Create InfluxDB datasource for "default" DB name, eseries
             datasource_config = {
                 "name": "EPA",
                 "type": "influxdb",
@@ -122,19 +122,22 @@ class GrafanaInitializer:
                 with open(dashboard_file, 'r') as f:
                     dashboard_json = json.load(f)
                 
-                # Prepare dashboard for import
-                dashboard_payload = {
-                    'dashboard': dashboard_json,
-                    'overwrite': True,
-                    'inputs': [],
-                    'folderId': 0
-                }
+                # Extract title from filename (remove .json extension)
+                dashboard_title = dashboard_file.stem
                 
                 # Remove id and uid if present (let Grafana assign new ones)
-                if 'id' in dashboard_payload['dashboard']:
-                    del dashboard_payload['dashboard']['id']
-                if 'uid' in dashboard_payload['dashboard']:
-                    del dashboard_payload['dashboard']['uid']
+                if 'id' in dashboard_json:
+                    del dashboard_json['id']
+                if 'uid' in dashboard_json:
+                    del dashboard_json['uid']
+                
+                # Prepare dashboard payload with title parameter
+                dashboard_payload = {
+                    'dashboard': dashboard_json,
+                    'title': dashboard_title,
+                    'overwrite': True,
+                    'message': f"Imported {dashboard_title} via grafana-init"
+                }
                 
                 result = self.grafana.dashboard.update_dashboard(dashboard_payload)
                 logger.info(f"Successfully imported {dashboard_file.name}: {result.get('slug', 'unknown')}")
