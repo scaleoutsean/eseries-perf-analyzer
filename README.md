@@ -6,8 +6,9 @@
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
     - [CLI users](#cli-users)
-    - [Docker Compose users:](#docker-compose-users)
+    - [Docker Compose users](#docker-compose-users)
     - [Environment variables and configuration files](#environment-variables-and-configuration-files)
+  - [Other procedures](#other-procedures)
     - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
     - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
     - [Update password of a monitor account](#update-password-of-a-monitor-account)
@@ -56,7 +57,7 @@ python3 ./collector.py -h
 
 Note that you can't do much with just the CLI - you need a DB where data can be sent. But you can test the CLI with `-n` which collects data but doesn't send to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME` or similar.
 
-### Docker Compose users:
+### Docker Compose users
 
 **NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you change `./epa/docker-compose.yaml` to a sub-directory before you deploy.
 
@@ -115,7 +116,6 @@ docker compose up -d collector
 docker compose logs collector
 ```
 
-
 Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
 
 ### Environment variables and configuration files
@@ -161,6 +161,8 @@ services:
       - DB_ADDRESS=7.7.7.7  # 'influxdb' in Compose or a K8s namespace
       - DB_PORT=8086
 ```
+
+## Other procedures
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
 
