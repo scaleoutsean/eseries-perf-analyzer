@@ -57,8 +57,8 @@ class GrafanaInitializer:
         
         for attempt in range(self.max_retries):
             try:
-                # Try to get datasources as a simple health check
-                datasources = self.grafana.datasource.get_all_datasources()
+                # Try to list datasources as a simple health check
+                datasources = self.grafana.datasource.list_datasources()
                 logger.info("Grafana is ready!")
                 return True
             except Exception as e:
@@ -74,7 +74,7 @@ class GrafanaInitializer:
         
         try:
             # Check if datasource already exists
-            datasources = self.grafana.datasource.get_all_datasources()
+            datasources = self.grafana.datasource.list_datasources()
             for ds in datasources:
                 if ds.get('name') == 'EPA':
                     logger.info("EPA datasource already exists")
