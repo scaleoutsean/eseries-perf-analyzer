@@ -159,7 +159,7 @@ services:
       - SYSID=600A098000F63714000000005E79C888
       - API=6.6.6.6
       - RETENTION_PERIOD=26w
-      - DB_ADDRESS=7.7.7.7  # 'influxdb' in Compose or a K8s namespace
+      - DB_ADDRESS=7.7.7.7  # influxdb instead of IPv4 when running in same Compose or K8s namespace
       - DB_PORT=8086
 ```
 
