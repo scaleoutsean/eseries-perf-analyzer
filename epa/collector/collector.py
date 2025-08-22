@@ -13,6 +13,7 @@ import requests
 import json
 import pickle
 import hashlib
+import os
 from datetime import datetime
 import random
 from datetime import datetime
@@ -446,8 +447,11 @@ def collect_storage_metrics(sys):
         if CMD.showDriveNames:
             for stats in drive_stats_list:
                 location_send = drive_locations.get(stats["diskId"])
-                LOG.info(("Tray{:02.0f}, Slot{:03.0f}").format(
-                    location_send[0], location_send[1]))  
+                if location_send is not None:
+                    LOG.info(("Tray{:02.0f}, Slot{:03.0f}").format(
+                        location_send[0], location_send[1]))
+                else:
+                    LOG.warning(f"Could not find location for drive {stats['diskId']}")  
 
         # workaround to get around API differences in < 11.70      
         fw_resp = session.get(("{}/{}/versions").format(get_controller("fw"), sys_id)).json()
@@ -480,13 +484,23 @@ def collect_storage_metrics(sys):
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
             else: 
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS)
+            
+            # Safely handle disk location info with fallbacks
+            if disk_location_info is not None and len(disk_location_info) >= 2:
+                tray_id = disk_location_info[0]
+                slot_id = disk_location_info[1]
+            else:
+                # Fallback to trayRef and driveSlot from stats if location info is unavailable
+                tray_id = stats.get('trayRef', 99)
+                slot_id = stats.get('driveSlot', 999)
+            
             disk_item = dict(
                 measurement="disks",
                 tags=dict(
                     sys_id=sys_id,
                     sys_name=sys_name,
-                    sys_tray=("{:02.0f}").format(disk_location_info[0]),
-                    sys_tray_slot=("{:03.0f}").format(disk_location_info[1])
+                    sys_tray=("{:02.0f}").format(tray_id),
+                    sys_tray_slot=("{:03.0f}").format(slot_id)
                 ),
                 fields= fields_dict
             )
@@ -857,6 +871,14 @@ if __name__ == "__main__":
                      " {:07.4f} Iteration: {:00.0f}"
                      .format(CMD.intervalTime, time_difference, loopIteration))
             loopIteration += 1
+
+        # Log memory consumption for container tuning
+        try:
+            tot_m, used_m, free_m = map(int, os.popen('free -t -m').readlines()[-1].split()[1:])
+            LOG.info("Memory consumption: {:.2f} MB (Total: {} MB, Used: {} MB, Free: {} MB)"
+                     .format(tot_m + used_m + free_m, tot_m, used_m, free_m))
+        except Exception as e:
+            LOG.warning("Could not get memory info: {}".format(e))
 
         wait_time = CMD.intervalTime - time_difference
         if CMD.intervalTime < time_difference:

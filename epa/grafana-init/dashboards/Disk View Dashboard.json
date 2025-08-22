@@ -2089,6 +2089,184 @@
 		    "align": false,
 		    "alignLevel": null
 		}
+	    },
+	    {
+		"aliasColors": {},
+		"bars": false,
+		"dashLength": 10,
+		"dashes": false,
+		"datasource": "EPA",
+		"description": "SSD endurance wear level as percentage. Only shows data for SSD drives on SANtricity 11.52+ systems.",
+		"editable": true,
+		"error": false,
+		"fill": 1,
+		"fillGradient": 0,
+		"gridPos": {
+		    "h": 7,
+		    "w": 24,
+		    "x": 0,
+		    "y": 21
+		},
+		"height": "250px",
+		"id": 10,
+		"legend": {
+		    "alignAsTable": true,
+		    "avg": true,
+		    "current": true,
+		    "max": true,
+		    "min": false,
+		    "show": true,
+		    "total": false,
+		    "values": true
+		},
+		"lines": true,
+		"linewidth": 2,
+		"links": [],
+		"nullPointMode": "null as zero",
+		"options": {
+		    "dataLinks": []
+		},
+		"percentage": false,
+		"pointradius": 5,
+		"points": false,
+		"renderer": "flot",
+		"seriesOverrides": [],
+		"spaceLength": 10,
+		"stack": false,
+		"steppedLine": false,
+		"targets": [
+		    {
+			"alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+			"groupBy": [
+			    {
+				"params": [
+				    "$__interval"
+				],
+				"type": "time"
+			    },
+			    {
+				"params": [
+				    "sys_name"
+				],
+				"type": "tag"
+			    },
+			    {
+				"params": [
+				    "sys_tray"
+				],
+				"type": "tag"
+			    },
+			    {
+				"params": [
+				    "sys_tray_slot"
+				],
+				"type": "tag"
+			    },
+			    {
+				"params": [
+				    "linear"
+				],
+				"type": "fill"
+			    }
+			],
+			"measurement": "disks",
+			"orderByTime": "ASC",
+			"policy": "default",
+			"refId": "A",
+			"resultFormat": "time_series",
+			"select": [
+			    [
+				{
+				    "params": [
+					"percentEnduranceUsed"
+				    ],
+				    "type": "field"
+				},
+				{
+				    "params": [],
+				    "type": "mean"
+				}
+			    ]
+			],
+			"tags": [
+			    {
+				"key": "sys_name",
+				"operator": "=~",
+				"value": "/^$System$/"
+			    },
+			    {
+				"condition": "AND",
+				"key": "sys_tray",
+				"operator": "=~",
+				"value": "/^$Tray$/"
+			    },
+			    {
+				"condition": "AND",
+				"key": "sys_tray_slot",
+				"operator": "=~",
+				"value": "/^$Slot$/"
+			    }
+			]
+		    }
+		],
+		"thresholds": [
+		    {
+			"colorMode": "critical",
+			"fill": true,
+			"line": true,
+			"op": "gt",
+			"value": 90,
+			"yaxis": "left"
+		    },
+		    {
+			"colorMode": "warning",
+			"fill": true,
+			"line": true,
+			"op": "gt", 
+			"value": 80,
+			"yaxis": "left"
+		    }
+		],
+		"timeFrom": null,
+		"timeRegions": [],
+		"timeShift": null,
+		"title": "SSD Endurance Used (%)",
+		"tooltip": {
+		    "msResolution": false,
+		    "shared": true,
+		    "sort": 0,
+		    "value_type": "individual"
+		},
+		"type": "graph",
+		"xaxis": {
+		    "buckets": null,
+		    "mode": "time",
+		    "name": null,
+		    "show": true,
+		    "values": []
+		},
+		"yaxes": [
+		    {
+			"format": "percent",
+			"label": "Endurance Used",
+			"logBase": 1,
+			"max": 100,
+			"min": 0,
+			"show": true
+		    },
+		    {
+			"format": "short",
+			"label": null,
+			"logBase": 1,
+			"max": null,
+			"min": null,
+			"show": true
+		    }
+		],
+		"yaxis": {
+		    "align": false,
+		    "alignLevel": null
+		}
 	    }
 	],
 	"refresh": "30s",
@@ -2100,88 +2278,24 @@
 	"templating": {
 	    "list": [
 		{
-		    "allValue": null,
+		    "allValue": ".*",
 		    "current": {
-			"tags": [],
-			"text": "All Storage Systems",
-			"value": "All Storage Systems"
+			"text": "all",
+			"value": "$__all"
 		    },
 		    "datasource": "EPA",
-		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"folder_name\"",
+		    "definition": "SHOW TAG VALUES FROM \"disks\" WITH KEY = \"sys_name\"",
 		    "hide": 0,
-		    "includeAll": false,
-		    "label": null,
-		    "multi": false,
-		    "name": "Folder",
-		    "options": [
-			{
-			    "selected": true,
-			    "text": "All Storage Systems",
-			    "value": "All Storage Systems"
-			},
-			{
-			    "selected": false,
-			    "text": "Small",
-			    "value": "Small"
-			},
-			{
-			    "selected": false,
-			    "text": "borked",
-			    "value": "borked"
-			},
-			{
-			    "selected": false,
-			    "text": "subset",
-			    "value": "subset"
-			},
-			{
-			    "selected": false,
-			    "text": "test",
-			    "value": "test"
-			}
-		    ],
-		    "query": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"folder_name\"",
-		    "refresh": 0,
-		    "regex": "",
-		    "skipUrlSync": false,
-		    "sort": 0,
-		    "tagValuesQuery": "",
-		    "tags": [],
-		    "tagsQuery": "",
-		    "type": "query",
-		    "useTags": false
-		},
-		{
-		    "allValue": null,
-		    "current": {
-			"text": "ictm1301s02c1 + ictm1301s02c2 + ictm1301s03c1 + ictm1301s03c2 + ictm1302s01c1 + ictm1302s01c2 + ictm1302s02c1 + ictm1302s02c2 + ictm1302s03c1 + ictm1303s01c1 + ictm1303s09c1",
-			"value": [
-			    "ictm1301s02c1",
-			    "ictm1301s02c2",
-			    "ictm1301s03c1",
-			    "ictm1301s03c2",
-			    "ictm1302s01c1",
-			    "ictm1302s01c2",
-			    "ictm1302s02c1",
-			    "ictm1302s02c2",
-			    "ictm1302s03c1",
-			    "ictm1303s01c1",
-			    "ictm1303s09c1"
-			]
-		    },
-		    "datasource": "EPA",
-		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"sys_name\" WHERE \"folder_name\" =~ /$Folder/",
-		    "hide": 0,
-		    "includeAll": false,
-		    "label": null,
+		    "includeAll": true,
+		    "label": "System",
 		    "multi": true,
 		    "name": "System",
 		    "options": [],
-		    "query": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"sys_name\" WHERE \"folder_name\" =~ /$Folder/",
+		    "query": "SHOW TAG VALUES FROM \"disks\" WITH KEY = \"sys_name\"",
 		    "refresh": 2,
 		    "regex": "",
 		    "skipUrlSync": false,
-		    "sort": 0,
+		    "sort": 1,
 		    "tagValuesQuery": "",
 		    "tags": [],
 		    "tagsQuery": "",
@@ -2189,16 +2303,16 @@
 		    "useTags": false
 		},
 		{
-		    "allValue": null,
+		    "allValue": ".*",
 		    "current": {
-			"text": "All",
+			"text": "all",
 			"value": "$__all"
 		    },
 		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM disks WITH KEY = \"sys_tray\" WHERE \"sys_name\" =~ /$System/",
 		    "hide": 0,
 		    "includeAll": true,
-		    "label": null,
+		    "label": "Tray",
 		    "multi": true,
 		    "name": "Tray",
 		    "options": [],
@@ -2206,7 +2320,7 @@
 		    "refresh": 2,
 		    "regex": "",
 		    "skipUrlSync": false,
-		    "sort": 0,
+		    "sort": 1,
 		    "tagValuesQuery": "",
 		    "tags": [],
 		    "tagsQuery": "",
@@ -2214,19 +2328,16 @@
 		    "useTags": false
 		},
 		{
-		    "allValue": null,
+		    "allValue": ".*",
 		    "current": {
-			"tags": [],
-			"text": "All",
-			"value": [
-			    "$__all"
-			]
+			"text": "all",
+			"value": "$__all"
 		    },
 		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM disks WITH KEY = \"sys_tray_slot\" WHERE \"sys_name\" =~ /$System/ AND \"sys_tray\" =~ /$Tray/",
 		    "hide": 0,
 		    "includeAll": true,
-		    "label": null,
+		    "label": "Slot",
 		    "multi": true,
 		    "name": "Slot",
 		    "options": [],
@@ -2234,7 +2345,7 @@
 		    "refresh": 2,
 		    "regex": "",
 		    "skipUrlSync": false,
-		    "sort": 0,
+		    "sort": 1,
 		    "tagValuesQuery": "",
 		    "tags": [],
 		    "tagsQuery": "",
