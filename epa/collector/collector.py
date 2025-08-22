@@ -14,7 +14,6 @@ import json
 import pickle
 import hashlib
 import os
-import subprocess
 from datetime import datetime
 import random
 from datetime import datetime
@@ -454,32 +453,48 @@ def collect_storage_metrics(sys):
                 else:
                     LOG.warning(f"Could not find location for drive {stats['diskId']}")  
 
-        # workaround to get around API differences in < 11.70      
+        # Get firmware version to determine API capabilities
         fw_resp = session.get(("{}/{}/versions").format(get_controller("fw"), sys_id)).json()
         fw_cv = fw_resp['codeVersions']
+        minor_vers = 0
         for mod in (range(len(fw_cv))):
             if fw_cv[mod]['codeModule'] == 'management':
                 minor_vers = int((fw_cv[mod]['versionString']).split(".")[1])
-                if int(minor_vers) >= 52:
-                    drive_phys_stats_list = session.get(("{}/{}/drives").format(
-                        get_controller("sys"), sys_id)).json()
-                else:
-                    LOG.info("Minor SANtricity management OS version is too old - upgrade to 11.52 or higher:", minor_vers)
+                break
+        
+        # Get SSD wear statistics from the new drive-health-history endpoint
+        ssd_wear_dict = {}
+        if minor_vers >= 52:
+            try:
+                drive_health_response = session.get(("{}/{}/drives/drive-health-history").format(
+                    get_controller("sys"), sys_id), params={"all-history": "false"}).json()
+                
+                # Extract SSD wear data from the response
+                if 'collections' in drive_health_response and len(drive_health_response['collections']) > 0:
+                    latest_collection = drive_health_response['collections'][0]
+                    if 'ssdDriveWearStatistics' in latest_collection:
+                        for ssd_stat in latest_collection['ssdDriveWearStatistics']:
+                            # Map drive WWN to spare blocks remaining percentage
+                            drive_wwn = ssd_stat.get('driveWwn')
+                            spare_blocks = ssd_stat.get('spareBlockRemainingPercentage')
+                            if drive_wwn and spare_blocks is not None:
+                                ssd_wear_dict[drive_wwn] = spare_blocks
+                LOG.info(f"Found SSD wear data for {len(ssd_wear_dict)} drives")
+            except Exception as e:
+                LOG.warning(f"Could not retrieve SSD wear statistics: {e}")
+        else:
+            LOG.info("Minor SANtricity management OS version is too old for SSD wear stats - upgrade to 11.52 or higher")
+        
         for stats in drive_stats_list:
             pdict = {}
             disk_location_info = drive_locations.get(stats["diskId"])
-            if minor_vers >= 70:
-                for pdrive in drive_phys_stats_list:
-                    if pdrive['driveMediaType'] == 'ssd' and pdrive['physicalLocation']['trayRef'] == stats['trayRef'] and pdrive['physicalLocation']['slot'] == stats['driveSlot']:
-                        if isinstance(pdrive['ssdWearLife']['spareBlocksRemainingPercent'], int): 
-                            pdict = dict({'spareBlocksRemainingPercent': pdrive['ssdWearLife']['spareBlocksRemainingPercent']})
-            elif minor_vers >= 52 and minor_vers < 62:
-                for pdrive in drive_phys_stats_list:
-                    if pdrive['driveMediaType'] == 'ssd' and pdrive['driveRef'] == stats['diskId']:
-                        if isinstance(pdrive['ssdWearLife']['spareBlocksRemainingPercent'], int):
-                            pdict = dict({'spareBlocksRemainingPercent': pdrive['ssdWearLife']['spareBlocksRemainingPercent']})
-            else:
-                LOG.warning("SANtricity version not tested - skipping")
+            
+            # Try to get SSD wear data using the diskId (which should be the WWN)
+            disk_id = stats.get("diskId")
+            if disk_id and disk_id in ssd_wear_dict:
+                spare_blocks_remaining = ssd_wear_dict[disk_id]
+                pdict = {'spareBlocksRemainingPercent': spare_blocks_remaining}
+                LOG.debug(f"Found SSD wear data for drive {disk_id}: {spare_blocks_remaining}%")
             
             if 'spareBlocksRemainingPercent' in pdict.keys(): 
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
@@ -705,11 +720,12 @@ def collect_system_state(sys, checksums):
                     break
 
             if push:
-                if CMD.showStateMetrics:
-                    LOG.info("Failure payload T1: %s", item)
-                json_body.append(create_failure_dict_item(sys_id, sys_name,
+                failure_item = create_failure_dict_item(sys_id, sys_name,
                                                           r_fail_type, r_obj_ref, r_obj_type,
-                                                          True, datetime.now(timezone.utc).isoformat()))
+                                                          True, datetime.now(timezone.utc).isoformat())
+                if CMD.showStateMetrics:
+                    LOG.info("Failure payload T1: %s", failure_item)
+                json_body.append(failure_item)
 
         # take care of failures that are no longer active
         for point in failure_points:
@@ -735,11 +751,12 @@ def collect_system_state(sys, checksums):
                     break
 
             if push:
-                if CMD.showStateMetrics:
-                    LOG.info("Failure payload T2: %s", item)
-                json_body.append(create_failure_dict_item(sys_id, sys_name,
+                failure_item = create_failure_dict_item(sys_id, sys_name,
                                                           p_fail_type, p_obj_ref, p_obj_type,
-                                                          False, datetime.now(timezone.utc).isoformat()))
+                                                          False, datetime.now(timezone.utc).isoformat())
+                if CMD.showStateMetrics:
+                    LOG.info("Failure payload T2: %s", failure_item)
+                json_body.append(failure_item)
 
         # write failures to InfluxDB
         if CMD.showStateMetrics:
@@ -872,14 +889,6 @@ if __name__ == "__main__":
                      " {:07.4f} Iteration: {:00.0f}"
                      .format(CMD.intervalTime, time_difference, loopIteration))
             loopIteration += 1
-
-        # Log memory consumption for container tuning
-        try:
-            tot_m, used_m, free_m = map(int, subprocess.check_output(['free', '-t', '-m']).decode().splitlines()[-1].split()[1:])
-            LOG.info("Memory consumption: {:.2f} MB (Total: {} MB, Used: {} MB, Free: {} MB)"
-                     .format(tot_m + used_m + free_m, tot_m, used_m, free_m))
-        except Exception as e:
-            LOG.warning("Could not get memory info: {}".format(e))
 
         wait_time = CMD.intervalTime - time_difference
         if CMD.intervalTime < time_difference:

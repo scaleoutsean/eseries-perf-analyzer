@@ -15,7 +15,7 @@ docker run -d --name influxdb-utils-test --entrypoint tail ntap-grafana/utils:la
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
 
 # create database (this helps avoid running dbmanager container) - change the DB name in command and no dashes in DB names!
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE me_series'
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
 
 # list measurements for a database (InfluxDB v1 CLI) - change DB name to whatever DB name you have in collector container(s)
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "${DB:-eseries}" -execute 'SHOW MEASUREMENTS'
@@ -26,10 +26,10 @@ curl "http://${INFLUX_HOST:-influxdb}:${INFLUX_PORT:-8086}/query?db=${DB:-eserie
 ### Sample queries
 
 # Check SSD endurance data 
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT sys_name, sys_tray, sys_tray_slot, percentEnduranceUsed FROM disks WHERE percentEnduranceUsed IS NOT NULL ORDER BY time DESC LIMIT 10'
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT sys_name, sys_tray, sys_tray_slot, spareBlocksRemainingPercent FROM disks WHERE spareBlocksRemainingPercent IS NOT NULL ORDER BY time DESC LIMIT 10'
 
 # See what actual values are being stored
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT percentEnduranceUsed FROM disks WHERE percentEnduranceUsed IS NOT NULL ORDER BY time DESC LIMIT 5'
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT spareBlocksRemainingPercent FROM disks WHERE spareBlocksRemainingPercent IS NOT NULL ORDER BY time DESC LIMIT 5'
 
 # Check the interface measurement
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT * FROM interface LIMIT 3'
