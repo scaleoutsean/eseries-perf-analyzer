@@ -76,13 +76,13 @@ class GrafanaInitializer:
             # Check if datasource already exists
             datasources = self.grafana.datasource.get_all_datasources()
             for ds in datasources:
-                if ds.get('name') == 'InfluxDB':
-                    logger.info("InfluxDB datasource already exists")
+                if ds.get('name') == 'EPA':
+                    logger.info("EPA datasource already exists")
                     return True
                     
             # Create InfluxDB datasource
             datasource_config = {
-                "name": "InfluxDB",
+                "name": "EPA",
                 "type": "influxdb",
                 "url": "http://influxdb:8086",
                 "access": "proxy",
@@ -94,7 +94,7 @@ class GrafanaInitializer:
             }
             
             result = self.grafana.datasource.create_datasource(datasource_config)
-            logger.info(f"Created InfluxDB datasource: {result}")
+            logger.info(f"Created EPA datasource: {result}")
             return True
             
         except GrafanaClientError as e:

@@ -12,7 +12,7 @@
 		    "type": "dashboard"
 		},
 		{
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "enable": true,
 		    "hide": false,
 		    "iconColor": "#C4162A",
@@ -26,7 +26,7 @@
 		    "type": "tags"
 		},
 		{
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "enable": true,
 		    "hide": false,
 		    "iconColor": "#56A64B",
@@ -2175,7 +2175,7 @@
 			"text": "All Storage Systems",
 			"value": "All Storage Systems"
 		    },
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"folder_name\"",
 		    "hide": 0,
 		    "includeAll": false,
@@ -2212,7 +2212,7 @@
 			    "ictm1303s09c1"
 			]
 		    },
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"sys_name\" WHERE \"folder_name\" =~ /$Folder/",
 		    "hide": 0,
 		    "includeAll": false,

@@ -3319,7 +3319,7 @@
 			"text": "All Storage Systems",
 			"value": "All Storage Systems"
 		    },
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"folder_name\"",
 		    "hide": 0,
 		    "includeAll": false,
@@ -3350,7 +3350,7 @@
 			"text": "ICTM1402S02C1",
 			"value": "ICTM1402S02C1"
 		    },
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES FROM \"folders\" WITH KEY = \"sys_name\" WHERE \"folder_name\" =~ /$Folder/",
 		    "hide": 0,
 		    "includeAll": false,
@@ -3408,7 +3408,7 @@
 			    "$__all"
 			]
 		    },
-		    "datasource": "WSP",
+		    "datasource": "EPA",
 		    "definition": "SHOW TAG VALUES ON \"eseries\" FROM \"interface\" WITH KEY = \"interface_id\" WHERE \"sys_name\" =~ /$System/",
 		    "hide": 0,
 		    "includeAll": true,

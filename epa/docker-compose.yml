@@ -3,6 +3,7 @@ services:
   influxdb:
     image: ${PROJ_NAME}/influxdb:${TAG}
     container_name: influxdb
+    user: "1500:1500"
     mem_limit: 2G
     restart: unless-stopped
     ports:

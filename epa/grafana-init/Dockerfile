@@ -2,6 +2,10 @@ ARG TAG=3.4
 ARG PROJ_NAME=ntap-grafana
 FROM ${PROJ_NAME}/python-base:${TAG}
 
+# Install Python dependencies
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+
 # Copy dashboards directly into container
 COPY dashboards /dashboards
 
