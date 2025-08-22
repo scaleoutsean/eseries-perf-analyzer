@@ -57,8 +57,8 @@ class GrafanaInitializer:
         
         for attempt in range(self.max_retries):
             try:
-                # Try to get Grafana health status
-                health = self.grafana.admin.get_settings()
+                # Try to get datasources as a simple health check
+                datasources = self.grafana.datasource.get_all_datasources()
                 logger.info("Grafana is ready!")
                 return True
             except Exception as e:
