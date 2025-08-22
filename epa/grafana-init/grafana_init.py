@@ -120,10 +120,19 @@ class GrafanaInitializer:
                 logger.info(f"Importing dashboard: {dashboard_file.name}")
                 
                 with open(dashboard_file, 'r') as f:
-                    dashboard_json = json.load(f)
+                    dashboard_data = json.load(f)
+                
+                # Extract the actual dashboard object if it's wrapped
+                if 'dashboard' in dashboard_data:
+                    dashboard_json = dashboard_data['dashboard']
+                else:
+                    dashboard_json = dashboard_data
                 
                 # Extract title from filename (remove .json extension)
                 dashboard_title = dashboard_file.stem
+                
+                # Set the title in the dashboard JSON
+                dashboard_json['title'] = dashboard_title
                 
                 # Remove id and uid if present (let Grafana assign new ones)
                 if 'id' in dashboard_json:
@@ -131,10 +140,9 @@ class GrafanaInitializer:
                 if 'uid' in dashboard_json:
                     del dashboard_json['uid']
                 
-                # Prepare dashboard payload with title parameter
+                # Prepare dashboard payload (title is now in dashboard_json)
                 dashboard_payload = {
                     'dashboard': dashboard_json,
-                    'title': dashboard_title,
                     'overwrite': True,
                     'message': f"Imported {dashboard_title} via grafana-init"
                 }
