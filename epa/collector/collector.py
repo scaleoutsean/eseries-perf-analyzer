@@ -464,7 +464,7 @@ def collect_storage_metrics(sys):
         
         # Get SSD wear statistics from the new drive-health-history endpoint
         ssd_wear_dict = {}
-        if minor_vers >= 52:
+        if minor_vers >= 80:
             try:
                 drive_health_response = session.get(("{}/{}/drives/drive-health-history").format(
                     get_controller("sys"), sys_id), params={"all-history": "false"}).json()
@@ -483,7 +483,9 @@ def collect_storage_metrics(sys):
             except Exception as e:
                 LOG.warning(f"Could not retrieve SSD wear statistics: {e}")
         else:
-            LOG.info("Minor SANtricity management OS version is too old for SSD wear stats - upgrade to 11.52 or higher")
+            version_string = next((fw_cv[mod]['versionString'] for mod in range(len(fw_cv)) 
+                                 if fw_cv[mod]['codeModule'] == 'management'), 'unknown')
+            LOG.warning(f"SSD wear level ignored for this SANtricity version {version_string}")
         
         for stats in drive_stats_list:
             pdict = {}
