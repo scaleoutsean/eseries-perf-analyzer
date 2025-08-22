@@ -35,6 +35,7 @@ Change log and additional details are at the bottom of this page and in the Rele
 
 - System
 - Volumes
+- Disks
 - Interfaces
 - E-Series MEL events
 - Environmental (temperature and power consumption)
