@@ -210,7 +210,7 @@ With Grafana ready, we can add a InfluxDB v1 data source. You can do it manually
 
 InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively.
 
-In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0; but EPA v3.4.0 defaults to `EPA`).
+In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0; but EPA v3.4.0 defaults to **`EPA`**).
 
 ![Create Grafana Data Source for InfluxDB v1](../../images/kubernetes-01-influxdb-datasource.png)
 
