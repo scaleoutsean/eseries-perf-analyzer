@@ -118,8 +118,12 @@ Kubernetes users should skim through this page to get the idea how EPA works, an
 
 ### Environment variables and configuration files
 
-`./epa/.env` has some environment variables used by ./epa/docker-compose.yaml. You may want to edit `TAG` if you make own versions.
-Collector arguments and switches
+Environment variables:
+
+- `./epa/.env` has environment variables used by `./epa/docker-compose.yaml`. You may want to edit `TAG` if you make own versions or container version upgrades.
+
+Collector arguments and switches:
+
 - `USERNAME` - SANtricity account for collecting API metrics such as `monitor` (read-only access to SANtricity - create it in SANtricity)
 - `PASSWORD` - SANtricity password for the collector account
 - `SYSNAME` - SANtricity array name, such as `R26U25-EF600`. Get this from the SANtricity Web UI, but you can use your own. If you want to make the name identical to actual E-Series array name, [this mage](/images/sysname-in-santricity-manager.png) shows where to look it up
@@ -130,7 +134,7 @@ Collector arguments and switches
   - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
   - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
 
-Example of `docker-compose.yml` with a collector for one array:
+Example of a collector service entry in`docker-compose.yml`:
 
 ```yaml
 services:
@@ -158,11 +162,9 @@ services:
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
 
-The original EPA v3.0.0 exposes the SANtricity WSP (8080/tcp) and Grafana (3000/tcp) to the outside world.
+Grafana is exposed over HTTP (3000/tcp) as per usual Grafana defaults (and credentials).
 
-This fork does not use WSP. 
-
-Grafana is the same (exposed at 3000/tcp), and InfluxDB is exposed externally at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB. If you want to remove external access from the InfluxDB container, remove `8086:8086` and the `ports` line above it in epa/docker-compose.yaml and restart the container.
+InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB. If you want to remove external access from the InfluxDB container, remove `- 8086:8086` and the line with `ports` above it in `./epa/docker-compose.yaml` and restart the container.
 
 ### Add or remove a monitored array
 
@@ -176,7 +178,7 @@ To update the monitor account's password, simply change it in `./epa/docker-comp
 
 ### Grafana dashboards
 
-As you clone the repo, they are in `epa/grafana-init/dashboards`. 
+As you clone the repository and enter it, they are in `./epa/grafana-init/dashboards`. 
 
 You can import them to your own Grafana instance. If you use the included `./epa/docker-compose.yaml`, the dashboards may/should be deployed by the `grafana-init` container automatically.
 
@@ -220,7 +222,7 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
 
 ## Changelog
 
-- 3.4.0 (Auguust 22, 2025)
+- 3.4.0 (August 23, 2025)
   - Add 'utils' container with InfluxDB v1 client for easy management of InfluxDB
   - Remove `dbmanager` container and its JSON configuration file (one less container to worry about)
   - Minor update of version tags for various images (InfluxDB, Python, Alpine)
