@@ -233,7 +233,7 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
   - Add `grafana-init` container to replace what epa/ansible used to do in a more complicated way
   - Remove "internal images" build feature - builds are much faster and easier to maintain
   - Small error handling improvements in EPA Collector noted in Issues
-  - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues)
+  - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues) 
 
 - 3.3.1 (June 1, 2024):
   - Dependency update (requests library)
