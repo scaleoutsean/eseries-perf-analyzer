@@ -475,11 +475,15 @@ def collect_storage_metrics(sys):
                     latest_collection = drive_health_response['collections'][0]
                     if 'ssdDriveWearStatistics' in latest_collection:
                         for ssd_stat in latest_collection['ssdDriveWearStatistics']:
-                            # Map drive WWN to spare blocks remaining percentage
+                            # Use volGroupName as primary key for safe correlation
+                            vol_group_name = ssd_stat.get('volumeGroupName')
                             drive_wwn = ssd_stat.get('driveWwn')
                             spare_blocks = ssd_stat.get('spareBlockRemainingPercentage')
-                            if drive_wwn and spare_blocks is not None:
-                                ssd_wear_dict[drive_wwn] = spare_blocks
+                            if vol_group_name and spare_blocks is not None:
+                                # Create composite key: volGroupName + WWN suffix for uniqueness
+                                if len(drive_wwn) >= 12:
+                                    composite_key = f"{vol_group_name}#{drive_wwn[-12:]}"
+                                    ssd_wear_dict[composite_key] = spare_blocks
                 LOG.info(f"Found SSD wear data for {len(ssd_wear_dict)} drives")
             except Exception as e:
                 LOG.warning(f"Could not retrieve SSD wear statistics: {e}")
@@ -492,12 +496,20 @@ def collect_storage_metrics(sys):
             pdict = {}
             disk_location_info = drive_locations.get(stats["diskId"])
             
-            # Try to get SSD wear data using the diskId (which should be the WWN)
+            # Try to get SSD wear data using volGroupName as primary correlation
             disk_id = stats.get("diskId")
-            if disk_id and disk_id in ssd_wear_dict:
-                spare_blocks_remaining = ssd_wear_dict[disk_id]
-                pdict = {'spareBlocksRemainingPercent': spare_blocks_remaining}
-                LOG.debug(f"Found SSD wear data for drive {disk_id}: {spare_blocks_remaining}%")
+            vol_group_name = stats.get("volGroupName")
+            
+            if disk_id and vol_group_name and ssd_wear_dict:
+                spare_blocks_remaining = None
+                
+                # Create composite key using volGroupName + diskId suffix for safe matching
+                if len(disk_id) >= 12:
+                    composite_key = f"{vol_group_name}#{disk_id[-12:]}"
+                    if composite_key in ssd_wear_dict:
+                        spare_blocks_remaining = ssd_wear_dict[composite_key]
+                        pdict = {'spareBlocksRemainingPercent': spare_blocks_remaining}
+                        LOG.info(f"Found SSD wear data for drive {disk_id} in {vol_group_name}: {spare_blocks_remaining}%")
             
             if 'spareBlocksRemainingPercent' in pdict.keys(): 
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
