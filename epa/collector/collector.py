@@ -102,7 +102,8 @@ DRIVE_PARAMS = [
     'writeOps',
     'writePhysicalIOps',
     'writeResponseTime',
-    'writeThroughput'
+    'writeThroughput',
+    'spareBlocksRemainingPercent'
 ]
 
 INTERFACE_PARAMS = [
