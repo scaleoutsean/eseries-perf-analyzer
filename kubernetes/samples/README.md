@@ -51,9 +51,9 @@ kubectl create namespace epa
 
 EPA v3.4.0 uses InvluxDB v1.
 
-Port 8086/tcp is used for client connections and should be open to all *external* collector and dbmanager clients as well as Grafana (if Grafana runs externally). 
+Port 8086/tcp is used for client connections and should be open to all *external* collector clients as well as Grafana (if Grafana runs externally). 
 
-Collector and dbmanager do not use authentication, so either create firewall rules to allow only external collector by IP address, or run collector and dbmanager in the same namespace as InfluxDB to eliminate the need for external access to InfluxDB.
+Collector does not use DB authentication, so either create firewall rules to allow only external collector by IP address, or run collector in the same namespace as InfluxDB to eliminate the need for external access to InfluxDB.
 
 ### InfluxDB storage
 
@@ -95,7 +95,7 @@ If you need reliable InfluxDB backups and plan to snapshot PVs to get that, it's
 
 Various configuration options for InfluxDB may be viewed [here](https://docs.influxdata.com/influxdb/v1.8/introduction/install/).
 
-InfluxDB secrets can be complex or simple depending on needs. EPA collector has never used authentication (because it used to runs on the same network as InfluxDB), so we cannot simply create INFLUXDB_USER (that's why it's marked-out) without modifying collector and dbmanager scripts to add authentication. 
+InfluxDB secrets can be complex or simple depending on needs. EPA collector has never used authentication (because it used to runs on the same network as InfluxDB), so we cannot simply create INFLUXDB_USER (that's why it's marked-out) without modifying collector scripts to add authentication. 
 
 If you will run collector and dbmanger as they are, create proper firewall rules for the InfluxDB external IP (to allow only external collectors to connect to it), or run collector(s) and dbmanger in the same namespace.
 
@@ -173,7 +173,7 @@ kubectl -n epa get services
 
 As you can see there's no `EXTERNAL-IP` which means InfluxDB is not exposed to LAN or the Internet. This is fine if the rest of containers will run in the `epa` namespace. 
 
-If you need to use InfluxDB from outside of Kubernetes (if either Grafana, or collector, or dbmanager will run externally), [add `EXTERNAL-IP`](https://kubernetes.io/docs/tutorials/stateless-application/expose-external-ip-address/) depending on your environment.
+If you need to use InfluxDB from outside of Kubernetes (if either Grafana, or collector will run externally), [add `EXTERNAL-IP`](https://kubernetes.io/docs/tutorials/stateless-application/expose-external-ip-address/) depending on your environment.
 
 ## Grafana v8
 
@@ -216,7 +216,7 @@ In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Da
 
 If authentication was not configured in the InfluxDB section (`kubectl -n epa create secret generic influxdb-creds`), or you don't want to use authentication for Grafana, it's unnecessary to enable Basic Auth and provide credentials for Grafana account on InfluxDB. But if your InfluxDB is open to LAN clients, it's better to protect it and use a read-only account in Grafana.
 
-Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is still missing, Grafana will complain about the missing database (screenshot below). That's not a problem because the database will be created later (by collector or by dbmanager).
+Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is still missing, Grafana will complain about the missing database (screenshot below). Login to InfluxDB or use its API address to create a database. You can also use the `utils` container in the same namespace to do that easily.
 
 ![Database missing until created](../../images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
 
@@ -224,36 +224,15 @@ The InfluxDB API or CLI can be used create a database before that. Then Save & T
 
 ![Database available after created](../../images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
 
-Either way is fine. It's easier to ignore this and let dbmanager automatically create initial data.
-
-If possible, make the WSP data source your Default data source in Grafana. That seems to cause less problems when EPA dashboards are imported in various approaches.
-
 ### Manually import Grafana dashboards
 
-The EPA dashboards can be found in `./epa/plugins/eseries_monitoring/dashboards`, but importing them manually is another problem.
+The EPA dashboards can be found in `./epa/grafana-init/dashboards`.
 
-Visit `http://${GRAFANA_IP}:3000/dashboard/import` to import them. You'll probably have problems here and should take another look at Ansible instead.
-
-At this time dashboard can be viewed, but without anything to see. If you get a blank page (like [this](../../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start the collector and then refresh a dashboard view. In this screenshot you can also see `dbmanager`, a container that was removed in v3.4.0.
-
-![dbmanager data in Explorer](../../images/kubernetes-05-grafana-explore-dbmanager-data.png)
-
-If Grafana > Explore shows nothing while collector is successfully sending data to InfluxDB, Data Source is probably misconfigured.
-
-If Grafana > Explore shows E-Series data from Influx data source but dashboards show nothing, dashboards may be messed up or there's a mismatch between the name expected by the dashboards vs. the InfluxDB data source name that exists in Grafana. Fix data source name or change dashboards (perform a search & replace on the dashboard files).
+Visit `http://${GRAFANA_IP}:3000/dashboard/import` to import them.
 
 ## Wrap-up
 
 Now the correct functioning of Grafana and InfluxDB can be checked.
 
 In this section InfluxDB and Grafana were deployed to the same namespace (`epa`), exposed as services, and configured so that Grafana has access to InfluxDB databases and EPA dashboards.
-
-## Video demos
-
-If you're using v3.4.0, note that the steps are much simpler and very different.
-
-- [EPA 3.2.0 on Kubernetes](https://rumble.com/v28mh6w-netapp-e-series-performance-analyzer-epa-v3.2.0-for-kubernetes.html)
-  - Docker Compose users may find this video useful, but make sure you work by the main README file
-- [EPA 3.1.0 on Kubernetes](https://rumble.com/v25nep8-e-series-performance-analyzer-3.1.0-on-kubernetes.html) (3m16s) 
-  - uses YAML files and automated Data Source and dashboard deployment approach with Ansible container running in Kubernetes
 

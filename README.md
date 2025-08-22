@@ -43,8 +43,7 @@ Change log and additional details are at the bottom of this page and in the Rele
 ## Requirements
 
 - NetApp SANtricity OS: >= 11.80 recommended, older releases are not tested
-- CLI: 
-  - collector should work on any Linux with recent Python 3.10 or similar
+- CLI: collector should work on any Linux with recent Python 3.10 or similar
 
 ## Quick start
 
@@ -57,11 +56,12 @@ pip install -r requirements.txt
 python3 ./collector.py -h
 ```
 
-Note that you can't do much with just the CLI - you need a DB where data can be sent. But you can test the CLI with `-n` which collects data but doesn't send to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname NAME` or similar.
+Note that you can't do much with just the CLI - you need a DB where data can be sent. But you can test the CLI with `-n` which collects data but doesn't send to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME` or similar.
 
 ### Docker Compose users:
 
-- Download and decompress latest release and enter the `epa` sub-directory:
+Download and decompress latest release and enter the `epa` sub-directory:
+
 ```sh
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
@@ -76,6 +76,8 @@ Now that the containers have been built, three steps remain:
 - Start `grafana`
 - Create Grafana Data Source and attempt to import dashboards
 
+InfluxDB first:
+
 ```bash
 docker compose up -d influxdb
 docker comopse logs influxdb
@@ -84,9 +86,9 @@ docker compose up -d utils
 docker compose ps 
 ```
 
-Now we have InfluxDB and utilities container running. Before we start EPA Collector, we should have a Database to be able to insert data to InfluxDB.
+Now we have InfluxDB and the `utils` container running. Before we start EPA Collector, we should have a database instance to be able to insert data to InfluxDB.
 
-We do that from the `utils` container. 
+We create one from the `utils` container. 
 
 ```bash
 # enter the container
@@ -118,18 +120,17 @@ Kubernetes users should skim through this page to get the idea how EPA works, an
 
 ### Environment variables and configuration files
 
-- `./epa/.env` has some environment variables used by ./epa/docker-compose.yaml. 
-- Collector arguments and switches
-  - `USERNAME` - SANtricity account for collecting API metrics such as `monitor` (read-only access to SANtricity - create it in SANtricity)
-  - `PASSWORD` - SANtricity password for the collector account
-  - `SYSNAME` - SANtricity array name, such as `R26U25-EF600`. Get this from the SANtricity Web UI, but you can use your own. If you want to make the name identical to actual E-Series array name, [this image](/images/sysname-in-santricity-manager.png) shows where to look it up
-  - `SYSID` - SANtricity WWN for the array, such as `600A098000F63714000000005E79C888`. See [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI.
-  - `API` - SANtricity controller's IP address such as 6.6.6.6. Port number (`:8443`) is automatically set in Collector
-  - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
-  - `DB_ADDRESS`
-    - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
-    - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
-    - Note that 
+`./epa/.env` has some environment variables used by ./epa/docker-compose.yaml. You may want to edit `TAG` if you make own versions.
+Collector arguments and switches
+- `USERNAME` - SANtricity account for collecting API metrics such as `monitor` (read-only access to SANtricity - create it in SANtricity)
+- `PASSWORD` - SANtricity password for the collector account
+- `SYSNAME` - SANtricity array name, such as `R26U25-EF600`. Get this from the SANtricity Web UI, but you can use your own. If you want to make the name identical to actual E-Series array name, [this mage](/images/sysname-in-santricity-manager.png) shows where to look it up
+- `SYSID` - SANtricity WWN for the array, such as `600A098000F63714000000005E79C888`. See [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI.
+- `API` - SANtricity controller's IP address such as 6.6.6.6. Port number (`:8443`) is automatically set in Collector, and `https://` is not necessary either.
+- `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
+- `DB_ADDRESS`
+  - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
+  - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
 
 Example of `docker-compose.yml` with a collector for one array:
 
@@ -203,7 +204,7 @@ This screenshot shows *aggregate* values for all arrays (useful in HPC environme
 
 ![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
 
-In order to collect this data, an E-Series array with a recent SANtricity OS (> 11.80, for example) and at least one SSD is required. Note that before v3.4.0, EPA collector used to fetch `percentEnduranceUsed` but now it fetches `spareBlocksRemainingPercent` because this one I've actually seen drop below 100% while the former one showed suspicious results (in the samples I've seen).
+In order to collect this data, an E-Series array with a recent SANtricity OS (> 11.80, for example) and at least one SSD is required. Note that before v3.4.0, EPA collector used to fetch `percentEnduranceUsed` but now it fetches `spareBlocksRemainingPercent` because this one I've actually seen drop below 100% while the former one showed suspicious results in the samples I've seen.
 
 - Logical volumes
 
@@ -227,10 +228,10 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
   - Minor update of version tags for various images (InfluxDB, Python, Alpine)
   - Docker Compose with InfluxDB 1.11.8 necessitates `user` key addition and change to InfluxDB volume ownership
   - Minor update of version tag for Python and Alpine in Collector
-  - Complete removal of the pre-fork bloat (epa/Makefile, Ansible and BlackDuck containers, and the rest of it)
+  - Complete removal of the pre-fork bloat (epa/Makefile, epa/ansible epa/blackduck and the rest of it)
   - Merge two docker-compose.yaml files into one (epa/docker-compose.yaml)
   - Add `grafana-init` container to replace what epa/ansible used to do in a more complicated way
-  - Get rid of "internal image" build mechanism that didn't add any value (much faster builds with stock container images)
+  - Remove "internal images" build feature - builds are much faster and easier to maintain
   - Small error handling improvements in EPA Collector noted in Issues
   - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues)
 

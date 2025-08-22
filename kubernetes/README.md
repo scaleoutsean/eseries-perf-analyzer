@@ -1,7 +1,7 @@
-# Deploy EPA dbmanager and collector(s)
+# Deploy EPA collector(s)
 
 
-- [Deploy EPA dbmanager and collector(s)](#deploy-epa-dbmanager-and-collectors)
+- [Deploy EPA collector(s)](#deploy-epa-collectors)
   - [Assumptions](#assumptions)
   - [Deployment decisions](#deployment-decisions)
   - [Create a namespace and deploy InfluxDB and Grafana](#create-a-namespace-and-deploy-influxdb-and-grafana)
@@ -57,12 +57,12 @@ Because the JSON example above uses two arrays, two sample YAML files (02 and 03
 
 Change at least the following:
 
-- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name from dbmanager config.json (see above), `SYSID` which is WWN for the array (see the [main README](../README.md)), and username/password pair for the SANtricity API user (best use the `monitor` account because that one is read-only). Use the same `DB_ADDRESS` for dbmanager and all collectors
+- Enter your SANtricity API endpoint IPv4 (`API`; port 8443 is assumed), a `SYSNAME` that should match the name of the array, `SYSID` which is WWN for the array (see the [main README](../README.md)), and username/password pair for the SANtricity API user (best use the `monitor` account because that one is read-only and has limited permissions). Use the same `DB_ADDRESS` for all collectors that store to the same  server.
 
 ```yaml
 data:
   API: "5.5.5.5"
-  SYSNAME: "R26U25-EF600" # note uppercase letters, consistent with dbmanager
+  SYSNAME: "R26U25-EF600" # note uppercase letters - may be easier to read in Grafana 
   SYSID: "600A098000F63714000000005E791234"
   DB_ADDRESS: "7.7.7.7"
   USERNAME: "monitor"
