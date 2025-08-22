@@ -1,15 +1,13 @@
 services:
 
   influxdb:
-    image: ${PROJ_NAME}/influxdb:${TAG}
+    image: influxdb:1.11.8-alpine
     container_name: influxdb
     user: "1500:1500"
     mem_limit: 2G
     restart: unless-stopped
     ports:
       - 8086:8086
-      # remove if InfluxDB doesn't need to be reachable from the outside (e.g. newer Grafana on external network)
-      # if we only need to reach it from internal collector and/or Grafana in Docker, we can use http://inflxudb:8086
     logging:
       driver: "json-file"
       options:
@@ -22,23 +20,22 @@ services:
       - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
 
   utils:
-    image: ${PROJ_NAME}/utils:${TAG}
+    image: epa/utils:${TAG}
     container_name: utils
     mem_limit: 512M
     restart: unless-stopped
     build:
       context: ./utils
       args:
-        BASE_IMAGE: ${PROJ_NAME}/influxdb:${TAG}
+        BASE_IMAGE: influxdb:1.11.8-alpine
     networks:
       - eseries_perf_analyzer
     volumes:
       - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
     command: ["tail","-f","/dev/null"]    
 
-
   grafana:
-    image: ${PROJ_NAME}/grafana:${TAG}
+    image: grafana/grafana:8.5.27
     container_name: grafana
     mem_limit: 2G
     restart: unless-stopped
@@ -46,12 +43,10 @@ services:
       - influxdb
     ports:
       - 3000:3000
-        # exposes Grafana externally over HTTPS. it's recommended to use reverse proxy to protect Grafana, e.g.:
-        # https://proxy.example.com:8443 -> http://grafana:3000
     volumes:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
       - grafana_data:/var/lib/grafana
-      - grafana_dashboards:/var/lib/grafana/dashboards  # R/W: User-created dashboards
+      - grafana_dashboards:/var/lib/grafana/dashboards
     logging:
       driver: "json-file"
       options:
@@ -61,11 +56,9 @@ services:
       - eseries_perf_analyzer
 
   grafana-init:
+    image: epa/grafana-init:${TAG}
     build: 
       context: ./grafana-init
-      args:
-        TAG: ${TAG}
-        PROJ_NAME: ${PROJ_NAME}
     container_name: grafana-init
     mem_limit: 128M
     depends_on:
@@ -76,7 +69,7 @@ services:
       - GRAFANA_PASSWORD=admin
     networks:
       - eseries_perf_analyzer
-    restart: "no"  # Run once and exit
+    restart: "no"
 
   collector:
     image: epa/collector:${TAG}

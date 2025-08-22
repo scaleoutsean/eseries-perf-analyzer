@@ -1,7 +1,6 @@
 ARG CONTAINER_PYTHON_TAG=3.10.16-alpine3.19
 ARG TAG=latest
-ARG PROJ_NAME=ntap-grafana
-FROM ${PROJ_NAME}-plugin/eseries_monitoring/alpine-base AS builder
+FROM epa-plugin/eseries_monitoring/alpine-base AS builder
 # Signifies this is a temporary image that can be purged
 LABEL autodelete="true"
 

@@ -1,7 +1,6 @@
 ARG CONTAINER_INFLUXDB_TAG=1.11.8-alpine
 ARG TAG=latest
-ARG PROJ_NAME=ntap-grafana
-FROM ${PROJ_NAME}/alpine-base:${TAG} AS builder
+FROM ntap-grafana/alpine-base:${TAG} AS builder
 LABEL autodelete="true"
 
 FROM influxdb:${CONTAINER_INFLUXDB_TAG}

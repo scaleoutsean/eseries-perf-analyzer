@@ -1,6 +1,4 @@
-ARG TAG=3.4
-ARG PROJ_NAME=ntap-grafana
-FROM ${PROJ_NAME}/python-base:${TAG}
+FROM python:3.10.16-alpine3.19
 
 # Install Python dependencies
 COPY requirements.txt /requirements.txt
