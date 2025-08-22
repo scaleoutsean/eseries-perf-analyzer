@@ -21,9 +21,8 @@
 
 ## Assumptions
 
-- Recent Kubernetes such as v1.25
-- EPA v3.3.0 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
-- CSI plugin for persistent volumes
+- Recent Kubernetes 
+- EPA v3.4.0 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
 ## Sample configuration files 
@@ -50,7 +49,7 @@ kubectl create namespace epa
 
 ## InfluxDB v1
 
-EPA v3.2.0 uses InvluxDB v1.
+EPA v3.4.0 uses InvluxDB v1.
 
 Port 8086/tcp is used for client connections and should be open to all *external* collector and dbmanager clients as well as Grafana (if Grafana runs externally). 
 
@@ -85,9 +84,12 @@ Permissions:
 .../influxdb/wal/   700
 ```
 
+
 I because WAL and Meta aren't large, there isn't much disadvantage to using three separate PVCs, which is the approach taken by the sample YAML files. 
 
 If you need reliable InfluxDB backups and plan to snapshot PVs to get that, it's safer to use one larger volume for everything, unless you have a way to take multi-PV snapshots (aka "group snapshots", "consistency group snapshots").
+
+**NOTE:** In EPA v3.4.0 as we updated InfluxDB to 1.11.8, we noticed it runs as UID/GID 1500:1500.
 
 ### Other configuration, secrets and standing up InfluxDB
 
@@ -105,13 +107,12 @@ cd eseries-perf-analyzer/epa
 pwd
 # /home/sean/eseries-perf-analyzer/epa
 
-# build EPA containers
-make build
+# build EPA Collector (or build all by omitting "collector")
+docker compose build collector
 # see new images
-docker images
+docker images | grep epa
 
-# go to K8s samples
-cd ../kubernetes/samples
+# use K8s samples
 pwd
 # /home/sean/eseries-perf-analyzer/kubernetes/samples
 
@@ -148,8 +149,9 @@ stringData:
 
 **NOTE** 
 
-- EPA v3.0.0 does not have database authentication for collector and Grafana, because they used to run in the same docker-compose deployment. EPA v3.1.0 and v3.2.0 did not change that, so authentication options are marked out. If user authentication is used, dbmanager and collector will not be able to access InfluxDB. 
-- For Grafana, is possible to create a read-only account here, but if automated deployment of InfluxDB data source is used authentication won't be set up. To work around that create a read-only account for Grafana here, configure data source with Ansible (see below), and then modify Grafana's WSP data source to use authentication. What that will do is prevent deletion of data from Grafana.
+- Enter the container to create a database in InfluxDB. Several can be created if you will have multiple Collectors and don't want to store their data in the same instance
+- EPA v3.4.0 does not use database authentication for collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
+- For Grafana, is possible to create a read-only InfluxDB user account here, but if automated deployment of InfluxDB data source is used, authentication won't be set up. To work around that create a read-only account for Grafana here
 
 With `influxdb-creds` ready, next we create PVCs, service and finally deployment:
 
@@ -202,130 +204,13 @@ kubectl -n epa get services
 
 Like with InfluxDB, you need `EXTERNAL-IP` or port forwarding if you want to connect from the outside world.
 
-With Grafana ready, we can add a InfluxDB v1 data source. There are 4-5 ways to do that. Let's start with the same approach used in EPA: Ansible.
+With Grafana ready, we can add a InfluxDB v1 data source. You can do it manually (create the `EPA` data source and import dashboards from `./epa/grafana-init/dashboards`) or try the `grafana-init` container in this repo.
 
 ## Connect Grafana to InfluxDB (deploy InfluxDB data source and Grafana dashboards)
 
-We can reuse Ansible from EPA here, but the Ansible playbook was done for Docker Compose and we need it to work with Kubernetes. There are two ways:
+InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively.
 
-- run EPA Ansible container in InfluxDB/Grafana namespace (if these share namespace) - no changes to Ansible YAML files required
-- run Ansible from Docker (using EPA's Ansible container image) or OS shell (Ansible must be installed) anywhere where you can reach `EXTERNAL-IP` of InfluxDB and Grafana - LAN IPs for InfluxDB and Grafana are required here, so search & replace in Ansible YAML files is also required
-
-Both approaches work the same as they do in EPA with Docker Compose: Ansible configures the default Data Source ("WSP"), adds another Data Source for internal InfluxDB metrics, and deploys the dashboards (four for E-Series, one for InfluxDB v1 internal metrics).
-
-**NOTE:** Ansible adds a new data source ("WSP") and makes it the Grafana default. Make sure your other Grafana dashboards do not depend on there being some other default data source.
-
-### Automated approach with Ansible when Grafana and InfluxDB are in the same namespace
-
-For this we need to execute EPA Ansible container **in the Kubernetes namespace where InfluxDB and Grafana run**.
-
-If EPA Grafana was built with `cd epa & make build` earlier, the Ansible container should be already ready to use. If not, go to the top-level `epa` directory and run `make build`. Use `docker images | grep ansible` to find the container name and version.
-
-InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively, otherwise Ansible won't be able to connect.
-
-```sh
-# find the ansible container buit in ./epa with make build
-docker images | grep ansible
-# ntap-grafana/ansible:3.1
-
-# run this in the same namespace where InfluxDB and Grafana are (example: epa)
-kubectl run ansible --restart=Never --image=ntap-grafana/ansible:3.1 -n epa
-
-# this image hasn't changed from upstream v3.0.0, so you can use v3.0.0 or v3.1 you already have it in your registry
-# kubectl run ansible --restart=Never --image=regi.istry.lan/ntap-grafana/ansible:3.0 -n epa
-# or (container image uploaded by me to Docker Hub)
-# kubectl run ansible --restart=Never --image=docker.io/scaleoutsean/epa-ansible:v3.2.0 -n epa
-
-# check that the ansible pod is running
-
-kubectl get pods -n epa
-# NAME                                   READY   STATUS    RESTARTS       AGE
-# ansible                                1/1     Running   0              3s     <==== running!
-# collector-dbmanager-6f577597c4-bhppx   1/1     Running   0              7m27s
-# grafana-ff9ff46d4-nsnw6                1/1     Running   0              14m
-# influxdb-f4bb6575d-z44wt               1/1     Running   3 (118m ago)   44h
-
-# once it's stopped, you can remove it
-kubectl delete pod ansible -n epa
-```
-
-Now Grafana should have two new Data Sources and EPA dashboards. If it doesn't, that means Ansible failed to connect to InfluxDB and Grafana in the `epa` namespace. You need to fix that and run the pod again.
-
-If you want to use this approach but Grafana and InfluxDB are *not* in the same namespace, maybe they can be deployed to the same namespace, and Grafana can be exported after Ansible has completed its configuration. See below for other approaches.
-
-### Automated approach with Ansible from your client, VM or other location
-
-In the second approach we need to change Grafana address in several YAML files to be the same as external Grafana service address. I changed `http://grafana:3000` to `http://192.168.1.127:3000` in the following files.
-
-- ./epa/ansible/tasks/dashboard_import.yml
-- ./epa/ansible/tasks/grafana_backup.yml
-- ./epa/ansible/tasks/plugin_tasks/influxdb_internal_monitoring/datasource.yml
-- ./epa/ansible/tasks/grafana.yml
-
-The same needs to be done for InfluxDB. I changed `influxdb:8086` to `192.168.1.127:8086` in the following locations:
-
-- ./epa/ansible/tasks/plugin_tasks/influxdb_internal_monitoring/datastore.json
-- ./epa/ansible/datastore.json
-
-At this stage it's possible to run Ansible from a container (for which we'd have to build a new container image by running `make build` in the epa subdirectory) or - I think this is easier - we can install Ansible and run the Ansible playbook from the shell:
-
-```sh
-# we're in ./epa/ansible
-pwd
-# /home/sean/eseries-perf-analyzer/epa/ansible
-
-# install Ansible as per the Ansible documentation
-
-# run the playbook without container
-ansible-playbook main.yml
-```
-
-### Manually add InfluxDB as Grafana Data Source
-
-If you can't make Ansible work, you can try the manual approach. I strongly recommend *against* the manual approach for Grafana dashboards - it's a nightmare!
-
-Add InfluxDB v1 source by replicating configuration from Grafana in EPA v3.2.0 created with docker-compose. This is to make sure that EPA dashboards can find Data Source by the expected name ("WSP").
-
-If Grafana and InfluxDB are the same namespace, InfluxDB can be added as `http://influxdb:8086/` (screenshots here show InfluxDB exposed on a Class A network, which is what I tried).
-
-A read-only InfluxDB account can be created for Grafana (done earlier for demo purposes when creating InfluxDB secrets: grafana/grafana123readonlyUSER) and then Basic Auth can be enabled in Grafana Data Sources. EPA by default doesn't use authentication for InfluxDB, so no need to enable Basic Auth if you didn't configure it in Influx.
-
-With BasicAuth disabled (default in EPA, Ansible also deploys this way):
-
-```json
-{
-  "name":"WSP",
-  "label": "WSP",
-  "type": "influxdb",
-  "url":"http://influxdb:8086",
-  "access":"proxy",
-  "basicAuth": false,
-  "isDefault": true,
-  "database":"eseries"
-}
-```
-
-With BasicAuth enabled (using the same credentials created in InfluxDB section above, and the DB name `eseries`):
-
-```json
-{
-  "name": "WSP",
-  "isDefault": true,
-  "type": "influxdb",
-  "access": "proxy",
-  "database": "eseries",
-  "user": "grafana",
-  "url": "http://influxdb:8086",
-  "jsonData": {
-    "httpMode": "GET"
-  },
-  "secureJsonData": {
-    "password": "grafana123readonlyUSER"
-  }
-}
-```
-
-In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0).
+In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0; but EPA v3.4.0 defaults to `EPA`).
 
 ![Create Grafana Data Source for InfluxDB v1](../../images/kubernetes-01-influxdb-datasource.png)
 
@@ -343,13 +228,13 @@ Either way is fine. It's easier to ignore this and let dbmanager automatically c
 
 If possible, make the WSP data source your Default data source in Grafana. That seems to cause less problems when EPA dashboards are imported in various approaches.
 
-#### Manually import Grafana dashboards
+### Manually import Grafana dashboards
 
 The EPA dashboards can be found in `./epa/plugins/eseries_monitoring/dashboards`, but importing them manually is another problem.
 
 Visit `http://${GRAFANA_IP}:3000/dashboard/import` to import them. You'll probably have problems here and should take another look at Ansible instead.
 
-At this time dashboard can be viewed, but without anything to see. If you get a blank page (like [this](../../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start the collector and then refresh a dashboard view. In this screenshot dbmanager we started earlier is sending data to InfluxDB.
+At this time dashboard can be viewed, but without anything to see. If you get a blank page (like [this](../../images/kubernetes-04-grafana-dashboard-problem.png)), it's best to start the collector and then refresh a dashboard view. In this screenshot you can also see `dbmanager`, a container that was removed in v3.4.0.
 
 ![dbmanager data in Explorer](../../images/kubernetes-05-grafana-explore-dbmanager-data.png)
 
@@ -357,61 +242,15 @@ If Grafana > Explore shows nothing while collector is successfully sending data 
 
 If Grafana > Explore shows E-Series data from Influx data source but dashboards show nothing, dashboards may be messed up or there's a mismatch between the name expected by the dashboards vs. the InfluxDB data source name that exists in Grafana. Fix data source name or change dashboards (perform a search & replace on the dashboard files).
 
-#### Other ways to provision Grafana data sources and dashboards
-
-Grafana also lets you use its provisioning features to automatically provision [data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources) and [dashboards](https://grafana.com/docs/grafana/latest/administration/provisioning/#reusable-dashboard-urls).
-
-I found these to be buggy and frustratingly hard to use. 
-
-In theory, all it takes is to build a Grafana container with the `/etc/grafana/provisioning/dashboards` path pre-populated with a dashboard source defnition (YAML) and EPA dashboards. This is how Grafana container subdirectory would look like before `docker build`:
-
-```raw
-.
-├── Dockerfile
-└── provisioning
-    ├── dashboards
-    │   ├── dashboards.yaml
-    │   ├── system.json
-    │   └── interface.json
-    │   └── disk.json
-    │   └── volume.json
-    └── datasources
-        └── influxd.yaml
-```
-
-dashboards.yaml would look something like this:
-
-```yaml
-apiVersion: 1
-providers:
-  - name: 'EPA'
-    folder: ''
-    type: file
-    orgId: 1
-    folderUid: ''
-    allowUiUpdates: true
-    updateIntervalSeconds: 30
-    options:
-      path: /etc/grafana/provisioning/dashboards
-```
-
-Grafana Dockerfile would copy this to the container with `ADD ./provisioning /etc/grafana/` and Grafana would load JSON files after startup. But I couldn't get this to work, maybe due to small errors in the exported EPA dashboard files or some other reason.
-
-Maybe Grafana Helm charts work better. I haven't tried.
-
-Recreating dashboards from scratch is possible, but could turn out to be time-consuming.
-
 ## Wrap-up
 
 Now the correct functioning of Grafana and InfluxDB can be checked.
 
-This screenshot shows dbmanager with a different container name to what's in YAML file. (The reason is it was rebuilt to check if it can send data to InfluxDB's External IP address, as explained earlier). Container names can be changed to anything that suits your environment, of course.
-
-![EPA deployments in Kubernetes dashboard](../../images/kubernetes-06-dashboard.png)
-
 In this section InfluxDB and Grafana were deployed to the same namespace (`epa`), exposed as services, and configured so that Grafana has access to InfluxDB databases and EPA dashboards.
 
-## Video demo
+## Video demos
+
+If you're using v3.4.0, note that the steps are much simpler and very different.
 
 - [EPA 3.2.0 on Kubernetes](https://rumble.com/v28mh6w-netapp-e-series-performance-analyzer-epa-v3.2.0-for-kubernetes.html)
   - Docker Compose users may find this video useful, but make sure you work by the main README file
