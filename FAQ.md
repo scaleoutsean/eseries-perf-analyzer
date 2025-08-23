@@ -100,13 +100,39 @@ python3 ./epa/collector/collector.py \
 
 ### How to upgrade?
 
-From 3.[1,2,3] to 3.4, I wouldn't try since there aren't new features. But if you want to, then I recommend removing old setup and starting from scratch. Or, if you insist, you could transplant Collector from ./epa/collector/ and also copy its Docker Compose service to the "old" ./collector/collector/docker-compose.yaml, and leave InfluxDB and Grafana alone. That is quick, easy to do and easy to revert.
+From 3.[1,2,3] to 3.4, I wouldn't try since there aren't new features. But if you want to, then I recommend removing old setup and starting from scratch. Or, if you insist, you could transplant Collector from `./epa/collector/` and also copy its Docker Compose service to the "old" `./collector/collector/docker-compose.yaml`, and leave InfluxDB and Grafana alone. That is quick, easy to do and easy to revert.
 
-EPA 3.4.0's new ./epa/docker-compose.yaml has quite a few changes, from versions to volumes and so on, that it's quite unlikely that older versions can be upgraded in place and without any trouble.
+EPA 3.4.0's new `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
 ### If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
-Use the `utils` container to re-create the database, and use `grafana-init` to push configuration to Grafana (or, alternatively, create a new InfluxDB v1 Data Source `EPA` and then import dashboards from `./epa/grafana-init/dashboards`/)
+EPA Collector creates database automatically: `--dbName` parameter if specified, `eseries` if not. So you can just run Collector. 
+
+Or you can create the DB before you run.
+
+- Using the `collector` container (mind the container name and version!):
+
+```sh
+docker run --rm --network eseries_perf_analyzer \
+  -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
+  epa/collector:3.4.0
+```
+
+- Using the `utils` container:
+
+```sh
+# if you prefer to use InfluxDB v1 CLI
+docker compose up -d utils
+# enter the container
+docker exec -u 0 -it utils /bin/sh
+# inside of the utils container
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
+# create database (or several). EPA defaults to "eseries"
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
+exit
+```
+
+To restore default configuration to Grafana, deploy Grafana, run `grafana-init` once (configures Grafana Data Source, pushes dashboards to Grafana) and finally start EPA Collector.
 
 ### What happens if the controller (specified by `--api` IPv4 address or `API=` in `docker-compose.yml`) fails? 
 

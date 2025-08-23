@@ -9,7 +9,6 @@
     - [Docker Compose users](#docker-compose-users)
       - [Environment variables and configuration files](#environment-variables-and-configuration-files)
       - [Deploy](#deploy)
-      - [Create database for EPA](#create-database-for-epa)
     - [Kubernetes](#kubernetes)
   - [Other procedures](#other-procedures)
     - [Execute containerized collector.py](#execute-containerized-collectorpy)
@@ -85,7 +84,7 @@ Collector arguments and switches:
 - `DB_ADDRESS`
   - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
   - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
-- `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries` 
+- `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries`. Collector creates database if it doesn't exist.
 - `DB_PORT` - 8086 is the standard port for InfluxDB v1
 
 Example of a collector service entry in`docker-compose.yml`:
@@ -112,7 +111,7 @@ services:
       - RETENTION_PERIOD=26w
       - DB_ADDRESS=7.7.7.7  # influxdb instead of IPv4 when running in same Compose or K8s namespace
       - DB_PORT=8086
-      # Optional: Override default database name (eseries)
+      # Optional: Override default database name (eseries) on a per-collector basis
       # - DB_NAME=eseries
       # Optional: Create database and exit (true/1 = enable); remember to revert to 'false' after successful run
       # - CREATE_DB=false      
@@ -128,43 +127,16 @@ Download and decompress latest release and enter the `epa` sub-directory:
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
-vim docker-compose.yaml  # see collector service sample on this page
-docker-compose build
+vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name for each collector
+
+# one shot Hail Mary: docker compose -d up # includes 'utils' container
+# or, step by step:
+
+docker compose build
 
 docker compose up -d influxdb
 docker compose logs influxdb
-````
 
-#### Create database for EPA
-
-If InfluxDB is remove, you can use the CLI.
-
-If InfluxDB is in same Docker Compose (EPA defaults to 'eseries'):
-- Using the `collector` container:
-
-```sh
-docker run --rm --network eseries_perf_analyzer \
-  -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.4.0
-```
-
-- Using the `utils` container:
-
-```sh
-# if you prefer to use InfluxDB v1 CLI
-docker compose up -d utils
-# enter the container
-docker exec -u 0 -it utils /bin/sh
-# inside of the utils container
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# create database (or several). EPA defaults to "eseries"
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
-exit
-```
-
-Start Grafana, run `grafana-init` once (configures Grafana Data Source, pushes dashboards to Grafana) and finally start EPA Collector.
-
-```bash
 docker compose up -d grafana
 docker compose logs grafana
 
@@ -172,6 +144,10 @@ docker compose up grafana-init
 
 docker compose up -d collector
 docker compose logs collector
+
+# not required, best to start it on-demand
+# docker compose up -d utils
+
 ```
 
 If you have any problems with Grafana Data Source, add InfluxDB v1 data source `EPA` (use `http://{DB_ADDRESS}:{DB_PORT}` and your DB name). If you have problems with dashboards, import them from `./epa/grafana-init/dashboards/`.
