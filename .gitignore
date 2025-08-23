@@ -1,19 +1,9 @@
 # ignore the graphite database
-graphite-database/*
 .idea/*
 # ignore all array files except the example
-!ansible/arrays/example_array.json
-ansible/arrays/*
-# ignore the influxbdb database
 influx-database/*
 # ignore the web services working directory
-plugins/eseries_monitoring/webservices_working/*
-# ignore python test cache
-plugins/eseries_monitoring/collector/tests/__pycache__/*
-plugins/eseries_monitoring/collector/tests/collector.py
-# sample config files
-configs/*
-# venv dirs
 .venv
+epa/collector/__pycache__
 # other
 workspace.code-workspace
