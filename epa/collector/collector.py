@@ -812,10 +812,12 @@ def create_continuous_query(client, params_list, database):
     :param database: The InfluxDB measurement to down-sample in EPA's database
     """
     try:
+        # temp measurements are not downsampled as averaging values from different sensors doesn't seem to work properly
+        if database == "temp":
+            LOG.info(f"Creation of continuous query on '{database}' measurement skipped to avoid averaging values from different sensors")
+            return
+        
         for metric in params_list:
-            # temp measurements are not downsampled as averaging values from different sensors doesn't seem to work properly
-            if database == "temp":
-                LOG.info(f"Creation of continuous query on '{database}' measurement skipped to avoid averaging values from different sensors")
             ds_select = "SELECT mean(\"" + metric + "\") AS \"ds_" + metric + "\" INTO \"" + INFLUXDB_DATABASE + \
                 "\".\"downsample_retention\".\"" + database + "\" FROM \"" + \
                 database + "\" WHERE (time < now()-1w) GROUP BY time(5m)"
@@ -888,9 +890,6 @@ if __name__ == "__main__":
         except (InfluxDBClientError, requests.exceptions.RequestException):
             LOG.error("Database creation failed")
             sys.exit(1)
-
-    # Default behavior: ensure database exists
-    client.create_database(INFLUXDB_DATABASE)
 
     try:
 
