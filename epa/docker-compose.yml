@@ -94,6 +94,10 @@ services:
       - RETENTION_PERIOD=52w
       - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086
+      # Optional: Override default database name (eseries)
+      # - DB_NAME=my_custom_db
+      # Optional: Create database and exit (true/1 = enable)
+      # - CREATE_DB=false
     networks:
       - eseries_perf_analyzer
 
@@ -117,6 +121,8 @@ services:
       - RETENTION_PERIOD=52w
       - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086
+      # Example: Using custom database name for this collector
+      # - DB_NAME=e2824_metrics
     networks:
       - eseries_perf_analyzer
 

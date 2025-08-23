@@ -1,13 +1,16 @@
 # NetApp E-Series Performance Analyzer ("EPA")
 
 - [NetApp E-Series Performance Analyzer ("EPA")](#netapp-e-series-performance-analyzer-epa)
-  - [What is this thing](#what-is-this-thing)
+  - [What is EPA](#what-is-epa)
   - [What E-Series metrics does EPA collect](#what-e-series-metrics-does-epa-collect)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
-    - [CLI users](#cli-users)
+    - [CLI and systemd users](#cli-and-systemd-users)
     - [Docker Compose users](#docker-compose-users)
-    - [Environment variables and configuration files](#environment-variables-and-configuration-files)
+      - [Environment variables and configuration files](#environment-variables-and-configuration-files)
+      - [Deploy](#deploy)
+      - [Create database for EPA](#create-database-for-epa)
+    - [Kubernetes](#kubernetes)
   - [Other procedures](#other-procedures)
     - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
     - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
@@ -18,18 +21,16 @@
   - [Changelog](#changelog)
 
 
-## What is this thing
+## What is EPA
 
-This is a friendly fork of [E-Series Performance Analyzer aka EPA](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0 (see its README.md for additional information) created with the following objectives:
+This is a fork of the now-archived [E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. This fork's objectives:
 
-- Disentangle E-Series Collector from the rest of EPA and make it easy to run it anywhere (shell, Docker/Docker Compose, Kubernetes, Nomad)
+- Continue development of an OSS monitoring solution for NetApp E-Series
+- Disentangle E-Series Collector from the rest of EPA stac and make it easy to run it stand-alone and anywhere
 - Remove SANtricity Web Services Proxy (WSP) dependency from Collector and remove WSP from EPA, so that one collector container or script captures data for one and only one E-Series array
 
-In terms of services, collectors collects metrics from E-Series and sends them to InfluxDB.
-
-Each of the light-blue rectangles can be in a different location (host, network, Kubernetes namespace, etc.). But if you want to consolidate, that's still possible.
-
-Change log and additional details are at the bottom of this page and in the Releases tab.
+EPA Collector collects metrics from E-Series and sends them to InfluxDB. 
+Each collector uses own credentials and can (but doesn't have to) write data to the same InfluxDB database instance.
 
 ## What E-Series metrics does EPA collect
 
@@ -43,87 +44,34 @@ Change log and additional details are at the bottom of this page and in the Rele
 ## Requirements
 
 - NetApp SANtricity OS: >= 11.80 recommended, older releases are not tested
-- CLI: collector should work on any Linux with recent Python 3.10 or similar
+- EPA Collector should work on any Linux with recent Python 3.10 or similar - you may run it as a script, systemd service, Docker/Podman/Nomad/K8s container, etc.
+- The rest of EPA "stack" is standard OSS integrated in a stack for reference purposes. Users are encouraged to use own database and Grafana
 
 ## Quick start
 
-### CLI users
+### CLI and systemd users
 
 ```bash
 git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa/collector
+# create and activate a venv if you want
 pip install -r requirements.txt
 python3 ./collector.py -h
 ```
 
-Note that you can't do much with just the CLI - you need a DB where data can be sent. But you can test the CLI with `-n` which collects data but doesn't send to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME` or similar.
+Note that you can't do much with just the CLI - you need a DB where data can be sent. What you can do next?
+
+- If SANtricity is reachable: try collection with `-n` switch: collect data but don't write to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME -u monitor -p p@ss` or similar.
+- If InfluxDB is reachable: create database first with `--createDB --dbName eseries`. Example: `python3 epa/collector/collector.py --createDb --dbName mydb --dbAddress influxdb:8086` (or `hostname:8086` if executing outside of Docker when eternal InfluxDB port is exposed)
 
 ### Docker Compose users
 
-**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory before you deploy.
-
-Download and decompress latest release and enter the `epa` sub-directory:
-
-```sh
-git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
-cd eseries-perf-analyzer/epa
-vim .env # you probably don't need to change anything here
-vim docker-compose.yaml  # see collector service sample on this page
-docker-compose build
-````
-
-Now that the containers have been built, several steps remain:
-- Start `influxdb`
-- Create a database (or several) for EPA Collector
-- Start `grafana`
-- Create Grafana Data Source and attempt to import dashboards
-
-InfluxDB first:
-
-```bash
-docker compose up -d influxdb
-docker comopse logs influxdb
-
-docker compose up -d utils
-docker compose ps 
-```
-
-Now we have InfluxDB and the `utils` container running. Before we start EPA Collector, we should have a database instance to be able to insert data to InfluxDB.
-
-We create one from the `utils` container. 
-
-```bash
-# enter the container
-docker exec -u 0 -it utils /bin/sh
-# inside of the utils container
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# create database (or several). EPA defaults to "eseries"
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
-# show databases again
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# if OK, exit
-exit
-```
-
-Proceed with Grafana, `grafana-init` (configures Grafana Data Source, pushes dashboards) and finally start EPA Collector.
-
-```bash
-docker compose up -d grafana
-docker compose logs grafana
-
-docker compose up grafana-init
-
-docker compose up -d collector
-docker compose logs collector
-```
-
-Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
-
-### Environment variables and configuration files
+#### Environment variables and configuration files
 
 Environment variables:
 
 - `./epa/.env` has environment variables used by `./epa/docker-compose.yaml`. You may want to edit `TAG` if you make own versions or container version upgrades.
+- Some can be found in the Docker Compose file itself
 
 Collector arguments and switches:
 
@@ -136,6 +84,8 @@ Collector arguments and switches:
 - `DB_ADDRESS`
   - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
   - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
+- `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries` 
+- `DB_PORT` - 8086 is the standard port for InfluxDB v1
 
 Example of a collector service entry in`docker-compose.yml`:
 
@@ -161,7 +111,77 @@ services:
       - RETENTION_PERIOD=26w
       - DB_ADDRESS=7.7.7.7  # influxdb instead of IPv4 when running in same Compose or K8s namespace
       - DB_PORT=8086
+      # Optional: Override default database name (eseries)
+      # - DB_NAME=eseries
+      # Optional: Create database and exit (true/1 = enable); remember to revert to 'false' after successful run
+      # - CREATE_DB=false      
 ```
+
+#### Deploy
+
+**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory before you deploy.
+
+Download and decompress latest release and enter the `epa` sub-directory:
+
+```sh
+git clone https://github.com/scaleoutsean/eseries-perf-analyzer/
+cd eseries-perf-analyzer/epa
+vim .env                 # you probably don't need to change anything here
+vim docker-compose.yaml  # see collector service sample on this page
+docker-compose build
+
+docker compose up -d influxdb
+docker comopse logs influxdb
+````
+
+#### Create database for EPA
+
+If InfluxDB is remove, you can use the CLI.
+
+If InfluxDB is in same Docker Compose (EPA defaults to 'eseries'):
+- Using the `collector` container:
+
+```sh
+docker run --rm --network eseries_perf_analyzer \
+  -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
+  epa/collector:v3.4.0
+```
+
+- Using the `utils` container:
+
+```sh
+# if you prefer to use InfluxDB v1 CLI
+docker compose up -d utils
+docker compose ps 
+# enter the container
+docker exec -u 0 -it utils /bin/sh
+# inside of the utils container
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
+# create database (or several). EPA defaults to "eseries"
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
+# show databases again
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
+# if OK, exit
+exit
+```
+
+Start Grafana, run `grafana-init` once (configures Grafana Data Source, pushes dashboards to Grafana) and finally start EPA Collector.
+
+```bash
+docker compose up -d grafana
+docker compose logs grafana
+
+docker compose up grafana-init
+
+docker compose up -d collector
+docker compose logs collector
+```
+
+If you have any problems with Grafana Data Source, add InfluxDB v1 data source `EPA` (use `http://{DB_ADDRESS}:{DB_PORT}` and your DB name). If you have problems with dashboards, import them from `./epa/grafana-init/dashboards/`.
+
+### Kubernetes
+
+Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
 
 ## Other procedures
 
@@ -228,8 +248,9 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
 ## Changelog
 
 - 3.4.0 (August 23, 2025)
-  - Add 'utils' container with InfluxDB v1 client for easy management of InfluxDB
   - Remove `dbmanager` container and its JSON configuration file (one less container to worry about)
+  - Add 'utils' container with InfluxDB v1 client for easy management of InfluxDB  
+  - Add some database-related functions to Collector to replace dbmanager's function
   - Minor update of version tags for various images (InfluxDB, Python, Alpine)
   - Docker Compose with InfluxDB 1.11.8 necessitates `user` key addition and change to InfluxDB volume ownership
   - Minor update of version tag for Python and Alpine in Collector
@@ -239,8 +260,8 @@ Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/
   - Remove "internal images" build feature - builds are much faster and easier to maintain
   - Small error handling improvements in EPA Collector noted in Issues
   - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues) 
+  - Prior versions use `urllib3` v1 (collector, dbmanager). v3.4.0 removes direct import of `urllib3` and lets `requests` deal with it (and requests now defaults to v2.5.0)
   - See upgrade-related Q&A in the [FAQs](./FAQ.md). There are no new features or security fixes, so skip this version if your EPA is running fine
-  - Pre 3.4.0 versions have urllib3 v1 (vulnerable to redirects in scenarios unrelated to EPA) in collector or dbmanager. 3.4.0 removes urllib3 and lets requests use urllib3 v2
 
 - 3.3.1 (June 1, 2024):
   - Dependency update (requests library)
