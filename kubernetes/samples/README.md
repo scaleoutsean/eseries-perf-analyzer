@@ -10,13 +10,8 @@
     - [Other configuration, secrets and standing up InfluxDB](#other-configuration-secrets-and-standing-up-influxdb)
   - [Grafana v8](#grafana-v8)
   - [Connect Grafana to InfluxDB (deploy InfluxDB data source and Grafana dashboards)](#connect-grafana-to-influxdb-deploy-influxdb-data-source-and-grafana-dashboards)
-    - [Automated approach with Ansible when Grafana and InfluxDB are in the same namespace](#automated-approach-with-ansible-when-grafana-and-influxdb-are-in-the-same-namespace)
-    - [Automated approach with Ansible from your client, VM or other location](#automated-approach-with-ansible-from-your-client-vm-or-other-location)
-    - [Manually add InfluxDB as Grafana Data Source](#manually-add-influxdb-as-grafana-data-source)
-      - [Manually import Grafana dashboards](#manually-import-grafana-dashboards)
-      - [Other ways to provision Grafana data sources and dashboards](#other-ways-to-provision-grafana-data-sources-and-dashboards)
+    - [Manually import Grafana dashboards](#manually-import-grafana-dashboards)
   - [Wrap-up](#wrap-up)
-  - [Video demo](#video-demo)
 
 
 ## Assumptions
@@ -149,8 +144,8 @@ stringData:
 
 **NOTE** 
 
-- Enter the container to create a database in InfluxDB. Several can be created if you will have multiple Collectors and don't want to store their data in the same instance
-- EPA v3.4.0 does not use database authentication for collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
+- Collector can create specified (or if not, the default) database name in InfluxDB. You may set a different DB for each collector instance.
+- EPA v3.4.0 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
 - For Grafana, is possible to create a read-only InfluxDB user account here, but if automated deployment of InfluxDB data source is used, authentication won't be set up. To work around that create a read-only account for Grafana here
 
 With `influxdb-creds` ready, next we create PVCs, service and finally deployment:
@@ -216,11 +211,11 @@ In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Da
 
 If authentication was not configured in the InfluxDB section (`kubectl -n epa create secret generic influxdb-creds`), or you don't want to use authentication for Grafana, it's unnecessary to enable Basic Auth and provide credentials for Grafana account on InfluxDB. But if your InfluxDB is open to LAN clients, it's better to protect it and use a read-only account in Grafana.
 
-Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is still missing, Grafana will complain about the missing database (screenshot below). Login to InfluxDB or use its API address to create a database. You can also use the `utils` container in the same namespace to do that easily.
+Also notice that EPA by default uses the `eseries` database. If Grafana connects to InfluxDB while the DB is still missing, Grafana will complain about the missing database (screenshot below). Login to InfluxDB or use its API address to create a database. You can also use the `utils` container in the same namespace to do that easily. Or you can run Collector to create the DB (see Collector help or the FAQs).
 
 ![Database missing until created](../../images/kubernetes-02-influxdb-datasource-influxdb-eseries-missing.png)
 
-The InfluxDB API or CLI can be used create a database before that. Then Save & Test will show that Data Source is fully validated (below).
+Once a DB exists and is configured Grafana data sources, Save & Test will show that Data Source is fully validated (below).
 
 ![Database available after created](../../images/kubernetes-03-influxdb-datasource-influxdb-eseries-present.png)
 

@@ -93,5 +93,5 @@ kubectl -n epa get pods
 # influxdb-f4bb6575d-z44wt                  1/1     Running   0          176m
 ```
 
-Go to Grafana > Explore to see if the InfluxDB database is available to Grafana.
+Go to Grafana > Explore to see if the InfluxDB v1 datab source is available to Grafana.
 
