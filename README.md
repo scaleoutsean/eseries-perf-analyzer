@@ -12,6 +12,7 @@
       - [Create database for EPA](#create-database-for-epa)
     - [Kubernetes](#kubernetes)
   - [Other procedures](#other-procedures)
+    - [Execute containerized collector.py](#execute-containerized-collectorpy)
     - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
     - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
     - [Update password of a monitor account](#update-password-of-a-monitor-account)
@@ -131,7 +132,7 @@ vim docker-compose.yaml  # see collector service sample on this page
 docker-compose build
 
 docker compose up -d influxdb
-docker comopse logs influxdb
+docker compose logs influxdb
 ````
 
 #### Create database for EPA
@@ -144,7 +145,7 @@ If InfluxDB is in same Docker Compose (EPA defaults to 'eseries'):
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:v3.4.0
+  epa/collector:3.4.0
 ```
 
 - Using the `utils` container:
@@ -152,16 +153,12 @@ docker run --rm --network eseries_perf_analyzer \
 ```sh
 # if you prefer to use InfluxDB v1 CLI
 docker compose up -d utils
-docker compose ps 
 # enter the container
 docker exec -u 0 -it utils /bin/sh
 # inside of the utils container
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
 # create database (or several). EPA defaults to "eseries"
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
-# show databases again
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
-# if OK, exit
 exit
 ```
 
@@ -184,6 +181,18 @@ If you have any problems with Grafana Data Source, add InfluxDB v1 data source `
 Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
 
 ## Other procedures
+
+### Execute containerized collector.py 
+
+Mind the project/container name and version!
+
+```sh
+docker run --rm --network eseries_perf_analyzer \
+  --entrypoint python3 \
+  epa/collector:3.4.0 collector.py -h
+# or, since we don't need to specify network to get help
+# docker run --rm epa/collector:3.4.0 -h
+```
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
 
