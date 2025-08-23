@@ -205,23 +205,23 @@ except (AttributeError, KeyError):
 
 PARSER = argparse.ArgumentParser()
 
-PARSER.add_argument('-u', '--username', default='', type=str, required=True,
-                    help='<Required> Username to connect to the SANtricity API. '
-                         'Default: \'' + DEFAULT_USERNAME + '\'. <String>')
-PARSER.add_argument('-p', '--password', default='', type=str, required=True,
-                    help='<Required> Password for this user to connect to the SANtricity API. '
-                         'Default: \'' + DEFAULT_PASSWORD + '\'. <String>')
-PARSER.add_argument('--api', default='',  nargs='+', required=True,
-                    help='<Required> The IPv4 address for the SANtricity API endpoint. '
-                         'Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to: \'' +
+PARSER.add_argument('-u', '--username', default='', type=str, required=False,
+                    help='Username to connect to the SANtricity API. '
+                         'Required unless --createDb is used. Default: \'' + DEFAULT_USERNAME + '\'. <String>')
+PARSER.add_argument('-p', '--password', default='', type=str, required=False,
+                    help='Password for this user to connect to the SANtricity API. '
+                         'Required unless --createDb is used. Default: \'' + DEFAULT_PASSWORD + '\'. <String>')
+PARSER.add_argument('--api', default='',  nargs='+', required=False,
+                    help='The IPv4 address for the SANtricity API endpoint. '
+                         'Required unless --createDb is used. Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to: \'' +
                     DEFAULT_SYSTEM_PORT + '\'. '
                          'May be provided twice (for two controllers). <IPv4 Address>')
-PARSER.add_argument('--sysname', default='', type=str, required=True,
-                    help='<Required> SANtricity system\'s user-configured array name. '
-                         ' Example: dc1r226-elk. Default: None. <String>')
-PARSER.add_argument('--sysid', default='', type=str, required=True,
-                    help='<Required> SANtricity storage system\'s WWN. '
-                         'Example: 600A098000F63714000000005E79C17C. Default: None. <String>')
+PARSER.add_argument('--sysname', default='', type=str, required=False,
+                    help='SANtricity system\'s user-configured array name. '
+                         'Required unless --createDb is used. Example: dc1r226-elk. Default: None. <String>')
+PARSER.add_argument('--sysid', default='', type=str, required=False,
+                    help='SANtricity storage system\'s WWN. '
+                         'Required unless --createDb is used. Example: 600A098000F63714000000005E79C17C. Default: None. <String>')
 PARSER.add_argument('-t', '--intervalTime', type=int, default=60, choices=[60, 120, 300, 600],
                     help='Interval (seconds) to poll and send data from the SANtricity API '
                     ' to InfluxDB. Default: 60. <Integer>')
@@ -268,21 +268,45 @@ PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
 CMD = PARSER.parse_args()
 
+# Conditional validation for database creation mode
+if CMD.createDb:
+    # For database creation, only dbName and dbAddress are required
+    if not CMD.dbName:
+        PARSER.error("--createDb requires --dbName to be specified")
+else:
+    # For normal operation, SANtricity API parameters are required
+    if not CMD.username:
+        PARSER.error("--username is required for normal operation")
+    if not CMD.password:
+        PARSER.error("--password is required for normal operation")
+    if not CMD.api:
+        PARSER.error("--api is required for normal operation")
+    if not CMD.sysname:
+        PARSER.error("--sysname is required for normal operation")
+    if not CMD.sysid:
+        PARSER.error("--sysid is required for normal operation")
+
 # Conditional validation: dbAddress is required unless doNotPost is used
 if not CMD.doNotPost and (CMD.dbAddress == '' or CMD.dbAddress is None):
     PARSER.error("--dbAddress is required when --doNotPost is not used")
 
-if CMD.sysname == '' or CMD.sysname == None:
-    LOG.warning("sysname not provided. Using default: %s", DEFAULT_SYSTEM_NAME)
-    sys_name = DEFAULT_SYSTEM_NAME
-else:
-    sys_name = CMD.sysname
+# Only set up SANtricity-related variables if not in createDb mode
+if not CMD.createDb:
+    if CMD.sysname == '' or CMD.sysname == None:
+        LOG.warning("sysname not provided. Using default: %s", DEFAULT_SYSTEM_NAME)
+        sys_name = DEFAULT_SYSTEM_NAME
+    else:
+        sys_name = CMD.sysname
 
-if CMD.sysid == '' or CMD.sysid == None:
-    LOG.warning("sysid not provided. Using default: %s", DEFAULT_SYSTEM_ID)
-    sys_id = DEFAULT_SYSTEM_ID
+    if CMD.sysid == '' or CMD.sysid == None:
+        LOG.warning("sysid not provided. Using default: %s", DEFAULT_SYSTEM_ID)
+        sys_id = DEFAULT_SYSTEM_ID
+    else:
+        sys_id = CMD.sysid
 else:
-    sys_id = CMD.sysid
+    # In createDb mode, these variables are not needed
+    sys_name = None
+    sys_id = None
 
 if CMD.dbAddress == '' or CMD.dbAddress == None:
     if not CMD.doNotPost:
