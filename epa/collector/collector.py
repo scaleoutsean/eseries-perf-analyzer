@@ -3,21 +3,16 @@
 Retrieves and collects data from the the NetApp E-Series API server
 and sends the data to an InfluxDB server
 """
-import struct
-import time
-import logging
-import socket
 import argparse
 import concurrent.futures
-import requests
-import json
-import pickle
 import hashlib
-import os
-from datetime import datetime
+import logging
 import random
-from datetime import datetime
-from datetime import timezone
+import sys
+import time
+from datetime import datetime, timezone
+
+import requests
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError
 
@@ -187,12 +182,21 @@ NUMBER_OF_THREADS = 8
 # LOGGING
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-requests.packages.urllib3.disable_warnings()
+# Disable urllib3 warnings (SSL verification disabled)
+try:
+    requests.packages.urllib3.disable_warnings()
+except AttributeError:
+    # urllib3 warnings suppression failed, continuing without it
+    pass
 LOG = logging.getLogger("collector")
 
 # Disables reset connection warning message if the connection time is too long
-logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
-    logging.WARNING)
+try:
+    logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
+        logging.WARNING)
+except (AttributeError, KeyError):
+    # Fallback for different urllib3 configurations
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
 
 
 #######################
@@ -230,6 +234,10 @@ PARSER.add_argument('-r', '--retention', default=DEFAULT_RETENTION, type=str, re
                     help='Data retention for InfluxDB as an integer suffixed by a calendar unit. '
                     'Example: 4w translates into 28 day data retention. Default: 52w. '
                     'Default: \'' + DEFAULT_RETENTION + '\'.')
+PARSER.add_argument('--dbName', default='', type=str, required=False,
+                    help='Optional InfluxDB database name to override the default (eseries).')
+PARSER.add_argument('--createDb', action='store_true', default=False,
+                    help='Create the database and exit. Requires --dbName to be specified.')
 PARSER.add_argument('-s', '--showStorageNames', action='store_true',
                     help='Outputs the storage array names found from the SANtricity API to console. Optional. <switch>')
 PARSER.add_argument('-v', '--showVolumeNames', action='store_true', default=0,
@@ -327,9 +335,10 @@ def get_controller(query):
         api_path = '/devmgr/v2/firmware/embedded-firmware'
     else:
         LOG.error("Unsupported API path requested")
+        raise ValueError(f"Unsupported query type: {query}")
     if (len(CMD.api) == 0) or (CMD.api == None) or (CMD.api == ''):
         storage_controller_ep = 'https://' + \
-            DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + api_path 
+            DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + api_path
     elif (len(CMD.api) == 1):
         storage_controller_ep = 'https://' + \
             CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + api_path
@@ -338,7 +347,7 @@ def get_controller(query):
         storage_controller_ep = 'https://' + \
             CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
             api_path
-        LOG.info(("Controller selection: {}").format(storage_controller_ep))
+        LOG.info(f"Controller selection: {storage_controller_ep}")
     return (storage_controller_ep)
 
 
@@ -349,8 +358,7 @@ def get_drive_location(sys_id, session):
     ::return: returns a dictionary containing the disk id matched up against
     the tray id it is located in:
     """
-    hardware_list = session.get("{}/{}/hardware-inventory".format(
-        get_controller("sys"), sys_id)).json()
+    hardware_list = session.get(f"{get_controller('sys')}/{sys_id}/hardware-inventory").json()
     tray_list = hardware_list["trays"]
     drive_list = hardware_list["drives"]
     tray_ids = {}
@@ -365,7 +373,7 @@ def get_drive_location(sys_id, session):
         if tray_id != "none":
             drive_location[drive["driveRef"]] = [
                 tray_id, drive["physicalLocation"]["slot"]]
-        else:   
+        else:
             LOG.error("Error matching drive to a tray in the storage system")
     return drive_location
 
@@ -380,25 +388,25 @@ def collect_symbol_stats(sys):
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         # PSU
-        psu_response = session.get(("{}/{}/symbol/getEnergyStarData").format(get_controller("sys"), sys_id),
+        psu_response = session.get(f"{get_controller('sys')}/{sys_id}/symbol/getEnergyStarData",
                                    params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
         psu_total = psu_response['energyStarData']['totalPower']
         if CMD.showPower:
             LOG.info("PSU response (total): %s", psu_total)
         json_body = list()
-        item = dict(
-            measurement="power",
-            tags=dict(
-                sys_id=sys_id,
-                sys_name=sys_name
-                ),
-            fields=dict(totalPower=psu_total)
-        )
+        item = {
+            "measurement": "power",
+            "tags": {
+                "sys_id": sys_id,
+                "sys_name": sys_name
+                },
+            "fields": {"totalPower": psu_total}
+        }
         json_body.append(item)
         LOG.info("LOG: PSU data prepared")
 
         # ENVIRONMENTAL SENSORS
-        response = session.get(("{}/{}/symbol/getEnclosureTemperatures").format(get_controller("sys"), sys_id),
+        response = session.get(f"{get_controller('sys')}/{sys_id}/symbol/getEnclosureTemperatures",
                                    params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
         if CMD.showSensor:
             LOG.info("Sensor response: %s", response['thermalSensorData'])
@@ -407,16 +415,16 @@ def collect_symbol_stats(sys):
         for sensor in env_response:
             sensor_id = env_response[i]['thermalSensorRef']
             sensor_order = "sensor_" + str(i)
-            item = dict(
-                measurement="temp",
-                tags=dict(
-                    sensor=sensor_id,
-                    sensor_seq=sensor_order,
-                    sys_id=sys_id,
-                    sys_name=sys_name
-                    ),
-                fields=dict(temp=env_response[i]['currentTemp'])
-            )
+            item = {
+                "measurement": "temp",
+                "tags": {
+                    "sensor": sensor_id,
+                    "sensor_seq": sensor_order,
+                    "sys_id": sys_id,
+                    "sys_name": sys_name
+                    },
+                "fields": {"temp": env_response[i]['currentTemp']}
+            }
             json_body.append(item)
             i = i + 1
         LOG.info("LOG: sensor data prepared")
@@ -425,10 +433,9 @@ def collect_symbol_stats(sys):
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: SYMbol V2 PSU and sensor readings sent")
-    
+
     except RuntimeError:
-        LOG.error(
-            ("Error when attempting to post tmp sensors data for {}/{}").format(sys["name"], sys["wwn"]))
+        LOG.error(f"Error when attempting to post tmp sensors data for {sys['name']}/{sys['wwn']}")
 
 
 def collect_storage_metrics(sys):
@@ -442,34 +449,32 @@ def collect_storage_metrics(sys):
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-        drive_stats_list = session.get(("{}/{}/analysed-drive-statistics").format(
-            get_controller("sys"), sys_id)).json()
+        drive_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-drive-statistics").json()
         drive_locations = get_drive_location(sys_id, session)
         if CMD.showDriveNames:
             for stats in drive_stats_list:
                 location_send = drive_locations.get(stats["diskId"])
                 if location_send is not None:
-                    LOG.info(("Tray{:02.0f}, Slot{:03.0f}").format(
-                        location_send[0], location_send[1]))
+                    LOG.info(f"Tray{location_send[0]:02.0f}, Slot{location_send[1]:03.0f}")
                 else:
-                    LOG.warning(f"Could not find location for drive {stats['diskId']}")  
+                    LOG.warning(f"Could not find location for drive {stats['diskId']}")
 
         # Get firmware version to determine API capabilities
-        fw_resp = session.get(("{}/{}/versions").format(get_controller("fw"), sys_id)).json()
+        fw_resp = session.get(f"{get_controller('fw')}/{sys_id}/versions").json()
         fw_cv = fw_resp['codeVersions']
         minor_vers = 0
         for mod in (range(len(fw_cv))):
             if fw_cv[mod]['codeModule'] == 'management':
                 minor_vers = int((fw_cv[mod]['versionString']).split(".")[1])
                 break
-        
+
         # Get SSD wear statistics from the new drive-health-history endpoint
         ssd_wear_dict = {}
         if minor_vers >= 80:
             try:
-                drive_health_response = session.get(("{}/{}/drives/drive-health-history").format(
-                    get_controller("sys"), sys_id), params={"all-history": "false"}).json()
-                
+                drive_health_response = session.get(f"{get_controller('sys')}/{sys_id}/drives/drive-health-history",
+                    params={"all-history": "false"}).json()
+
                 # Extract SSD wear data from the response
                 if 'collections' in drive_health_response and len(drive_health_response['collections']) > 0:
                     latest_collection = drive_health_response['collections'][0]
@@ -485,24 +490,24 @@ def collect_storage_metrics(sys):
                                     composite_key = f"{vol_group_name}#{drive_wwn[-12:]}"
                                     ssd_wear_dict[composite_key] = spare_blocks
                 LOG.info(f"Found SSD wear data for {len(ssd_wear_dict)} drives")
-            except Exception as e:
+            except (requests.exceptions.RequestException, KeyError, ValueError) as e:
                 LOG.warning(f"Could not retrieve SSD wear statistics: {e}")
         else:
-            version_string = next((fw_cv[mod]['versionString'] for mod in range(len(fw_cv)) 
+            version_string = next((fw_cv[mod]['versionString'] for mod in range(len(fw_cv))
                                  if fw_cv[mod]['codeModule'] == 'management'), 'unknown')
             LOG.warning(f"SSD wear level ignored for this SANtricity version {version_string}")
-        
+
         for stats in drive_stats_list:
             pdict = {}
             disk_location_info = drive_locations.get(stats["diskId"])
-            
+
             # Try to get SSD wear data using volGroupName as primary correlation
             disk_id = stats.get("diskId")
             vol_group_name = stats.get("volGroupName")
-            
+
             if disk_id and vol_group_name and ssd_wear_dict:
                 spare_blocks_remaining = None
-                
+
                 # Create composite key using volGroupName + diskId suffix for safe matching
                 if len(disk_id) >= 12:
                     composite_key = f"{vol_group_name}#{disk_id[-12:]}"
@@ -510,12 +515,12 @@ def collect_storage_metrics(sys):
                         spare_blocks_remaining = ssd_wear_dict[composite_key]
                         pdict = {'spareBlocksRemainingPercent': spare_blocks_remaining}
                         LOG.info(f"Found SSD wear data for drive {disk_id} in {vol_group_name}: {spare_blocks_remaining}%")
-            
-            if 'spareBlocksRemainingPercent' in pdict.keys(): 
+
+            if 'spareBlocksRemainingPercent' in pdict.keys():
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
-            else: 
+            else:
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS)
-            
+
             # Safely handle disk location info with fallbacks
             if disk_location_info is not None and len(disk_location_info) >= 2:
                 tray_id = disk_location_info[0]
@@ -524,76 +529,73 @@ def collect_storage_metrics(sys):
                 # Fallback to trayRef and driveSlot from stats if location info is unavailable
                 tray_id = stats.get('trayRef', 99)
                 slot_id = stats.get('driveSlot', 999)
-            
-            disk_item = dict(
-                measurement="disks",
-                tags=dict(
-                    sys_id=sys_id,
-                    sys_name=sys_name,
-                    sys_tray=("{:02.0f}").format(tray_id),
-                    sys_tray_slot=("{:03.0f}").format(slot_id)
-                ),
-                fields= fields_dict
-            )
+
+            disk_item = {
+                "measurement": "disks",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "sys_tray": f"{tray_id:02.0f}",
+                    "sys_tray_slot": f"{slot_id:03.0f}"
+                },
+                "fields": fields_dict
+            }
             if CMD.showDriveMetrics:
                 LOG.info("Drive payload: %s", disk_item)
             json_body.append(disk_item)
 
-        interface_stats_list = session.get(("{}/{}/analysed-interface-statistics").format(
-            get_controller("sys"), sys_id)).json()
+        interface_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-interface-statistics").json()
         if CMD.showInterfaceNames:
             for stats in interface_stats_list:
                 LOG.info(stats["interfaceId"])
         for stats in interface_stats_list:
-            if_item = dict(
-                measurement="interface",
-                tags=dict(
-                    sys_id=sys_id,
-                    sys_name=sys_name,
-                    interface_id=stats["interfaceId"],
-                    channel_type=stats["channelType"]
-                ),
-                fields=dict(
+            if_item = {
+                "measurement": "interface",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "interface_id": stats["interfaceId"],
+                    "channel_type": stats["channelType"]
+                },
+                "fields": dict(
                     (metric, stats.get(metric)) for metric in INTERFACE_PARAMS
                 )
-            )
+            }
             if CMD.showInterfaceMetrics:
                 LOG.info("Interface payload: %s", if_item)
             json_body.append(if_item)
 
-        system_stats_list = session.get(("{}/{}/analysed-system-statistics").format(
-            get_controller("sys"), sys_id)).json()
-        sys_item = dict(
-            measurement="systems",
-            tags=dict(
-                sys_id=sys_id,
-                sys_name=sys_name
-            ),
-            fields=dict(
+        system_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-system-statistics").json()
+        sys_item = {
+            "measurement": "systems",
+            "tags": {
+                "sys_id": sys_id,
+                "sys_name": sys_name
+            },
+            "fields": dict(
                 (metric, system_stats_list.get(metric)) for metric in SYSTEM_PARAMS
             )
-        )
+        }
         if CMD.showSystemMetrics:
             LOG.info("System payload: %s", sys_item)
         json_body.append(sys_item)
 
-        volume_stats_list = session.get(("{}/{}/analysed-volume-statistics").format(
-            get_controller("sys"), sys_id)).json()
+        volume_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-volume-statistics").json()
         if CMD.showVolumeNames:
             for stats in volume_stats_list:
                 LOG.info(stats["volumeName"])
         for stats in volume_stats_list:
-            vol_item = dict(
-                measurement="volumes",
-                tags=dict(
-                    sys_id=sys_id,
-                    sys_name=sys_name,
-                    vol_name=stats["volumeName"]
-                ),
-                fields=dict(
+            vol_item = {
+                "measurement": "volumes",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "vol_name": stats["volumeName"]
+                },
+                "fields": dict(
                     (metric, stats.get(metric)) for metric in VOLUME_PARAMS
                 )
-            )
+            }
             if CMD.showVolumeMetrics:
                 LOG.info("Volume payload: %s", vol_item)
             json_body.append(vol_item)
@@ -604,8 +606,7 @@ def collect_storage_metrics(sys):
             LOG.info("LOG: storage metrics sent")
 
     except RuntimeError:
-        LOG.error(
-            ("Error when attempting to post statistics for {}/{}").format(sys["name"], sys["wwn"]))
+        LOG.error(f"Error when attempting to post statistics for {sys['name']}/{sys['wwn']}")
 
 
 def collect_major_event_log(sys):
@@ -621,36 +622,36 @@ def collect_major_event_log(sys):
         start_from = -1
         mel_grab_count = 8192
         query = client.query(
-            "SELECT id FROM major_event_log WHERE sys_id='%s' ORDER BY time DESC LIMIT 1" % sys_id)
+            f"SELECT id FROM major_event_log WHERE sys_id='{sys_id}' ORDER BY time DESC LIMIT 1")
 
         if query:
             start_from = int(next(query.get_points())["wwn"]) + 1
 
-        mel_response = session.get(("{}/{}/mel-events").format(get_controller("sys"), sys_id),
+        mel_response = session.get(f"{get_controller('sys')}/{sys_id}/mel-events",
                                    params={"count": mel_grab_count, "startSequenceNumber": start_from}, timeout=(6.10, CMD.intervalTime*2)).json()
         if CMD.showMELMetrics:
             LOG.info("Starting from %s", str(start_from))
             LOG.info("Grabbing %s MELs", str(len(mel_response)))
         for mel in mel_response:
-            item = dict(
-                measurement="major_event_log",
-                tags=dict(
-                    sys_id=sys_id,
-                    sys_name=sys_name,
-                    event_type=mel["eventType"],
-                    time_stamp=mel["timeStamp"],
-                    category=mel["category"],
-                    priority=mel["priority"],
-                    critical=mel["critical"],
-                    ascq=mel["ascq"],
-                    asc=mel["asc"]
-                ),
-                fields=dict(
+            item = {
+                "measurement": "major_event_log",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "event_type": mel["eventType"],
+                    "time_stamp": mel["timeStamp"],
+                    "category": mel["category"],
+                    "priority": mel["priority"],
+                    "critical": mel["critical"],
+                    "ascq": mel["ascq"],
+                    "asc": mel["asc"]
+                },
+                "fields": dict(
                     (metric, mel.get(metric)) for metric in MEL_PARAMS
                 ),
-                time=datetime.fromtimestamp(
+                "time": datetime.fromtimestamp(
                     int(mel["timeStamp"]), timezone.utc).isoformat()
-            )
+            }
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
             json_body.append(item)
@@ -658,27 +659,26 @@ def collect_major_event_log(sys):
             json_body, database=INFLUXDB_DATABASE, time_precision="s")
         LOG.info("LOG: MEL payload sent")
     except RuntimeError:
-        LOG.error(
-            ("Error when attempting to post MEL for {}/{}").format(sys["name"], sys["wwn"]))
+        LOG.error(f"Error when attempting to post MEL for {sys['name']}/{sys['wwn']}")
 
 
 def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_active, the_time):
-    item = dict(
-        measurement="failures",
-        tags=dict(
-            sys_id=sys_id,
-            sys_name=sys_name,
-            failure_type=fail_type,
-            object_ref=obj_ref,
-            object_type=obj_type,
-            active=is_active
-        ),
-        fields=dict(
-            name_of=sys_name,
-            type_of=fail_type
-        ),
-        time=the_time
-    )
+    item = {
+        "measurement": "failures",
+        "tags": {
+            "sys_id": sys_id,
+            "sys_name": sys_name,
+            "failure_type": fail_type,
+            "object_ref": obj_ref,
+            "object_type": obj_type,
+            "active": is_active
+        },
+        "fields": {
+            "name_of": sys_name,
+            "type_of": fail_type
+        },
+        "time": the_time
+    }
     return item
 
 
@@ -695,8 +695,7 @@ def collect_system_state(sys, checksums):
 
         sys_id = sys["wwn"]
         sys_name = sys["name"]
-        failure_response = session.get(
-            ("{}/{}/failures").format(get_controller("sys"), sys_id)).json()
+        failure_response = session.get(f"{get_controller('sys')}/{sys_id}/failures").json()
 
         # we can skip us if this is the same response we handled last time
         old_checksum = checksums.get(str(sys_id))
@@ -707,8 +706,7 @@ def collect_system_state(sys, checksums):
         checksums.update({str(sys_id): str(new_checksum)})
 
         # pull most recent failures for this system from our database, including their active status
-        query_string = (
-            "SELECT last(\"type_of\"),failure_type,object_ref,object_type,active FROM \"failures\" WHERE (\"sys_id\" = '{}') GROUP BY \"sys_name\", \"failure_type\"").format(sys_id)
+        query_string = f'SELECT last("type_of"),failure_type,object_ref,object_type,active FROM "failures" WHERE ("sys_id" = \'{sys_id}\') GROUP BY "sys_name", "failure_type"'
         query = client.query(query_string)
         failure_points = list(query.get_points())
 
@@ -775,33 +773,32 @@ def collect_system_state(sys, checksums):
 
         # write failures to InfluxDB
         if CMD.showStateMetrics:
-            LOG.info("Writing {} failures".format(len(json_body)))
+            LOG.info(f"Writing {len(json_body)} failures")
         client.write_points(json_body, database=INFLUXDB_DATABASE)
 
     except RuntimeError:
-        LOG.error(
-            ("Error when attempting to post state information for {}/{}").format(sys["name"], sys["id"]))
+        LOG.error(f"Error when attempting to post state information for {sys['name']}/{sys['id']}")
 
 
-def create_continuous_query(params_list, database):
+def create_continuous_query(client, params_list, database):
     """
     Creates a continuous data-pruning query for each metric in params_list
+    :param client: InfluxDB client instance
     :param params_list: The list of metrics to create the continuous query for
-    :param database: The InfluxDB measurement to down-sample in EPA's database 
+    :param database: The InfluxDB measurement to down-sample in EPA's database
     """
     try:
         for metric in params_list:
             # temp measurements are not downsampled as averaging values from different sensors doesn't seem to work properly
             if database == "temp":
-                LOG.info("Creation of continuous query on '{}' measurement skipped to avoid averaging values from different sensors".format(database))
+                LOG.info(f"Creation of continuous query on '{database}' measurement skipped to avoid averaging values from different sensors")
             ds_select = "SELECT mean(\"" + metric + "\") AS \"ds_" + metric + "\" INTO \"" + INFLUXDB_DATABASE + \
                 "\".\"downsample_retention\".\"" + database + "\" FROM \"" + \
                 database + "\" WHERE (time < now()-1w) GROUP BY time(5m)"
             client.create_continuous_query(
                 "downsample_" + database + "_" + metric, ds_select, INFLUXDB_DATABASE, "")
-    except Exception as err:
-        LOG.info(
-            "Creation of continuous query on '{}' failed: {}".format(database, err))
+    except InfluxDBClientError as err:
+        LOG.info(f"Creation of continuous query on '{database}' failed: {err}")
 
 
 def order_sensor_response_list(response):
@@ -823,6 +820,20 @@ def order_sensor_response_list(response):
     return(orderedResponse)
 
 
+def ensure_database(client, dbname):
+    """
+    Create the InfluxDB database if it doesn't exist. Raises on failure.
+    :param client: InfluxDB client instance
+    :param dbname: Database name to create
+    """
+    try:
+        client.create_database(dbname)
+        LOG.info("Database '%s' created or already exists", dbname)
+    except Exception as e:
+        LOG.error("Failed to create database '%s': %s", dbname, e)
+        raise
+
+
 #######################
 # MAIN FUNCTIONS ######
 #######################
@@ -834,8 +845,27 @@ if __name__ == "__main__":
     SESSION = get_session()
     loopIteration = 1
 
+    # Override database name if provided
+    if CMD.dbName:
+        INFLUXDB_DATABASE = CMD.dbName
+
     client = InfluxDBClient(host=influxdb_host,
                             port=influxdb_port, database=INFLUXDB_DATABASE)
+
+    # Handle database creation request
+    if CMD.createDb:
+        if not CMD.dbName:
+            LOG.error("--createDb requires --dbName to be specified")
+            sys.exit(1)
+        try:
+            ensure_database(client, INFLUXDB_DATABASE)
+            LOG.info("Database creation completed. Exiting as requested.")
+            sys.exit(0)
+        except (InfluxDBClientError, requests.exceptions.RequestException):
+            LOG.error("Database creation failed")
+            sys.exit(1)
+
+    # Default behavior: ensure database exists
     client.create_database(INFLUXDB_DATABASE)
 
     try:
@@ -843,40 +873,38 @@ if __name__ == "__main__":
         try:
             client.create_retention_policy("default_retention", "1w", "1", INFLUXDB_DATABASE, True)
         except InfluxDBClientError:
-            LOG.info("Updating retention policy to {}...".format("1w"))
+            LOG.info("Updating retention policy to 1w...")
             client.alter_retention_policy("default_retention", INFLUXDB_DATABASE,
                                           "1w", "1", True)
         try:
             client.create_retention_policy("downsample_retention", RETENTION_DUR, "1", INFLUXDB_DATABASE, False)
         except InfluxDBClientError:
-            LOG.info("Updating retention policy to {}...".format(RETENTION_DUR))
+            LOG.info(f"Updating retention policy to {RETENTION_DUR}...")
             client.alter_retention_policy("downsample_retention", INFLUXDB_DATABASE,
                                           RETENTION_DUR, "1", False)
 
         # create continuous queries that downsample our metric data
-        create_continuous_query(DRIVE_PARAMS, "disks")
-        create_continuous_query(SYSTEM_PARAMS, "system")
-        create_continuous_query(VOLUME_PARAMS, "volumes")
-        create_continuous_query(INTERFACE_PARAMS, "interface")
-        create_continuous_query(PSU_PARAMS, "power")
-        create_continuous_query(SENSOR_PARAMS, "temp")
+        create_continuous_query(client, DRIVE_PARAMS, "disks")
+        create_continuous_query(client, SYSTEM_PARAMS, "system")
+        create_continuous_query(client, VOLUME_PARAMS, "volumes")
+        create_continuous_query(client, INTERFACE_PARAMS, "interface")
+        create_continuous_query(client, PSU_PARAMS, "power")
+        create_continuous_query(client, SENSOR_PARAMS, "temp")
 
-    except requests.exceptions.HTTPError or requests.exceptions.ConnectionError:
+    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
         LOG.exception("Failed to add configured systems!")
 
-    checksums = dict()
+    checksums = {}
     while True:
         time_start = time.time()
         try:
             response = SESSION.get(get_controller("sys"))
             if response.status_code != 200:
-                LOG.warning(
-                    "Unable to connect to storage-system API endpoint! Status-code={}".format(response.status_code))
-        except requests.exceptions.HTTPError or requests.exceptions.ConnectionError as e:
-            LOG.warning(
-                "Unable to connect to the API!", e)
+                LOG.warning(f"Unable to connect to storage-system API endpoint! Status-code={response.status_code}")
+        except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
+            LOG.warning("Unable to connect to the API! %s", e)
         except Exception as e:
-            LOG.warning("Unexpected exception!", e)
+            LOG.warning("Unexpected exception! %s", e)
         else:
             sys = {'name': sys_name, 'wwn': sys_id}
             if CMD.showStorageNames:
@@ -900,16 +928,12 @@ if __name__ == "__main__":
 
         time_difference = time.time() - time_start
         if CMD.showIteration:
-            LOG.info("Time interval: {:07.4f} Time to collect and send:"
-                     " {:07.4f} Iteration: {:00.0f}"
-                     .format(CMD.intervalTime, time_difference, loopIteration))
+            LOG.info(f"Time interval: {CMD.intervalTime:07.4f} Time to collect and send: {time_difference:07.4f} Iteration: {loopIteration:00.0f}")
             loopIteration += 1
 
         wait_time = CMD.intervalTime - time_difference
         if CMD.intervalTime < time_difference:
-            LOG.error("The interval specified is not long enough. Time used: {:07.4f} "
-                      "Time interval specified: {:07.4f}"
-                      .format(time_difference, CMD.intervalTime))
+            LOG.error(f"The interval specified is not long enough. Time used: {time_difference:07.4f} Time interval specified: {CMD.intervalTime:07.4f}")
             wait_time = time_difference
 
         time.sleep(wait_time)
