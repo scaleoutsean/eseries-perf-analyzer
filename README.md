@@ -95,6 +95,7 @@ services:
 
   collector-R26U25-EF600:
     image: epa/collector:${TAG}
+    # image: docker.io/scaleoutsean/epa-collector:3.4.0 # it exists, but best build your own
     container_name: R26U25-EF600
     mem_limit: 256m
     restart: unless-stopped
