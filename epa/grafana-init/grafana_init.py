@@ -137,8 +137,10 @@ class GrafanaInitializer:
             folders = self.grafana.folder.get_all_folders()
             for folder in folders:
                 if folder.get('title') == 'EPA':
-                    logger.info(f"EPA folder already exists with UID: {folder.get('uid')}")
-                    return folder.get('uid')
+                    folder_id = folder.get('id')
+                    folder_uid = folder.get('uid')
+                    logger.info(f"EPA folder already exists with ID: {folder_id}, UID: {folder_uid}")
+                    return folder_id
             
             # Create EPA folder
             folder_config = {
@@ -147,9 +149,10 @@ class GrafanaInitializer:
             }
             
             result = self.grafana.folder.create_folder(**folder_config)
+            folder_id = result.get('id')
             folder_uid = result.get('uid')
-            logger.info(f"Created EPA folder with UID: {folder_uid}")
-            return folder_uid
+            logger.info(f"Created EPA folder with ID: {folder_id}, UID: {folder_uid}")
+            return folder_id
             
         except GrafanaClientError as e:
             logger.error(f"Failed to create EPA folder: {e}")
@@ -181,7 +184,7 @@ class GrafanaInitializer:
         dashboard_json.clear()
         dashboard_json.update(fixed_dashboard)
         
-    def import_dashboards(self, folder_uid=None):
+    def import_dashboards(self, folder_id=None):
         """Import all JSON dashboards from the dashboards directory"""
         if not self.dashboards_dir.exists():
             logger.warning(f"Dashboards directory {self.dashboards_dir} does not exist")
@@ -231,9 +234,9 @@ class GrafanaInitializer:
                     'allowUiUpdates': True  # Allow editing in Grafana UI
                 }
                 
-                # Add folder UID if provided
-                if folder_uid:
-                    dashboard_payload['folderId'] = folder_uid
+                # Add folder ID if provided
+                if folder_id:
+                    dashboard_payload['folderId'] = folder_id
                 
                 result = self.grafana.dashboard.update_dashboard(dashboard_payload)
                 logger.info(f"Successfully imported {dashboard_file.name}: {result.get('slug', 'unknown')}")
@@ -315,12 +318,12 @@ class GrafanaInitializer:
             sys.exit(1)
             
         # Create EPA folder for better organization
-        folder_uid = self.create_epa_folder()
-        if not folder_uid:
+        folder_id = self.create_epa_folder()
+        if not folder_id:
             logger.warning("Failed to create EPA folder, dashboards will go to General folder")
             
         # Import dashboards
-        success_count, total_count = self.import_dashboards(folder_uid)
+        success_count, total_count = self.import_dashboards(folder_id)
         if success_count == 0 and total_count > 0:
             logger.error("Failed to import any dashboards")
             sys.exit(1)
@@ -328,7 +331,7 @@ class GrafanaInitializer:
             logger.warning(f"Only imported {success_count}/{total_count} dashboards")
             
         # Verify the final setup
-        if folder_uid and not self.verify_epa_setup(expected_dashboards=success_count):
+        if folder_id and not self.verify_epa_setup(expected_dashboards=success_count):
             logger.error("EPA setup verification failed")
             sys.exit(1)
             
