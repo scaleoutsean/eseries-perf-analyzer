@@ -1,38 +1,38 @@
 {
+  "__elements": [],
   "__inputs": [
     {
-      "name": "DS_EPA",
-      "label": "EPA",
       "description": "",
-      "type": "datasource",
+      "label": "EPA",
+      "name": "DS_EPA",
       "pluginId": "influxdb",
-      "pluginName": "InfluxDB"
+      "pluginName": "InfluxDB",
+      "type": "datasource"
     }
   ],
-  "__elements": [],
   "__requires": [
     {
-      "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
+      "type": "grafana",
       "version": "8.5.27"
     },
     {
-      "type": "panel",
       "id": "graph",
       "name": "Graph (old)",
+      "type": "panel",
       "version": ""
     },
     {
-      "type": "datasource",
       "id": "influxdb",
       "name": "InfluxDB",
+      "type": "datasource",
       "version": "1.0.0"
     },
     {
-      "type": "panel",
       "id": "stat",
       "name": "Stat",
+      "type": "panel",
       "version": ""
     }
   ],
