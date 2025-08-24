@@ -14,9 +14,8 @@
     - [Execute containerized collector.py](#execute-containerized-collectorpy)
     - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
     - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
-    - [Update password of a monitor account](#update-password-of-a-monitor-account)
+    - [Update password of monitor account](#update-password-of-monitor-account)
     - [Grafana dashboards](#grafana-dashboards)
-  - [Sample Grafana screenshots](#sample-grafana-screenshots)
   - [FAQs](#faqs)
   - [Changelog](#changelog)
 
@@ -40,6 +39,8 @@ Each collector uses own credentials and can (but doesn't have to) write data to 
 - Interfaces
 - E-Series MEL events
 - Environmental (temperature and power consumption)
+
+Sample screenshots are available [here](./SCREENSHOTS.md).
 
 ## Requirements
 
@@ -95,7 +96,7 @@ services:
   collector-R26U25-EF600:
     image: epa/collector:${TAG}
     container_name: R26U25-EF600
-    mem_limit: 64m
+    mem_limit: 256m
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -116,6 +117,10 @@ services:
       # Optional: Create database and exit (true/1 = enable); remember to revert to 'false' after successful run
       # - CREATE_DB=false      
 ```
+
+Note that, if you create multiple collectors in the same docker-compose.yaml, only *one* of `DB_NAME` (as each collector may have it different) will be applied in Grafana Data Source configuration. If you're in this situation simply configure just one `DB_NAME` first (you don't have to do anything if you don't mind to have the first DB instance named `eseries`) and then use InfluxDB CLI or the related instructions from the FAQs (on how to do it from collector.py) to create another DB and another InfluxDB Data Source to Grafana. Then you can start all Collector containers. 
+
+You can also create additional database instances in InfluxDB from the CLI (instructions above), but you won't be able to if you modify Docker Compose to not expose InfluxDB externally. That's why it's easier to use the approach that runs collector.py in Docker - that will work for either Compose-internal or external InfluxDB.
 
 #### Deploy
 
@@ -160,13 +165,15 @@ Kubernetes users should skim through this page to get the idea how EPA works, an
 
 ### Execute containerized collector.py 
 
+If you want to run containerized collector as CLI program rather than service, try this and add correct parameters from `docker-compose.yaml`. 
+
 Mind the project/container name and version!
 
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
   epa/collector:3.4.0 collector.py -h
-# or, since we don't need to specify network to get help
+# or, if you just want to view help
 # docker run --rm epa/collector:3.4.0 -h
 ```
 
@@ -178,13 +185,20 @@ InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able t
 
 ### Add or remove a monitored array
 
-Add another collector service (e.g. `collector-ef300c`) to `docker-compose.yaml`, build it and start it. You may use the same (existing) or own (new) InfluxDB database instance. Enter the `utils` container to create it. 
+Add another collector service (e.g. `collector-ef300c`) to `docker-compose.yaml`, build it and start it. You may use the same (existing) or own (new) InfluxDB database instance. Enter the `utils` container or use Collector to create it in advance. You may also just run collector with `--dbName` to have it created automatically.
 
-To remove a collector that monitors an array, run `docker compose down <collector-name>`, enter the `utils` container to drop the database (if not shared with other collectors).
+To remove a collector that monitors an array, run `docker compose down <collector-name>`, enter the `utils` container to drop the database - if it's not shared with other collectors.
 
-### Update password of a monitor account
+### Update password of monitor account
 
-To update the monitor account's password, simply change it in `./epa/docker-compose.yaml`, stop and then start the collector.
+To update a monitor account's password, simply change it in `./epa/docker-compose.yaml`, stop and then start the collector.
+
+```sh
+# in ./epa directory
+docker compose stop collector_ef600_01
+vim docker-compose.yaml
+docker compose start collector_ef600_01
+```
 
 ### Grafana dashboards
 
@@ -192,61 +206,28 @@ As you clone the repository and enter it, they are in `./epa/grafana-init/dashbo
 
 You can import them to your own Grafana instance. If you use the included `./epa/docker-compose.yaml`, the dashboards may/should be deployed by the `grafana-init` container automatically.
 
-## Sample Grafana screenshots
-
-Power (PSU) metrics are collected and stored in InfluxDB, but no dashboard has a panel with it. You may add it yourself.
-
-- System view
-
-![E-Series System](/images/sample-screenshot-epa-collector-system.png)
-
-- Array interfaces
-
-![E-Series Array Interfaces.png](/images/sample-screenshot-epa-collector-interfaces.png)
-
-This screenshot shows *aggregate* values for all arrays (useful in HPC environments where workloads span across multiple arrays). Further below there are other charts with individual metrics.
-
-- Physical disks
-
-![E-Series Physical Disks.png](/images/sample-screenshot-epa-collector-disks.png)
-
-- Physical disks - SSD wear level (%)
-
-![E-Series SSD Wear Level](/images/sample-screenshot-epa-collector-disks-ssd-wear-level.png)
-
-In order to collect this data, an E-Series array with a recent SANtricity OS (> 11.80, for example) and at least one SSD is required. Note that before v3.4.0, EPA collector used to fetch `percentEnduranceUsed` but now it fetches `spareBlocksRemainingPercent` because this one I've actually seen drop below 100% while the former one showed suspicious results in the samples I've seen.
-
-- Logical volumes
-
-![E-Series Volumes.png](/images/sample-screenshot-epa-collector-volumes.png)
-
-- Environmental indicators - total power consumption (W) and temperature (C)
-
-![E-Series Power and Temperature](/images/sample-screenshot-epa-collector-environmental.png)
-
-Like SSD wear level, these metrics are collected since v3.3.0, but you need to create new panels if you want to visualize them in Grafana. See the FAQs for query examples.
-
 ## FAQs
 
-Find them [here](FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
+Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
 
-- 3.4.0 (August 23, 2025)
+- 3.4.0 (August 24, 2025)
   - Remove `dbmanager` container and its JSON configuration file (one less container to worry about)
-  - Add 'utils' container with InfluxDB v1 client for easy management of InfluxDB  
-  - Add some database-related functions to Collector to replace dbmanager's function
+  - Add "create database" feature to Collector to replace dbmanager
   - Minor update of version tags for various images (InfluxDB, Python, Alpine)
   - Docker Compose with InfluxDB 1.11.8 necessitates `user` key addition and change to InfluxDB volume ownership
-  - Minor update of version tag for Python and Alpine in Collector
   - Complete removal of the pre-fork bloat (epa/Makefile, epa/ansible epa/blackduck and the rest of it)
-  - Merge two docker-compose.yaml files into one (epa/docker-compose.yaml)
+  - Merge two docker-compose.yaml files into one (`epa/docker-compose.yaml`)
   - Add `grafana-init` container to replace what epa/ansible used to do in a more complicated way
-  - Remove "internal images" build feature - builds are much faster and easier to maintain
+  - Add `utils` container with InfluxDB v1 client for easy management of InfluxDB  
+  - Remove "internal images" build feature that epa/Makefile was using - builds are now much faster and easier to maintain
   - Small error handling improvements in EPA Collector noted in Issues
+  - Add checks and fixes for handling inconsistent API responses from SANtricity API that may have caused dropped inserts in InfluxDB in some situations
   - Multiple fixes related to built-in dashboards (Grafana data source set to `EPA`, `WSP` has been removed, dashboards can be imported without issues) 
-  - Prior versions use `urllib3` v1 (collector, dbmanager). v3.4.0 removes direct import of `urllib3` and lets `requests` deal with it (and requests now defaults to v2.5.0)
-  - See upgrade-related Q&A in the [FAQs](./FAQ.md). There are no new features or security fixes, so skip this version if your EPA is running fine
+  - Dashboards are now imported to "EPA" folder. Find them in Grafana with Dashboards > Browse
+  - Remove direct import of `urllib3` and lets `requests` deal with it (and requests now defaults to v2.5.0). Prior versions of EPA use `urllib3` v1 which has minor vulnerability that doesn't impact EPA which connects to trusted SANtricity API endpoint over trusted network
+  - See upgrade-related Q&A in the [FAQs](./FAQ.md). There are no new features and apart from the weak `urllib3` vulnerability there's no reason to install this if your EPA < 3.4.0 is running fine
 
 - 3.3.1 (June 1, 2024):
   - Dependency update (requests library)
