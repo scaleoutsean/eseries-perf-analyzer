@@ -82,7 +82,7 @@ services:
     image: epa/collector:${TAG}
     container_name: collector
     build: ./collector
-    mem_limit: 64m
+    mem_limit: 256m
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -109,7 +109,7 @@ services:
     image: epa/collector:${TAG}
     container_name: R24U04-E2824
     build: ./collector
-    mem_limit: 64m
+    mem_limit: 256m
     restart: unless-stopped
     logging:
       driver: "json-file"

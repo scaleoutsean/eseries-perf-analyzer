@@ -98,7 +98,8 @@ DRIVE_PARAMS = [
     'writePhysicalIOps',
     'writeResponseTime',
     'writeThroughput',
-    'spareBlocksRemainingPercent'
+    'spareBlocksRemainingPercent',
+    'percentEnduranceUsed'
 ]
 
 INTERFACE_PARAMS = [
@@ -172,6 +173,24 @@ PSU_PARAMS = [
    'totalPower'
 ]
 
+#######################
+# FIELD TYPE COERCION #
+#######################
+
+# Production InfluxDB schema-based field type coercion mapping
+# Based on analysis of real EPA production databases to prevent
+# field type conflicts that cause write failures
+FIELD_COERCIONS = {
+    # Fields that MUST be integers in production
+    'spareBlocksRemainingPercent': int,
+    'percentEnduranceUsed': int,
+    'totalPower': int,
+    'temp': int,
+    
+    # All other numeric fields should be floats to match production schema
+    # This includes all performance metrics, utilization percentages, etc.
+    # String fields (MEL descriptions, failure names) are left unchanged
+}
 
 #######################
 # PARAMETERS ##########
@@ -317,7 +336,7 @@ else:
     influxdb_host = CMD.dbAddress.split(":")[0]
     influxdb_port = CMD.dbAddress.split(":")[1]
 
-if (CMD.retention == '' or CMD.retention == None):
+if (CMD.retention == '' or CMD.retention is None):
     LOG.warning("retention set to: %s", DEFAULT_RETENTION)
     RETENTION_DUR = DEFAULT_RETENTION
 else:
@@ -402,10 +421,10 @@ def get_drive_location(sys_id, session):
     return drive_location
 
 
-def collect_symbol_stats(sys):
+def collect_symbol_stats(system_info):
     """
     Collects temp sensor and PSU consumption (W) and posts them to InfluxDB
-    :param sys: The JSON object
+    :param system_info: The JSON object
     """
     try:
         session = get_session()
@@ -424,7 +443,7 @@ def collect_symbol_stats(sys):
                 "sys_id": sys_id,
                 "sys_name": sys_name
                 },
-            "fields": {"totalPower": psu_total}
+            "fields": coerce_fields_dict({"totalPower": psu_total})
         }
         json_body.append(item)
         LOG.info("LOG: PSU data prepared")
@@ -435,10 +454,9 @@ def collect_symbol_stats(sys):
         if CMD.showSensor:
             LOG.info("Sensor response: %s", response['thermalSensorData'])
         env_response = order_sensor_response_list(response)
-        i = 0
-        for sensor in env_response:
-            sensor_id = env_response[i]['thermalSensorRef']
-            sensor_order = "sensor_" + str(i)
+        for i, sensor in enumerate(env_response):
+            sensor_id = sensor['thermalSensorRef']
+            sensor_order = f"sensor_{i}"
             item = {
                 "measurement": "temp",
                 "tags": {
@@ -447,10 +465,9 @@ def collect_symbol_stats(sys):
                     "sys_id": sys_id,
                     "sys_name": sys_name
                     },
-                "fields": {"temp": env_response[i]['currentTemp']}
+                "fields": coerce_fields_dict({"temp": sensor['currentTemp']})
             }
             json_body.append(item)
-            i = i + 1
         LOG.info("LOG: sensor data prepared")
 
         if not CMD.doNotPost:
@@ -459,10 +476,65 @@ def collect_symbol_stats(sys):
             LOG.info("LOG: SYMbol V2 PSU and sensor readings sent")
 
     except RuntimeError:
-        LOG.error(f"Error when attempting to post tmp sensors data for {sys['name']}/{sys['wwn']}")
+        LOG.error(f"Error when attempting to post tmp sensors data for {system_info['name']}/{system_info['wwn']}")
 
 
-def collect_storage_metrics(sys):
+def field_coerce(field_name, value):
+    """
+    Coerce field values to match production InfluxDB schema types.
+    
+    Prevents field type conflicts that cause write failures when NetApp API
+    returns mixed int/float values for fields that already exist as specific
+    types in the production database.
+    
+    Args:
+        field_name (str): Name of the field
+        value: The value to potentially coerce
+        
+    Returns:
+        The value coerced to the appropriate type, or unchanged if no coercion needed
+    """
+    if value is None:
+        return None
+        
+    # Handle explicit coercions from mapping
+    if field_name in FIELD_COERCIONS:
+        target_type = FIELD_COERCIONS[field_name]
+        try:
+            coerced_value = target_type(value)
+            if type(value) != target_type and LOG.isEnabledFor(logging.DEBUG):
+                LOG.debug(f"Coerced field '{field_name}': {type(value).__name__}({value}) -> {target_type.__name__}({coerced_value})")
+            return coerced_value
+        except (ValueError, TypeError):
+            LOG.warning(f"Could not coerce field '{field_name}' value {value} to {target_type.__name__}")
+            return value
+    
+    # For all other numeric fields, coerce to float to match production schema
+    # (except strings and explicitly mapped integers)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if not isinstance(value, float) and LOG.isEnabledFor(logging.DEBUG):
+            LOG.debug(f"Coerced field '{field_name}': {type(value).__name__}({value}) -> float({float(value)})")
+        return float(value)
+    
+    # Leave strings, booleans, and other types unchanged
+    return value
+
+def coerce_fields_dict(fields_dict):
+    """
+    Apply field coercion to all fields in a dictionary.
+    
+    Args:
+        fields_dict (dict): Dictionary of field names to values
+        
+    Returns:
+        dict: Dictionary with coerced field values
+    """
+    return {field_name: field_coerce(field_name, value) 
+            for field_name, value in fields_dict.items()}
+
+
+
+def collect_storage_metrics(system_info):
     """
     Collects all defined storage metrics and posts them to InfluxDB: drives, system stats,
     interfaces, and volumes
@@ -508,11 +580,23 @@ def collect_storage_metrics(sys):
                             vol_group_name = ssd_stat.get('volumeGroupName')
                             drive_wwn = ssd_stat.get('driveWwn')
                             spare_blocks = ssd_stat.get('spareBlockRemainingPercentage')
-                            if vol_group_name and spare_blocks is not None:
+                            wearlife_percent = ssd_stat.get('wearlifePercentageUsed')
+                            
+                            if vol_group_name:
                                 # Create composite key: volGroupName + WWN suffix for uniqueness
                                 if len(drive_wwn) >= 12:
                                     composite_key = f"{vol_group_name}#{drive_wwn[-12:]}"
-                                    ssd_wear_dict[composite_key] = spare_blocks
+                                    # Store both wear metrics as a dict
+                                    wear_data = {}
+                                    if spare_blocks is not None:
+                                        wear_data['spareBlocksRemainingPercent'] = spare_blocks
+                                    # Handle wearlifePercentageUsed: null means "no wear yet" so use 0
+                                    if wearlife_percent is not None:
+                                        wear_data['percentEnduranceUsed'] = wearlife_percent
+                                    else:
+                                        wear_data['percentEnduranceUsed'] = 0  # null = no wear yet
+                                    if wear_data:  # Only store if we have at least one metric
+                                        ssd_wear_dict[composite_key] = wear_data
                 LOG.info(f"Found SSD wear data for {len(ssd_wear_dict)} drives")
             except (requests.exceptions.RequestException, KeyError, ValueError) as e:
                 LOG.warning(f"Could not retrieve SSD wear statistics: {e}")
@@ -530,20 +614,26 @@ def collect_storage_metrics(sys):
             vol_group_name = stats.get("volGroupName")
 
             if disk_id and vol_group_name and ssd_wear_dict:
-                spare_blocks_remaining = None
-
                 # Create composite key using volGroupName + diskId suffix for safe matching
                 if len(disk_id) >= 12:
                     composite_key = f"{vol_group_name}#{disk_id[-12:]}"
                     if composite_key in ssd_wear_dict:
-                        spare_blocks_remaining = ssd_wear_dict[composite_key]
-                        pdict = {'spareBlocksRemainingPercent': spare_blocks_remaining}
-                        LOG.info(f"Found SSD wear data for drive {disk_id} in {vol_group_name}: {spare_blocks_remaining}%")
+                        wear_data = ssd_wear_dict[composite_key]
+                        pdict = wear_data.copy()  # Copy the wear metrics dictionary
+                        wear_metrics = []
+                        if 'spareBlocksRemainingPercent' in wear_data:
+                            wear_metrics.append(f"spareBlocks={wear_data['spareBlocksRemainingPercent']}%")
+                        if 'percentEnduranceUsed' in wear_data:
+                            wear_metrics.append(f"enduranceUsed={wear_data['percentEnduranceUsed']}%")
+                        LOG.info(f"Found SSD wear data for drive {disk_id} in {vol_group_name}: {', '.join(wear_metrics)}")
 
-            if 'spareBlocksRemainingPercent' in pdict.keys():
+            if pdict:
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS) | pdict
             else:
                 fields_dict = dict((metric, stats.get(metric)) for metric in DRIVE_PARAMS)
+
+            # Apply field type coercion to match production InfluxDB schema
+            fields_dict = coerce_fields_dict(fields_dict)
 
             # Safely handle disk location info with fallbacks
             if disk_location_info is not None and len(disk_location_info) >= 2:
@@ -573,6 +663,9 @@ def collect_storage_metrics(sys):
             for stats in interface_stats_list:
                 LOG.info(stats["interfaceId"])
         for stats in interface_stats_list:
+            interface_fields = dict((metric, stats.get(metric)) for metric in INTERFACE_PARAMS)
+            interface_fields = coerce_fields_dict(interface_fields)
+            
             if_item = {
                 "measurement": "interface",
                 "tags": {
@@ -581,24 +674,23 @@ def collect_storage_metrics(sys):
                     "interface_id": stats["interfaceId"],
                     "channel_type": stats["channelType"]
                 },
-                "fields": dict(
-                    (metric, stats.get(metric)) for metric in INTERFACE_PARAMS
-                )
+                "fields": interface_fields
             }
             if CMD.showInterfaceMetrics:
                 LOG.info("Interface payload: %s", if_item)
             json_body.append(if_item)
 
         system_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-system-statistics").json()
+        system_fields = dict((metric, system_stats_list.get(metric)) for metric in SYSTEM_PARAMS)
+        system_fields = coerce_fields_dict(system_fields)
+        
         sys_item = {
             "measurement": "systems",
             "tags": {
                 "sys_id": sys_id,
                 "sys_name": sys_name
             },
-            "fields": dict(
-                (metric, system_stats_list.get(metric)) for metric in SYSTEM_PARAMS
-            )
+            "fields": system_fields
         }
         if CMD.showSystemMetrics:
             LOG.info("System payload: %s", sys_item)
@@ -609,6 +701,9 @@ def collect_storage_metrics(sys):
             for stats in volume_stats_list:
                 LOG.info(stats["volumeName"])
         for stats in volume_stats_list:
+            volume_fields = dict((metric, stats.get(metric)) for metric in VOLUME_PARAMS)
+            volume_fields = coerce_fields_dict(volume_fields)
+            
             vol_item = {
                 "measurement": "volumes",
                 "tags": {
@@ -616,9 +711,7 @@ def collect_storage_metrics(sys):
                     "sys_name": sys_name,
                     "vol_name": stats["volumeName"]
                 },
-                "fields": dict(
-                    (metric, stats.get(metric)) for metric in VOLUME_PARAMS
-                )
+                "fields": volume_fields
             }
             if CMD.showVolumeMetrics:
                 LOG.info("Volume payload: %s", vol_item)
@@ -630,10 +723,10 @@ def collect_storage_metrics(sys):
             LOG.info("LOG: storage metrics sent")
 
     except RuntimeError:
-        LOG.error(f"Error when attempting to post statistics for {sys['name']}/{sys['wwn']}")
+        LOG.error(f"Error when attempting to post statistics for {system_info['name']}/{system_info['wwn']}")
 
 
-def collect_major_event_log(sys):
+def collect_major_event_log(system_info):
     """
     Collects all defined MEL metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
@@ -670,9 +763,9 @@ def collect_major_event_log(sys):
                     "ascq": mel["ascq"],
                     "asc": mel["asc"]
                 },
-                "fields": dict(
+                "fields": coerce_fields_dict(dict(
                     (metric, mel.get(metric)) for metric in MEL_PARAMS
-                ),
+                )),
                 "time": datetime.fromtimestamp(
                     int(mel["timeStamp"]), timezone.utc).isoformat()
             }
@@ -683,7 +776,7 @@ def collect_major_event_log(sys):
             json_body, database=INFLUXDB_DATABASE, time_precision="s")
         LOG.info("LOG: MEL payload sent")
     except RuntimeError:
-        LOG.error(f"Error when attempting to post MEL for {sys['name']}/{sys['wwn']}")
+        LOG.error(f"Error when attempting to post MEL for {system_info['name']}/{system_info['wwn']}")
 
 
 def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_active, the_time):
@@ -697,16 +790,16 @@ def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_
             "object_type": obj_type,
             "active": is_active
         },
-        "fields": {
+        "fields": coerce_fields_dict({
             "name_of": sys_name,
             "type_of": fail_type
-        },
+        }),
         "time": the_time
     }
     return item
 
 
-def collect_system_state(sys, checksums):
+def collect_system_state(system_info, checksums):
     """
     Collects state information from the storage system and posts it to InfluxDB
     :param sys: The JSON object of a storage_system
@@ -717,8 +810,8 @@ def collect_system_state(sys, checksums):
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
 
-        sys_id = sys["wwn"]
-        sys_name = sys["name"]
+        sys_id = system_info["wwn"]
+        sys_name = system_info["name"]
         failure_response = session.get(f"{get_controller('sys')}/{sys_id}/failures").json()
 
         # we can skip us if this is the same response we handled last time
@@ -801,7 +894,7 @@ def collect_system_state(sys, checksums):
         client.write_points(json_body, database=INFLUXDB_DATABASE)
 
     except RuntimeError:
-        LOG.error(f"Error when attempting to post state information for {sys['name']}/{sys['id']}")
+        LOG.error(f"Error when attempting to post state information for {system_info['name']}/{system_info['id']}")
 
 
 def create_continuous_query(client, params_list, database):
@@ -890,6 +983,14 @@ if __name__ == "__main__":
         except (InfluxDBClientError, requests.exceptions.RequestException):
             LOG.error("Database creation failed")
             sys.exit(1)
+
+    # Ensure database exists for normal operation (not just --createDb)
+    try:
+        ensure_database(client, INFLUXDB_DATABASE)
+        LOG.info(f"Database '{INFLUXDB_DATABASE}' is ready")
+    except (InfluxDBClientError, requests.exceptions.RequestException):
+        LOG.error(f"Failed to ensure database '{INFLUXDB_DATABASE}' exists")
+        sys.exit(1)
 
     try:
 
