@@ -52,7 +52,7 @@
           "limit": 100,
           "matchAny": false,
           "tags": [
-             "NetAppESeries"
+            "NetAppESeries"
           ],
           "type": "dashboard"
         },
@@ -98,7 +98,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1755863262732,
+  "iteration": 1756017184377,
   "links": [
     {
       "asDropdown": true,
@@ -172,6 +172,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -243,14 +247,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -310,11 +314,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -406,6 +406,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -477,14 +481,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -544,11 +548,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -640,6 +640,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -711,14 +715,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -778,11 +782,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -874,6 +874,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -945,14 +949,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1012,11 +1016,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -1108,6 +1108,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1179,14 +1183,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1246,11 +1250,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -1342,6 +1342,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1413,14 +1417,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1480,11 +1484,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -1576,6 +1576,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1647,14 +1651,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1714,11 +1718,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -1810,6 +1810,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1879,14 +1883,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1946,11 +1950,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -2042,6 +2042,10 @@
       "targets": [
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -2111,14 +2115,14 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "$tag_sys_name: Tray $tag_sys_tray - Slot $tag_sys_tray_slot",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -2178,11 +2182,7 @@
               "operator": "=~",
               "value": "/^$Slot$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "thresholds": [],
@@ -2228,7 +2228,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2321,7 +2322,9 @@
   "refresh": "30s",
   "schemaVersion": 36,
   "style": "dark",
-  "tags": [],
+  "tags": [
+    "NetAppESeries"
+  ],
   "templating": {
     "list": [
       {
@@ -2332,6 +2335,9 @@
           "uid": "${DS_EPA}"
         },
         "definition": "SHOW TAG VALUES FROM \"disks\" WITH KEY = \"sys_name\"",
+        "error": {
+          "message": "InfluxDB Error: database not found: eseries"
+        },
         "hide": 0,
         "includeAll": true,
         "label": "System",
@@ -2356,6 +2362,9 @@
           "uid": "${DS_EPA}"
         },
         "definition": "SHOW TAG VALUES FROM disks WITH KEY = \"sys_tray\" WHERE \"sys_name\" =~ /$System/",
+        "error": {
+          "message": "InfluxDB Error: database not found: eseries"
+        },
         "hide": 0,
         "includeAll": true,
         "label": "Tray",
@@ -2380,6 +2389,9 @@
           "uid": "${DS_EPA}"
         },
         "definition": "SHOW TAG VALUES FROM disks WITH KEY = \"sys_tray_slot\" WHERE \"sys_name\" =~ /$System/ AND \"sys_tray\" =~ /$Tray/",
+        "error": {
+          "message": "InfluxDB Error: database not found: eseries"
+        },
         "hide": 0,
         "includeAll": true,
         "label": "Slot",
@@ -2428,8 +2440,8 @@
     ]
   },
   "timezone": "browser",
-  "title": "Disk View Dashboard Edited",
-  "uid": "oJJx1FXHz",
-  "version": 2,
+  "title": "Disk View Dashboard",
+  "uid": "9vLKMAXHk",
+  "version": 3,
   "weekStart": ""
 }

@@ -205,10 +205,15 @@ class GrafanaInitializer:
                 with open(dashboard_file, 'r') as f:
                     dashboard_data = json.load(f)
                 
-                # Extract the actual dashboard object if it's wrapped
+                # Handle different JSON structures and extract dashboard + tags
                 if 'dashboard' in dashboard_data:
+                    # Wrapped format: {"dashboard": {...}, "meta": {...}}
                     dashboard_json = dashboard_data['dashboard']
+                    # Tags might be at root level of the file
+                    if 'tags' in dashboard_data and 'tags' not in dashboard_json:
+                        dashboard_json['tags'] = dashboard_data['tags']
                 else:
+                    # Unwrapped format: dashboard object at root level
                     dashboard_json = dashboard_data
                 
                 # Extract title from filename (remove .json extension)
@@ -216,6 +221,13 @@ class GrafanaInitializer:
                 
                 # Set the title in the dashboard JSON
                 dashboard_json['title'] = dashboard_title
+                
+                # Ensure tags exist and include NetAppESeries
+                if 'tags' not in dashboard_json:
+                    dashboard_json['tags'] = []
+                if 'NetAppESeries' not in dashboard_json['tags']:
+                    dashboard_json['tags'].append('NetAppESeries')
+                    logger.info(f"Added NetAppESeries tag to {dashboard_title}")
                 
                 # Remove id and uid if present (let Grafana assign new ones)
                 if 'id' in dashboard_json:
@@ -282,20 +294,57 @@ class GrafanaInitializer:
             logger.info(f"EPA folder found with UID: {folder_uid}")
             
             # Check dashboards in EPA folder using tag-based search
-            search_results = self.grafana.search.search_dashboards(tag="NetAppESeries", folder_id=folder_uid)
-            dashboard_count = len(search_results)
+            # Note: search_dashboards doesn't support folder_id parameter, so we get all EPA dashboards
+            # and filter by folder manually
+            search_results = self.grafana.search.search_dashboards(tag="NetAppESeries")
+            logger.info(f"Found {len(search_results)} total dashboards with NetAppESeries tag")
+            
+            # Show all dashboards with their folder locations for debugging
+            for dashboard in search_results:
+                folder_name = dashboard.get('folderTitle', 'General')
+                folder_uid = dashboard.get('folderUid', 'none')
+                logger.info(f"  Dashboard: {dashboard.get('title', 'Unknown')} -> folder: {folder_name} (UID: {folder_uid})")
+            
+            # Filter dashboards by folder UID
+            folder_dashboards = [d for d in search_results if d.get('folderUid') == folder_uid]
+            dashboard_count = len(folder_dashboards)
+            
+            logger.info(f"Filtering by EPA folder UID '{folder_uid}': {dashboard_count} dashboards found")
             
             if dashboard_count == 0:
                 logger.error("No dashboards with NetAppESeries tag found in EPA folder!")
+                
+                # Check if there are any dashboards in EPA folder without the tag
+                all_dashboards = self.grafana.search.search_dashboards()
+                epa_folder_dashboards = [d for d in all_dashboards if d.get('folderUid') == folder_uid]
+                if epa_folder_dashboards:
+                    logger.warning(f"Found {len(epa_folder_dashboards)} dashboards in EPA folder without NetAppESeries tag:")
+                    for dashboard in epa_folder_dashboards:
+                        logger.info(f"  - {dashboard.get('title', 'Unknown')}")
+                
                 return False
             elif dashboard_count < expected_dashboards:
                 logger.warning(f"Only {dashboard_count}/{expected_dashboards} EPA dashboards found in EPA folder")
-                for dashboard in search_results:
-                    logger.info(f"  - {dashboard.get('title', 'Unknown')}")
+                
+                # Check if missing dashboards are elsewhere or missing tags
+                all_dashboards = self.grafana.search.search_dashboards()
+                epa_folder_all = [d for d in all_dashboards if d.get('folderUid') == folder_uid]
+                logger.info(f"EPA folder contains {len(epa_folder_all)} total dashboards (including those without NetAppESeries tag)")
+                
+                for dashboard in folder_dashboards:
+                    logger.info(f"  - {dashboard.get('title', 'Unknown')} (has NetAppESeries tag)")
+                
+                # Show dashboards in EPA folder without the tag
+                untagged_in_folder = [d for d in epa_folder_all if d not in folder_dashboards]
+                if untagged_in_folder:
+                    logger.warning("Dashboards in EPA folder missing NetAppESeries tag:")
+                    for dashboard in untagged_in_folder:
+                        logger.info(f"  - {dashboard.get('title', 'Unknown')} (missing NetAppESeries tag)")
+                
                 return False
             else:
                 logger.info(f"EPA folder contains {dashboard_count} dashboards with NetAppESeries tag:")
-                for dashboard in search_results:
+                for dashboard in folder_dashboards:
                     logger.info(f"  - {dashboard.get('title', 'Unknown')}")
                 return True
                 
