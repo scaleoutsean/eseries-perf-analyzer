@@ -155,6 +155,32 @@ class GrafanaInitializer:
             logger.error(f"Failed to create EPA folder: {e}")
             return None
             
+    def _fix_datasource_references(self, dashboard_json):
+        """Fix datasource references in dashboard JSON to point to EPA datasource"""
+        import json
+        
+        # Convert to string to do global replacements
+        dashboard_str = json.dumps(dashboard_json)
+        
+        # Replace template variables
+        dashboard_str = dashboard_str.replace('${DS_EPA}', 'EPA')
+        dashboard_str = dashboard_str.replace('${__datasource}', 'EPA')
+        
+        # Convert back to dict
+        fixed_dashboard = json.loads(dashboard_str)
+        
+        # Also ensure templating section has correct datasource
+        if 'templating' in fixed_dashboard:
+            if 'list' in fixed_dashboard['templating']:
+                for template in fixed_dashboard['templating']['list']:
+                    if template.get('type') == 'datasource':
+                        template['current'] = {'text': 'EPA', 'value': 'EPA'}
+                        template['options'] = [{'text': 'EPA', 'value': 'EPA', 'selected': True}]
+        
+        # Update the original dashboard_json in place
+        dashboard_json.clear()
+        dashboard_json.update(fixed_dashboard)
+        
     def import_dashboards(self, folder_uid=None):
         """Import all JSON dashboards from the dashboards directory"""
         if not self.dashboards_dir.exists():
@@ -194,6 +220,9 @@ class GrafanaInitializer:
                 if 'uid' in dashboard_json:
                     del dashboard_json['uid']
                 
+                # Fix datasource references - replace template variables and ensure EPA datasource
+                self._fix_datasource_references(dashboard_json)
+                
                 # Prepare dashboard payload (title is now in dashboard_json)
                 dashboard_payload = {
                     'dashboard': dashboard_json,
@@ -232,40 +261,37 @@ class GrafanaInitializer:
             if not epa_folder:
                 logger.warning("EPA folder not found! Checking General folder as fallback...")
                 
-                # Fallback: check dashboards in General folder (no folder_id)
-                search_results = self.grafana.search.search_dashboards()
-                # Filter for EPA-related dashboards (basic heuristic)
-                epa_dashboards = [d for d in search_results 
-                                 if any(keyword in d.get('title', '').lower() 
-                                       for keyword in ['disk view', 'volume view', 'system view', 'interface view'])]
+                # Fallback: check dashboards with NetAppESeries tag (works regardless of folder)
+                search_results = self.grafana.search.search_dashboards(tag="NetAppESeries")
                 
-                if epa_dashboards:
-                    logger.info(f"Found {len(epa_dashboards)} EPA dashboards in General folder:")
-                    for dashboard in epa_dashboards:
-                        logger.info(f"  - {dashboard.get('title', 'Unknown')}")
+                if search_results:
+                    logger.info(f"Found {len(search_results)} EPA dashboards with NetAppESeries tag:")
+                    for dashboard in search_results:
+                        folder_info = f"(folder: {dashboard.get('folderTitle', 'General')})" if dashboard.get('folderTitle') else "(folder: General)"
+                        logger.info(f"  - {dashboard.get('title', 'Unknown')} {folder_info}")
                     logger.warning("Dashboards are in General folder instead of EPA folder - this may cause issues")
-                    return len(epa_dashboards) >= expected_dashboards
+                    return len(search_results) >= expected_dashboards
                 else:
-                    logger.error("EPA folder not found and no EPA dashboards found in General folder!")
+                    logger.error("EPA folder not found and no dashboards found with NetAppESeries tag!")
                     return False
                 
             folder_uid = epa_folder.get('uid')
             logger.info(f"EPA folder found with UID: {folder_uid}")
             
-            # Check dashboards in EPA folder
-            search_results = self.grafana.search.search_dashboards(folder_id=folder_uid)
+            # Check dashboards in EPA folder using tag-based search
+            search_results = self.grafana.search.search_dashboards(tag="NetAppESeries", folder_id=folder_uid)
             dashboard_count = len(search_results)
             
             if dashboard_count == 0:
-                logger.error("No dashboards found in EPA folder!")
+                logger.error("No dashboards with NetAppESeries tag found in EPA folder!")
                 return False
             elif dashboard_count < expected_dashboards:
-                logger.warning(f"Only {dashboard_count}/{expected_dashboards} dashboards found in EPA folder")
+                logger.warning(f"Only {dashboard_count}/{expected_dashboards} EPA dashboards found in EPA folder")
                 for dashboard in search_results:
                     logger.info(f"  - {dashboard.get('title', 'Unknown')}")
                 return False
             else:
-                logger.info(f"EPA folder contains {dashboard_count} dashboards:")
+                logger.info(f"EPA folder contains {dashboard_count} dashboards with NetAppESeries tag:")
                 for dashboard in search_results:
                     logger.info(f"  - {dashboard.get('title', 'Unknown')}")
                 return True
