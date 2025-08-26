@@ -654,6 +654,10 @@ def collect_storage_metrics(system_info):
                 },
                 "fields": fields_dict
             }
+            
+            # Add volume group tag if available
+            if vol_group_name is not None:
+                disk_item["tags"]["vol_group_name"] = vol_group_name
             if CMD.showDriveMetrics:
                 LOG.info("Drive payload: %s", disk_item)
             json_body.append(disk_item)
