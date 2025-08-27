@@ -73,8 +73,27 @@ Important detail about limitations:
 - Sensors: I've no idea if all E-Series models have 3 sensors per controller, and in what order (which is why I gave approximate values that you may expect from each kind). I also don't know if their names (e.g. 0B00000000000000000002000000000000000000) are consistent across E- and EF-Series models
 - Expansion shelves: I don't have access to E-Series with expansion enclosures and have no idea what the API returns for those, so in v3.3.0 collector does not collect total power consumption of the entire *array*
 
+## How to get more details about Major Event Log entries?
+
+You may create a panel with a table (rather than chart) and see how you want to filter it (e.g. last 24 hours or some other condition(s)).
+
+```sql
+SELECT "description", "id", "location" FROM "major_event_log"
+```
+
+## How to get interface error metrics?
+
+Check `channelErrorCounts` in the `interface` measurement.
+
+```sql
+SELECT mean("channelErrorCounts") FROM "interface" WHERE $timeFilter GROUP BY time($__interval), "sys_name" fill(none)
+```
+
+There may be some other places, but that could be the main one. I didn't see anything but 0 (no errors) in my InfluxDB, so I can't say it works for sure.
+
 ### If I use my own Grafana, do I need to recreate EPA dashboards from scratch?
 
+No, you may import them from epa/grafana-init/dashboards.
 
 ### How much memory does each collector container need? 
 
