@@ -285,6 +285,9 @@ PARSER.add_argument('-i', '--showIteration', action='store_true', default=0,
                     help='Outputs the current loop iteration. Optional. <switch>')
 PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
+PARSER.add_argument('--include', nargs='+', required=False,
+                    help='Only collect specified measurements. Options: disks, interface, systems, volumes, power, temp, major_event_log, failures. '
+                         'Example: --include disks interface. If not specified, all measurements are collected.')
 CMD = PARSER.parse_args()
 
 # Conditional validation for database creation mode
@@ -341,6 +344,29 @@ if (CMD.retention == '' or CMD.retention is None):
     RETENTION_DUR = DEFAULT_RETENTION
 else:
     RETENTION_DUR = CMD.retention
+
+# Define which measurements each collection function provides
+FUNCTION_MEASUREMENTS = {
+    'collect_storage_metrics': ['disks', 'interface', 'systems', 'volumes'],
+    'collect_symbol_stats': ['power', 'temp'],
+    'collect_major_event_log': ['major_event_log'],
+    'collect_system_state': ['failures']
+}
+
+# Validate --include options if provided
+if hasattr(CMD, 'include') and CMD.include:
+    valid_measurements = set()
+    for measurements in FUNCTION_MEASUREMENTS.values():
+        valid_measurements.update(measurements)
+    
+    invalid_measurements = [m for m in CMD.include if m not in valid_measurements]
+    if invalid_measurements:
+        PARSER.error(f"Invalid measurement(s) in --include: {', '.join(invalid_measurements)}. "
+                    f"Valid options: {', '.join(sorted(valid_measurements))}")
+    
+    LOG.info(f"Selective collection enabled. Including measurements: {', '.join(CMD.include)}")
+else:
+    LOG.info("Collecting all measurements (default behavior)")
 
 
 #######################
@@ -1012,12 +1038,30 @@ if __name__ == "__main__":
                                           RETENTION_DUR, "1", False)
 
         # create continuous queries that downsample our metric data
-        create_continuous_query(client, DRIVE_PARAMS, "disks")
-        create_continuous_query(client, SYSTEM_PARAMS, "system")
-        create_continuous_query(client, VOLUME_PARAMS, "volumes")
-        create_continuous_query(client, INTERFACE_PARAMS, "interface")
-        create_continuous_query(client, PSU_PARAMS, "power")
-        create_continuous_query(client, SENSOR_PARAMS, "temp")
+        # Only create queries for measurements that will be collected to avoid log spam
+        if hasattr(CMD, 'include') and CMD.include:
+            # Create queries only for included measurements
+            query_mapping = {
+                'disks': (DRIVE_PARAMS, "disks"),
+                'systems': (SYSTEM_PARAMS, "systems"), 
+                'volumes': (VOLUME_PARAMS, "volumes"),
+                'interface': (INTERFACE_PARAMS, "interface"),
+                'power': (PSU_PARAMS, "power"),
+                'temp': (SENSOR_PARAMS, "temp")
+            }
+            for measurement in CMD.include:
+                if measurement in query_mapping:
+                    params, db_name = query_mapping[measurement]
+                    create_continuous_query(client, params, db_name)
+                    LOG.info(f"Created continuous queries for included measurement: {measurement}")
+        else:
+            # Create all queries (default behavior when no --include specified)
+            create_continuous_query(client, DRIVE_PARAMS, "disks")
+            create_continuous_query(client, SYSTEM_PARAMS, "systems")
+            create_continuous_query(client, VOLUME_PARAMS, "volumes")
+            create_continuous_query(client, INTERFACE_PARAMS, "interface")
+            create_continuous_query(client, PSU_PARAMS, "power")
+            create_continuous_query(client, SENSOR_PARAMS, "temp")
 
     except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
         LOG.exception("Failed to add configured systems!")
@@ -1038,21 +1082,37 @@ if __name__ == "__main__":
             if CMD.showStorageNames:
                 LOG.info(sys_name)
 
-            collector = [executor.submit(
-                collect_storage_metrics, sys)]
-            concurrent.futures.wait(collector)
+            # Conditionally collect measurements based on --include filter
+            if hasattr(CMD, 'include') and CMD.include:
+                # Only run functions whose measurements are included
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_storage_metrics']):
+                    collector = [executor.submit(collect_storage_metrics, sys)]
+                    concurrent.futures.wait(collector)
 
-            collector = [executor.submit(
-                collect_system_state, sys, checksums)]
-            concurrent.futures.wait(collector)
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_system_state']):
+                    collector = [executor.submit(collect_system_state, sys, checksums)]
+                    concurrent.futures.wait(collector)
 
-            collector = [executor.submit(
-                collect_major_event_log, sys)]
-            concurrent.futures.wait(collector)
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_major_event_log']):
+                    collector = [executor.submit(collect_major_event_log, sys)]
+                    concurrent.futures.wait(collector)
 
-            collector = [executor.submit(
-                collect_symbol_stats, sys)]
-            concurrent.futures.wait(collector)
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_symbol_stats']):
+                    collector = [executor.submit(collect_symbol_stats, sys)]
+                    concurrent.futures.wait(collector)
+            else:
+                # Default behavior: collect all measurements
+                collector = [executor.submit(collect_storage_metrics, sys)]
+                concurrent.futures.wait(collector)
+
+                collector = [executor.submit(collect_system_state, sys, checksums)]
+                concurrent.futures.wait(collector)
+
+                collector = [executor.submit(collect_major_event_log, sys)]
+                concurrent.futures.wait(collector)
+
+                collector = [executor.submit(collect_symbol_stats, sys)]
+                concurrent.futures.wait(collector)
 
         time_difference = time.time() - time_start
         if CMD.showIteration:
