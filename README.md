@@ -95,7 +95,7 @@ services:
 
   collector-R26U25-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.4.0 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.4.1 # it exists, but best build your own
     container_name: R26U25-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -125,7 +125,7 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 
 #### Deploy
 
-**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory before you deploy.
+**NOTE:** EPA v3.4.0 (and newer version 3 releases) uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory before you deploy.
 
 Download and decompress latest release and enter the `epa` sub-directory:
 
@@ -173,9 +173,15 @@ Mind the project/container name and version!
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
-  epa/collector:3.4.0 collector.py -h
+  epa/collector:3.4.1 collector.py -h
 # or, if you just want to view help
-# docker run --rm epa/collector:3.4.0 -h
+# docker run --rm epa/collector:3.4.1 -h
+```
+
+Example run for limited database population:
+
+```sh
+docker run -e INCLUDE="power temp" epa/collector:3.4.1
 ```
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
@@ -212,6 +218,10 @@ You can import them to your own Grafana instance. If you use the included `./epa
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
+
+- 3.4.1 (August 27, 2025)
+  - Add volume group tag to physical disks (lets you filter disks by (RAID) group or (DPP) pool)
+  - Add `--include <measurement>` for filtered writes to InfluxDB (non-included measurement(s) doesn't get written). Default: include everything
 
 - 3.4.0 (August 24, 2025)
   - Remove `dbmanager` container and its JSON configuration file (one less container to worry about)

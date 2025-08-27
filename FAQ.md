@@ -78,7 +78,9 @@ Important detail about limitations:
 
 ### How much memory does each collector container need? 
 
-It my testing, much less than 32 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
+It my testing, much less than 32 MiB (average, 21 MiB). It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers). 
+
+However, EPA's RAM utilization may spike when it processes very large JSON, so if you need set a maximum uppper RAM resource limit, you may set it to 256 MiB. That should handle any short-lived spikes. 
 
 ### How much memory does the dbmanager container need? 
 

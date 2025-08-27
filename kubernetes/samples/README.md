@@ -17,7 +17,7 @@
 ## Assumptions
 
 - Recent Kubernetes 
-- EPA v3.4.0 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
+- EPA v3.4.1 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
 ## Sample configuration files 
@@ -44,7 +44,7 @@ kubectl create namespace epa
 
 ## InfluxDB v1
 
-EPA v3.4.0 uses InvluxDB v1.
+EPA v3 uses InvluxDB v1.
 
 Port 8086/tcp is used for client connections and should be open to all *external* collector clients as well as Grafana (if Grafana runs externally). 
 
@@ -145,7 +145,7 @@ stringData:
 **NOTE** 
 
 - Collector can create specified (or if not, the default) database name in InfluxDB. You may set a different DB for each collector instance.
-- EPA v3.4.0 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
+- EPA v3.4.1 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
 - For Grafana, is possible to create a read-only InfluxDB user account here, but if automated deployment of InfluxDB data source is used, authentication won't be set up. To work around that create a read-only account for Grafana here
 
 With `influxdb-creds` ready, next we create PVCs, service and finally deployment:
@@ -205,7 +205,7 @@ With Grafana ready, we can add a InfluxDB v1 data source. You can do it manually
 
 InfluxDB and Grafana must be reachable at `influxdb:8086` and `http://grafana:3000`, respectively.
 
-In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0; but EPA v3.4.0 defaults to **`EPA`**).
+In my test environment InfluxDB was available at an `EXTERNAL-IP` and Grafana Data Source was added with Basic Auth like this ("WSP" comes from Web Services Proxy, the data source name inherited from upstream EPA v3.0.0; but since EPA v3.4.0 version 3 defaults to **`EPA`**).
 
 ![Create Grafana Data Source for InfluxDB v1](../../images/kubernetes-01-influxdb-datasource.png)
 

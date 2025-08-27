@@ -8,6 +8,10 @@
 #
 # sysid should be array WWN (also, see screenshots on where to find it)
 # 
+# include can be space-separated list of measurements to collect:
+#   disks, interface, systems, volumes, power, temp, major_event_log, failures
+#   If not specified, all measurements are collected (default behavior)
+# 
 # Find other details with:
 # python3 collector.py -h
 
@@ -55,6 +59,11 @@ else
     
     if [ -n "${RETENTION_PERIOD}" ]; then
         CMD="${CMD} --retention ${RETENTION_PERIOD}"
+    fi
+    
+    # Add include filter if specified
+    if [ -n "${INCLUDE}" ]; then
+        CMD="${CMD} --include ${INCLUDE}"
     fi
     
     # Add default flags for normal operation

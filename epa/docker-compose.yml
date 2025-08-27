@@ -103,6 +103,9 @@ services:
       # - DB_NAME=my_custom_db
       # Optional: Create database and exit (true/1 = enable)
       # - CREATE_DB=false
+      # Optional: Only collect specific measurements (space-separated)
+      # - INCLUDE=disks interface
+      # - INCLUDE=power temp
     networks:
       - eseries_perf_analyzer
 
@@ -128,6 +131,8 @@ services:
       - DB_PORT=8086
       # Example: Using custom database name for this collector
       # - DB_NAME=e2824_metrics
+      # Optional: Only collect specific measurements (space-separated)
+      # - INCLUDE=disks systems volumes
     networks:
       - eseries_perf_analyzer
 

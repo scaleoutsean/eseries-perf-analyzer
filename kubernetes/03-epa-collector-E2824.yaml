@@ -27,7 +27,7 @@ metadata:
   creationTimestamp: null
   labels:
     kubernetes.io/os: "linux"
-    app.kubernetes.io/version: "3.4.0"
+    app.kubernetes.io/version: "3.4.1"
     app.kubernetes.io/name: collector
     # app.kubernetes.io/instance: dc1-collector-r24u04-e2824
     service: collector-r24u04-e2824
@@ -48,15 +48,15 @@ spec:
       restartPolicy: Always
       containers:
         - name: r24u04-e2824
-          image: epa/collector:3.4.0
+          image: epa/collector:3.4.1
           imagePullPolicy: IfNotPresent
           resources:
             requests:
-              memory: "48Mi"
+              memory: "256Mi"
               cpu: 0.25
             limits:
-              memory: "96Mi"
-              cpu: 0.5           
+              memory: "256Mi"
+              cpu: 0.5
           env:
             - name: API
               valueFrom:
