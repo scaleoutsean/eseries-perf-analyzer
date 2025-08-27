@@ -471,7 +471,8 @@ def collect_symbol_stats(system_info):
                 },
             "fields": coerce_fields_dict({"totalPower": psu_total})
         }
-        json_body.append(item)
+        if item["measurement"] in CMD.include:
+            json_body.append(item)
         LOG.info("LOG: PSU data prepared")
 
         # ENVIRONMENTAL SENSORS
@@ -493,7 +494,8 @@ def collect_symbol_stats(system_info):
                     },
                 "fields": coerce_fields_dict({"temp": sensor['currentTemp']})
             }
-            json_body.append(item)
+            if item["measurement"] in CMD.include:
+                json_body.append(item)
         LOG.info("LOG: sensor data prepared")
 
         if not CMD.doNotPost:
@@ -686,7 +688,8 @@ def collect_storage_metrics(system_info):
                 disk_item["tags"]["vol_group_name"] = vol_group_name
             if CMD.showDriveMetrics:
                 LOG.info("Drive payload: %s", disk_item)
-            json_body.append(disk_item)
+            if disk_item["measurement"] in CMD.include:
+                json_body.append(disk_item)
 
         interface_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-interface-statistics").json()
         if CMD.showInterfaceNames:
@@ -708,7 +711,8 @@ def collect_storage_metrics(system_info):
             }
             if CMD.showInterfaceMetrics:
                 LOG.info("Interface payload: %s", if_item)
-            json_body.append(if_item)
+            if if_item["measurement"] in CMD.include:
+                json_body.append(if_item)
 
         system_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-system-statistics").json()
         system_fields = dict((metric, system_stats_list.get(metric)) for metric in SYSTEM_PARAMS)
@@ -724,7 +728,8 @@ def collect_storage_metrics(system_info):
         }
         if CMD.showSystemMetrics:
             LOG.info("System payload: %s", sys_item)
-        json_body.append(sys_item)
+        if sys_item["measurement"] in CMD.include:
+            json_body.append(sys_item)
 
         volume_stats_list = session.get(f"{get_controller('sys')}/{sys_id}/analysed-volume-statistics").json()
         if CMD.showVolumeNames:
@@ -745,7 +750,8 @@ def collect_storage_metrics(system_info):
             }
             if CMD.showVolumeMetrics:
                 LOG.info("Volume payload: %s", vol_item)
-            json_body.append(vol_item)
+            if vol_item["measurement"] in CMD.include:
+                json_body.append(vol_item)
 
         if not CMD.doNotPost:
             client.write_points(
@@ -801,7 +807,8 @@ def collect_major_event_log(system_info):
             }
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
-            json_body.append(item)
+            if item["measurement"] in CMD.include:
+                json_body.append(item)
         client.write_points(
             json_body, database=INFLUXDB_DATABASE, time_precision="s")
         LOG.info("LOG: MEL payload sent")
@@ -885,7 +892,8 @@ def collect_system_state(system_info, checksums):
                                                           True, datetime.now(timezone.utc).isoformat())
                 if CMD.showStateMetrics:
                     LOG.info("Failure payload T1: %s", failure_item)
-                json_body.append(failure_item)
+                if failure_item["measurement"] in CMD.include:
+                    json_body.append(failure_item)
 
         # take care of failures that are no longer active
         for point in failure_points:
@@ -916,7 +924,8 @@ def collect_system_state(system_info, checksums):
                                                           False, datetime.now(timezone.utc).isoformat())
                 if CMD.showStateMetrics:
                     LOG.info("Failure payload T2: %s", failure_item)
-                json_body.append(failure_item)
+                if failure_item["measurement"] in CMD.include:
+                    json_body.append(failure_item)
 
         # write failures to InfluxDB
         if CMD.showStateMetrics:
