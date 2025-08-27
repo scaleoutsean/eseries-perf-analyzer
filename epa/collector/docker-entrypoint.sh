@@ -20,6 +20,10 @@ if [ "$1" = "-h" ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
     exec python collector.py -h
 fi
 
+# Set default values for optional variables to avoid undefined variable warnings
+DB_ADDRESS=${DB_ADDRESS:-}
+DB_PORT=${DB_PORT:-}
+
 # Build the base command
 CMD="python collector.py"
 
