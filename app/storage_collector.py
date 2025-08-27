@@ -107,6 +107,10 @@ def collect_storage_metrics(sys_info, session, san_headers, api_endpoints, influ
             loc = drive_locations.get(s.get('diskId'))
             if loc:
                 tags['sys_tray'], tags['sys_tray_slot'] = f"{loc[0]:02.0f}", f"{loc[1]:03.0f}"
+            # Add volGroupName to tags if available
+            vol_group_name = s.get('volGroupName')
+            if vol_group_name:
+                tags['vol_group_name'] = vol_group_name
             json_body.append({'measurement': 'disks', 'tags': tags, 'fields': fields})
         print(f"[STORAGE DIAG] Appended {len(drive_stats)} drive stats")
         LOG.info(f"[STORAGE] Appended {len(drive_stats)} drive stats")
