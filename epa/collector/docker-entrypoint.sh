@@ -67,7 +67,10 @@ else
     
     # Add include filter if specified
     if [ -n "${INCLUDE}" ]; then
+        echo "INCLUDE environment variable set: '${INCLUDE}'"
         CMD="${CMD} --include ${INCLUDE}"
+    else
+        echo "INCLUDE environment variable not set, collecting all measurements"
     fi
     
     # Add default flags for normal operation

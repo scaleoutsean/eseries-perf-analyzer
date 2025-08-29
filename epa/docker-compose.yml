@@ -138,7 +138,7 @@ services:
 
 networks:
   eseries_perf_analyzer:
-    external: true
+    driver: bridge
 
 volumes:
   influxdb_data:

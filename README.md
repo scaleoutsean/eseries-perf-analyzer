@@ -219,6 +219,11 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 ## Changelog
 
+- 3.4.2 (August 29, 2025)
+  - Change Docker Compose network type to `bridge` for automated setup/teardown by Docker
+  - Fix missing `--include <all-measurements>` resulted in nothing being collected
+  - Add `--debug` switch to make troubleshooting bugs like the one with `--include` easier
+
 - 3.4.1 (August 27, 2025)
   - Add volume group tag to physical disks (lets you filter disks by (RAID) group or (DPP) pool)
   - Add `--include <measurement>` for filtered writes to InfluxDB (non-included measurement(s) doesn't get written). Default: include everything

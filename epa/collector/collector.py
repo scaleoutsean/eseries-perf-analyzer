@@ -287,6 +287,8 @@ PARSER.add_argument('-i', '--showIteration', action='store_true', default=0,
                     help='Outputs the current loop iteration. Optional. <switch>')
 PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
+PARSER.add_argument('--debug', action='store_true', default=False,
+                    help='Enable debug logging to show detailed collection and filtering information. Optional. <switch>')
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
                          'disks, interface, systems, volumes, power, temp, '
@@ -294,6 +296,12 @@ PARSER.add_argument('--include', nargs='+', required=False,
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
 CMD = PARSER.parse_args()
+
+# Set logging level based on debug flag
+if CMD.debug:
+    logging.getLogger().setLevel(logging.DEBUG)
+    LOG.setLevel(logging.DEBUG)
+    LOG.debug("Debug logging enabled")
 
 # Conditional validation for database creation mode
 if CMD.createDb:
@@ -376,8 +384,12 @@ if hasattr(CMD, 'include') and CMD.include:
 
     LOG.info(
         f"Selective collection enabled. Including measurements: {', '.join(CMD.include)}")
+    LOG.debug(f"CMD.include value: {CMD.include}")
+    LOG.debug(f"CMD.include type: {type(CMD.include)}")
 else:
     LOG.info("Collecting all measurements (default behavior)")
+    LOG.debug(f"CMD.include value: {CMD.include}")
+    LOG.debug(f"CMD.include type: {type(CMD.include)}")
 
 
 #######################
@@ -483,8 +495,11 @@ def collect_symbol_stats(system_info):
             },
             "fields": coerce_fields_dict({"totalPower": psu_total})
         }
-        if item["measurement"] in CMD.include:
+        if not CMD.include or item["measurement"] in CMD.include:
             json_body.append(item)
+            LOG.debug(f"Added {item['measurement']} measurement to collection")
+        else:
+            LOG.debug(f"Skipped {item['measurement']} measurement (not in --include filter)")
         LOG.info("LOG: PSU data prepared")
 
         # ENVIRONMENTAL SENSORS
@@ -508,10 +523,11 @@ def collect_symbol_stats(system_info):
                 },
                 "fields": coerce_fields_dict({"temp": sensor['currentTemp']})
             }
-            if item["measurement"] in CMD.include:
+            if not CMD.include or item["measurement"] in CMD.include:
                 json_body.append(item)
         LOG.info("LOG: sensor data prepared")
 
+        LOG.debug(f"collect_symbol_stats: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
@@ -720,7 +736,7 @@ def collect_storage_metrics(system_info):
                 disk_item["tags"]["vol_group_name"] = vol_group_name
             if CMD.showDriveMetrics:
                 LOG.info("Drive payload: %s", disk_item)
-            if disk_item["measurement"] in CMD.include:
+            if not CMD.include or disk_item["measurement"] in CMD.include:
                 json_body.append(disk_item)
 
         interface_stats_list = session.get(
@@ -745,7 +761,7 @@ def collect_storage_metrics(system_info):
             }
             if CMD.showInterfaceMetrics:
                 LOG.info("Interface payload: %s", if_item)
-            if if_item["measurement"] in CMD.include:
+            if not CMD.include or if_item["measurement"] in CMD.include:
                 json_body.append(if_item)
 
         system_stats_list = session.get(
@@ -764,7 +780,7 @@ def collect_storage_metrics(system_info):
         }
         if CMD.showSystemMetrics:
             LOG.info("System payload: %s", sys_item)
-        if sys_item["measurement"] in CMD.include:
+        if not CMD.include or sys_item["measurement"] in CMD.include:
             json_body.append(sys_item)
 
         volume_stats_list = session.get(
@@ -788,13 +804,16 @@ def collect_storage_metrics(system_info):
             }
             if CMD.showVolumeMetrics:
                 LOG.info("Volume payload: %s", vol_item)
-            if vol_item["measurement"] in CMD.include:
+            if not CMD.include or vol_item["measurement"] in CMD.include:
                 json_body.append(vol_item)
 
+        LOG.debug(f"collect_storage_metrics: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: storage metrics sent")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
 
     except RuntimeError:
         LOG.error(
@@ -846,7 +865,7 @@ def collect_major_event_log(system_info):
             }
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
-            if item["measurement"] in CMD.include:
+            if not CMD.include or item["measurement"] in CMD.include:
                 json_body.append(item)
         client.write_points(
             json_body, database=INFLUXDB_DATABASE, time_precision="s")
@@ -933,7 +952,7 @@ def collect_system_state(system_info, checksums):
                                                         True, datetime.now(timezone.utc).isoformat())
                 if CMD.showStateMetrics:
                     LOG.info("Failure payload T1: %s", failure_item)
-                if failure_item["measurement"] in CMD.include:
+                if not CMD.include or failure_item["measurement"] in CMD.include:
                     json_body.append(failure_item)
 
         # take care of failures that are no longer active
@@ -965,7 +984,7 @@ def collect_system_state(system_info, checksums):
                                                         False, datetime.now(timezone.utc).isoformat())
                 if CMD.showStateMetrics:
                     LOG.info("Failure payload T2: %s", failure_item)
-                if failure_item["measurement"] in CMD.include:
+                if not CMD.include or failure_item["measurement"] in CMD.include:
                     json_body.append(failure_item)
 
         # write failures to InfluxDB
