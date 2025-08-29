@@ -27,7 +27,7 @@ def create_database(influxdb_url, auth_token, database_name, tls_ca=None):
     try:
         # Get existing databases
         response = requests.get(
-            f"{influxdb_url}/api/v3/configure/database",
+            f"{influxdb_url}/api/v3/configure/database?format=json",
             headers=headers,
             verify=verify
         )
