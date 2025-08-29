@@ -37,3 +37,13 @@ influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "
 # Check the interface measurement
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT * FROM interface LIMIT 3'
 
+## Backup and restore examples (needs manual Docker volume addition for target/source directory) 
+
+# Full backup
+docker exec utils influxd backup -portable -host influxdb:8088 /tmp/backup
+
+# Copy backup out of container
+docker cp utils:/tmp/backup ./influxdb_backup/
+
+# Specific database backup (when you have eseries data)
+docker exec utils influxd backup -portable -host influxdb:8088 -database eseries /tmp/eseries_backup
