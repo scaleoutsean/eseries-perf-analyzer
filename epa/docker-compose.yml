@@ -106,6 +106,7 @@ services:
       # Optional: Only collect specific measurements (space-separated)
       # - INCLUDE=disks interface
       # - INCLUDE=power temp
+      # - INCLUDE=config_volumes volumes
     networks:
       - eseries_perf_analyzer
 
@@ -133,6 +134,7 @@ services:
       # - DB_NAME=e2824_metrics
       # Optional: Only collect specific measurements (space-separated)
       # - INCLUDE=disks systems volumes
+      # - INCLUDE=config_volumes
     networks:
       - eseries_perf_analyzer
 

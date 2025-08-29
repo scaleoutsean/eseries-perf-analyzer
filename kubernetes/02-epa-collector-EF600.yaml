@@ -27,7 +27,7 @@ metadata:
   creationTimestamp: null
   labels:
     kubernetes.io/os: "linux"
-    app.kubernetes.io/version: "3.4.1"
+    app.kubernetes.io/version: "3.4.2"
     app.kubernetes.io/name: collector
     # app.kubernetes.io/instance: dc1-collector-r26u25-ef600
     service: collector-r26u25-ef600
@@ -48,7 +48,7 @@ spec:
       restartPolicy: Always
       containers:
         - name: r26u25-ef600
-          image: epa/collector:3.4.1
+          image: epa/collector:3.4.2
           imagePullPolicy: IfNotPresent
           resources:
             requests:

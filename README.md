@@ -95,7 +95,7 @@ services:
 
   collector-R26U25-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.4.1 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.4.2 # it exists, but best build your own
     container_name: R26U25-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -173,15 +173,15 @@ Mind the project/container name and version!
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
-  epa/collector:3.4.1 collector.py -h
+  epa/collector:3.4.2 collector.py -h
 # or, if you just want to view help
-# docker run --rm epa/collector:3.4.1 -h
+# docker run --rm epa/collector:3.4.2 -h
 ```
 
 Example run for limited database population:
 
 ```sh
-docker run -e INCLUDE="power temp" epa/collector:3.4.1
+docker run -e INCLUDE="power temp" epa/collector:3.4.2
 ```
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
