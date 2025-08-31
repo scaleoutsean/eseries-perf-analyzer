@@ -80,7 +80,7 @@ services:
 
   collector:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.4.0 # best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.5.0 # best build your own
     container_name: collector
     build: ./collector
     mem_limit: 256m

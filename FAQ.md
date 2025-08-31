@@ -121,9 +121,9 @@ python3 ./epa/collector/collector.py \
 
 ### How to upgrade?
 
-From 3.[1,2,3] to 3.4, I wouldn't try since there aren't new features. But if you want to, then I recommend removing old setup and starting from scratch. Or, if you insist, you could transplant Collector from `./epa/collector/` and also copy its Docker Compose service to the "old" `./collector/collector/docker-compose.yaml`, and leave InfluxDB and Grafana alone. That is quick, easy to do and easy to revert.
+From 3.[1,2,3] to 3.4 or newer version 3, I wouldn't try since there aren't new features. But if you want to, then I recommend removing old setup and starting from scratch. Or, if you insist, you could transplant Collector from `./epa/collector/` and also copy its Docker Compose service to the "old" `./collector/collector/docker-compose.yaml`, and leave InfluxDB and Grafana alone. That is quick, easy to do and easy to revert.
 
-EPA 3.4.0's new `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
+EPA 3.4.0's `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
 ### If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
@@ -136,7 +136,7 @@ Or you can create the DB before you run.
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.4.0
+  epa/collector:3.5.0
 ```
 
 - Using the `utils` container:

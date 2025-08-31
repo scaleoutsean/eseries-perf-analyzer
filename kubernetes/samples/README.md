@@ -17,7 +17,7 @@
 ## Assumptions
 
 - Recent Kubernetes 
-- EPA v3.4.2 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
+- EPA v3.5.0 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
 ## Sample configuration files 
@@ -145,7 +145,7 @@ stringData:
 **NOTE** 
 
 - Collector can create specified (or if not, the default) database name in InfluxDB. You may set a different DB for each collector instance.
-- EPA v3.4.2 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
+- EPA v3.5.0 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
 - For Grafana, is possible to create a read-only InfluxDB user account here, but if automated deployment of InfluxDB data source is used, authentication won't be set up. To work around that create a read-only account for Grafana here
 
 With `influxdb-creds` ready, next we create PVCs, service and finally deployment:

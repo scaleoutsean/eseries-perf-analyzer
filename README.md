@@ -2,7 +2,7 @@
 
 - [NetApp E-Series Performance Analyzer ("EPA")](#netapp-e-series-performance-analyzer-epa)
   - [What is EPA](#what-is-epa)
-  - [What E-Series metrics does EPA collect](#what-e-series-metrics-does-epa-collect)
+  - [Collected data](#collected-data)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
     - [CLI and systemd users](#cli-and-systemd-users)
@@ -11,14 +11,13 @@
       - [Deploy](#deploy)
     - [Kubernetes](#kubernetes)
   - [Other procedures](#other-procedures)
-    - [Execute containerized collector.py](#execute-containerized-collectorpy)
+    - [Execute containerized `collector.py` from CLI](#execute-containerized-collectorpy-from-cli)
     - [Adjust firewall settings for InfluxDB and Grafana ports](#adjust-firewall-settings-for-influxdb-and-grafana-ports)
     - [Add or remove a monitored array](#add-or-remove-a-monitored-array)
     - [Update password of monitor account](#update-password-of-monitor-account)
     - [Grafana dashboards](#grafana-dashboards)
   - [FAQs](#faqs)
   - [Changelog](#changelog)
-
 
 ## What is EPA
 
@@ -28,17 +27,27 @@ This is a fork of the now-archived [E-Series Performance Analyzer](https://githu
 - Disentangle E-Series Collector from the rest of EPA stac and make it easy to run it stand-alone and anywhere
 - Remove SANtricity Web Services Proxy (WSP) dependency from Collector and remove WSP from EPA, so that one collector container or script captures data for one and only one E-Series array
 
-EPA Collector collects metrics from E-Series and sends them to InfluxDB. 
-Each collector uses own credentials and can (but doesn't have to) write data to the same InfluxDB database instance.
+EPA Collector collects metrics from E-Series and sends them to InfluxDB.
+Each collector uses own credentials and may (but doesn't have to) write data to the same InfluxDB database or database instance.
 
-## What E-Series metrics does EPA collect
+## Collected data
 
-- System
-- Volumes
-- Disks
-- Interfaces
-- E-Series MEL events
-- Environmental (temperature and power consumption)
+- Performance metrics
+  - System
+  - Volumes
+  - Disks
+  - Interfaces
+- Log and environment
+  - E-Series MEL events
+  - Failures
+  - Temperature sensors
+  - Power supply unit consumption
+- Configuration
+  - Volumes
+  - Disks
+  - Hosts
+
+Users may use `--include` to limit the amount of data collected and the related data growth.
 
 Sample screenshots are available [here](./SCREENSHOTS.md).
 
@@ -49,6 +58,8 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 - The rest of EPA "stack" is standard OSS integrated in a stack for reference purposes. Users are encouraged to use own database and Grafana
 
 ## Quick start
+
+**NOTE:** `master` branch may be ahead of Releases. You may download and decompress a recent release from [Releases](https://github.com/scaleoutsean/eseries-perf-analyzer/releases) instead.
 
 ### CLI and systemd users
 
@@ -72,7 +83,7 @@ Note that you can't do much with just the CLI - you need a DB where data can be 
 Environment variables:
 
 - `./epa/.env` has environment variables used by `./epa/docker-compose.yaml`. You may want to edit `TAG` if you make own versions or container version upgrades.
-- Some can be found in the Docker Compose file itself
+- Some important variables are in the Docker Compose file itself
 
 Collector arguments and switches:
 
@@ -95,7 +106,7 @@ services:
 
   collector-R26U25-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.4.2 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.5.0 # it exists, but best build your own
     container_name: R26U25-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -109,7 +120,7 @@ services:
       - PASSWORD=monitor123
       - SYSNAME=R26U25-EF600
       - SYSID=600A098000F63714000000005E79C888
-      - API=6.6.6.6
+      - API=5.5.5.5 6.6.6.6 # it's OK to set only one
       - RETENTION_PERIOD=26w
       - DB_ADDRESS=7.7.7.7  # influxdb instead of IPv4 when running in same Compose or K8s namespace
       - DB_PORT=8086
@@ -119,13 +130,13 @@ services:
       # - CREATE_DB=false      
 ```
 
-Note that, if you create multiple collectors in the same docker-compose.yaml, only *one* of `DB_NAME` (as each collector may have it different) will be applied in Grafana Data Source configuration. If you're in this situation simply configure just one `DB_NAME` first (you don't have to do anything if you don't mind to have the first DB instance named `eseries`) and then use InfluxDB CLI or the related instructions from the FAQs (on how to do it from collector.py) to create another DB and another InfluxDB Data Source to Grafana. Then you can start all Collector containers. 
+Note that, if you create multiple collectors in the same docker-compose.yaml, only *one* of `DB_NAME` (as each collector may have it different) will be applied in Grafana Data Source configuration. If you're in this situation simply configure just one `DB_NAME` first (you don't have to do anything if you don't mind to have the first DB instance named `eseries`) and then use InfluxDB CLI or the related instructions from the FAQs (on how to do it from `collector.py`) to create another DB and another InfluxDB Data Source to Grafana. Then you can start all Collector containers.
 
-You can also create additional database instances in InfluxDB from the CLI (instructions above), but you won't be able to if you modify Docker Compose to not expose InfluxDB externally. That's why it's easier to use the approach that runs collector.py in Docker - that will work for either Compose-internal or external InfluxDB.
+You can also create additional database instances in InfluxDB from the CLI (instructions above), but you won't be able to if you modify Docker Compose to not expose InfluxDB externally. That's why it's easier to use the approach that runs `collector.py` in Docker - that will work for either Compose-internal or external InfluxDB.
 
 #### Deploy
 
-**NOTE:** EPA v3.4.0 (and newer version 3 releases) uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory before you deploy.
+**NOTE:** EPA v3.4.0 (and newer version 3 releases) uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes make that easier. If you are concerned about disk space for InfluxDB (/var/lib/docker/...), you can change InfluxDB container's volumes in `./epa/docker-compose.yaml` to a sub-directory in `epa` before you deploy. Existing users can backup and import data using the `utils` container (which has InfluxDB v1 CLI) to "migrate" existing DB.
 
 Download and decompress latest release and enter the `epa` sub-directory:
 
@@ -164,24 +175,24 @@ Kubernetes users should skim through this page to get the idea how EPA works, an
 
 ## Other procedures
 
-### Execute containerized collector.py 
+### Execute containerized `collector.py` from CLI
 
-If you want to run containerized collector as CLI program rather than service, try this and add correct parameters from `docker-compose.yaml`. 
+If you want to run containerized collector as a CLI program rather than Docker service, try this and add correct parameters from `docker-compose.yaml`.
 
 Mind the project/container name and version!
 
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
-  epa/collector:3.4.2 collector.py -h
+  epa/collector:3.5.0 collector.py -h
 # or, if you just want to view help
-# docker run --rm epa/collector:3.4.2 -h
+# docker run --rm epa/collector:3.5.0 -h
 ```
 
 Example run for limited database population:
 
 ```sh
-docker run -e INCLUDE="power temp" epa/collector:3.4.2
+docker run -e INCLUDE="power temp" epa/collector:3.5.0
 ```
 
 ### Adjust firewall settings for InfluxDB and Grafana ports
@@ -219,8 +230,13 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 ## Changelog
 
+- 3.5.0 (September 1, 2025)
+  - Add several array configuration objects: hosts, volumes, disk groupings, disks. Now monitoring of hardware configuration and - most importantly - disk group/pool and volume capacity should be easy. Existing EPA 3 users with tight DB disk space upgrading to 3.5.0+ should use `--include` and add `config_` collectors only gradually until they're sure their DB can handle it
+  - Expose RPC service for InfluxDB only on Docker-internal network for convenient access from the utilities container
+  - Improve database down-sampling/pruning for all records older than 30d. No real testing has been done (it'll take 31d to find out), but it's unlikely to be worse than in earlier releases. Still, 3.5.0+ collects a lot more with `config_` measurements, so monitor your `influxdb` volume in Docker
+
 - 3.4.2 (August 29, 2025)
-  - Change Docker Compose network type to `bridge` for automated setup/teardown by Docker
+  - Change Docker Compose network type to `bridge` for automated setup/tear-down by Docker
   - Fix missing `--include <all-measurements>` resulted in nothing being collected
   - Add `--debug` switch to make troubleshooting bugs like the one with `--include` easier
 
@@ -230,7 +246,7 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 - 3.4.0 (August 24, 2025)
   - Remove `dbmanager` container and its JSON configuration file (one less container to worry about)
-  - Add "create database" feature to Collector to replace dbmanager
+  - Add "create database" feature to Collector to replace `dbmanager`
   - Minor update of version tags for various images (InfluxDB, Python, Alpine)
   - Docker Compose with InfluxDB 1.11.8 necessitates `user` key addition and change to InfluxDB volume ownership
   - Complete removal of the pre-fork bloat (epa/Makefile, epa/ansible epa/blackduck and the rest of it)

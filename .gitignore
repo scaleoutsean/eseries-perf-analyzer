@@ -7,4 +7,5 @@ influx-database/*
 epa/collector/__pycache__
 epa/tests/*.sh
 # other
+release.sh
 workspace.code-workspace
