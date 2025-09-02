@@ -1,0 +1,810 @@
+{
+  "__elements": [],
+  "__inputs": [
+    {
+      "description": "",
+      "label": "EPA",
+      "name": "DS_EPA",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB",
+      "type": "datasource"
+    }
+  ],
+  "__requires": [
+    {
+      "id": "grafana",
+      "name": "Grafana",
+      "type": "grafana",
+      "version": "8.5.27"
+    },
+    {
+      "id": "influxdb",
+      "name": "InfluxDB",
+      "type": "datasource",
+      "version": "1.0.0"
+    },
+    {
+      "id": "table",
+      "name": "Table",
+      "type": "panel",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "8.5.27",
+      "targets": [
+        {
+          "alias": "$tag_host_name",
+          "groupBy": [
+            {
+              "params": ["hostRef"],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_hosts",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": ["host_name_field"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Host Name"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["initiators_first_nodeName_ioInterfaceType"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Interface"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["hostSidePortCount"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Host Ports"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["isSAControlled"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["SA Controlled"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["initiators_first_nodeName_remoteNodeWWN"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["FC_WWN"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["initiators_first_nodeName_iscsiNodeName"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["iSCSI_IQN"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["initiators_first_nodeName_nvmeNodeName"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["NVMe_NQN"],
+                "type": "alias"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        },
+        {
+          "alias": "$tag_host_name",
+          "groupBy": [
+            {
+              "params": ["hostRef"],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_hosts",
+          "orderByTime": "ASC",
+          "policy": "pruned_retention",
+          "query": "SELECT last(\"host_name_field\") AS \"Host Name\", last(\"initiators_first_nodeName_ioInterfaceType\") AS \"Interface\", last(\"hostSidePortCount\") AS \"Host Ports\", last(\"isSAControlled\") AS \"SA Controlled\", last(\"initiators_first_nodeName_remoteNodeWWN\") AS \"FC_WWN\", last(\"initiators_first_nodeName_iscsiNodeName\") AS \"iSCSI_IQN\", last(\"initiators_first_nodeName_nvmeNodeName\") AS \"NVMe_NQN\" FROM \"pruned_retention\".\"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"hostRef\"",
+          "rawQuery": true,
+          "refId": "B",
+          "resultFormat": "table",
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        }
+      ],
+      "title": "Host Configuration (Enhanced with Historical Data)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "optimal": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "failed": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "degraded": {
+                        "color": "yellow",
+                        "index": 2
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "8.5.27",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "driveRef": true
+            },
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "targets": [
+        {
+          "groupBy": [
+            {
+              "params": ["driveRef"],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_drives",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": ["physicalLocation__trayRef"],
+                "type": "tag"
+              },
+              {
+                "params": ["Tray"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["physicalLocation_slot"],
+                "type": "tag"
+              },
+              {
+                "params": ["Slot"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["serialNumber"],
+                "type": "tag"
+              },
+              {
+                "params": ["Serial"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["status"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Status"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["productID"],
+                "type": "tag"
+              },
+              {
+                "params": ["Model"],
+                "type": "alias"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        },
+        {
+          "measurement": "config_drives",
+          "orderByTime": "ASC",
+          "policy": "pruned_retention",
+          "query": "SELECT \"physicalLocation__trayRef\" AS \"Tray\", \"physicalLocation_slot\" AS \"Slot\", \"serialNumber\" AS \"Serial\", last(\"status\") AS \"Status\", \"productID\" AS \"Model\" FROM \"pruned_retention\".\"config_drives\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"driveRef\"",
+          "rawQuery": true,
+          "refId": "B",
+          "resultFormat": "table",
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        }
+      ],
+      "title": "Drive Status (Enhanced with Historical Data)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "optimal": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "failed": {
+                        "color": "red",
+                        "index": 1
+                      },
+                      "degraded": {
+                        "color": "yellow",
+                        "index": 2
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RAID Level"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "8.5.27",
+      "targets": [
+        {
+          "groupBy": [
+            {
+              "params": ["volumeGroupRef"],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_storage_pools",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": ["pool_name_field"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Pool Name"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["raidLevel"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["RAID Level"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["state"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["State"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["driveMediaType"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Media Type"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["usedSpace"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Used Space"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["freeSpace"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Free Space"],
+                "type": "alias"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        },
+        {
+          "measurement": "config_storage_pools",
+          "orderByTime": "ASC",
+          "policy": "pruned_retention",
+          "query": "SELECT last(\"pool_name_field\") AS \"Pool Name\", last(\"raidLevel\") AS \"RAID Level\", last(\"state\") AS \"State\", last(\"driveMediaType\") AS \"Media Type\", last(\"usedSpace\") AS \"Used Space\", last(\"freeSpace\") AS \"Free Space\" FROM \"pruned_retention\".\"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeGroupRef\"",
+          "rawQuery": true,
+          "refId": "B",
+          "resultFormat": "table",
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        }
+      ],
+      "title": "Storage Pools Configuration (Enhanced with Historical Data)",
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Capacity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "showHeader": true
+      },
+      "pluginVersion": "8.5.27",
+      "targets": [
+        {
+          "groupBy": [
+            {
+              "params": ["volumeRef"],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": ["volume_name_field"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Volume Name"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["capacity"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["Capacity"],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": ["listOfMappings_lun"],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              },
+              {
+                "params": ["LUN"],
+                "type": "alias"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        },
+        {
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "pruned_retention",
+          "query": "SELECT last(\"volume_name_field\") AS \"Volume Name\", last(\"capacity\") AS \"Capacity\", last(\"listOfMappings_lun\") AS \"LUN\" FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeRef\"",
+          "rawQuery": true,
+          "refId": "B",
+          "resultFormat": "table",
+          "tags": [
+            {
+              "key": "sys_name",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
+        }
+      ],
+      "title": "Volume Configuration (Enhanced with Historical Data)",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+        "definition": "SHOW TAG VALUES FROM \"config_drives\" WITH KEY = \"sys_name\"",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Storage System",
+        "multi": false,
+        "name": "storage_system",
+        "options": [],
+        "query": "SHOW TAG VALUES FROM \"config_drives\" WITH KEY = \"sys_name\"",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Configuration Template (Enhanced with Historical Data Support)",
+  "uid": "config_enhanced",
+  "version": 1,
+  "weekStart": ""
+}

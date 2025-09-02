@@ -73,6 +73,20 @@ else
         echo "INCLUDE environment variable not set, collecting all measurements"
     fi
     
+    # Add output destination if specified
+    if [ -n "${OUTPUT}" ]; then
+        echo "OUTPUT environment variable set: '${OUTPUT}'"
+        CMD="${CMD} --output ${OUTPUT}"
+    else
+        echo "OUTPUT environment variable not set, using default (both)"
+    fi
+    
+    # Add Prometheus port if specified
+    if [ -n "${PROMETHEUS_PORT}" ]; then
+        echo "PROMETHEUS_PORT environment variable set: '${PROMETHEUS_PORT}'"
+        CMD="${CMD} --prometheus-port ${PROMETHEUS_PORT}"
+    fi
+    
     # Add default flags for normal operation
     CMD="${CMD} -i -s"
 fi

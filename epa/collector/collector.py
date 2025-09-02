@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """
 Retrieves and collects data from the the NetApp E-Series API server
-and sends the data to an InfluxDB server
+and sends the data to an InfluxDB server and/or exports via Prometheus
+
+-----------------------------------------------------------------------------
+Copyright (c) 2025 E-Series Perf Analyzer (scaleoutSean@Github (post-v3.0.0 
+commits) and NetApp, Inc (pre-v3.1.0 commits))
+Licensed under the MIT License. See LICENSE in the project root for details.
+-----------------------------------------------------------------------------
+Repository: https://github.com/scaleoutsean/eseries-perf-analyzer
 """
+
 import argparse
 import concurrent.futures
 import hashlib
@@ -11,10 +19,19 @@ import random
 import sys
 import time
 from datetime import datetime, timezone
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import requests
 from influxdb import InfluxDBClient
 from influxdb.exceptions import InfluxDBClientError
+
+# Prometheus client imports (optional - will gracefully handle if not available)
+try:
+    from prometheus_client import CollectorRegistry, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
 
 DEFAULT_USERNAME = 'monitor'
 DEFAULT_PASSWORD = 'monitor123'
@@ -175,8 +192,9 @@ PSU_PARAMS = [
 
 CONFIG_VOLUME_PARAMS = [
     # Fields from config_volumes.metrics file
-    'blockSize',
-    'capacity', 
+    'name',  # Volume name from API (stored as volume_name_field)
+    'blkSize',
+    'capacity',
     'segmentSize',
     'totalSizeInBytes',
     'usableCapacity',
@@ -189,11 +207,17 @@ CONFIG_VOLUME_PARAMS = [
     'repositoryCapacity',
     'dssMaxSegmentSize',
     'dssPreReadRedundancyCheckEnabled',
-    'dssWriteCacheEnabled'
+    'dssWriteCacheEnabled',
+    # Controller and status fields
+    'currentControllerId',
+    'preferredControllerId',
+    'raidLevel',
+    'status'
 ]
 
 CONFIG_HOSTS_PARAMS = [
     # Host configuration boolean flags
+    'name',  # Host name from API (stored as host_name_field)
     'isSAControlled',
     'confirmLUNMappingCreation',
     'protectionInformationCapableAccessMethod',
@@ -214,7 +238,7 @@ CONFIG_HOSTS_PARAMS = [
     'initiators_first_initiatorInactive',
     'initiators_first_initiatorNodeName_interfaceType',
     'initiators_first_id',
-    # Flattened first host-side port data  
+    # Flattened first host-side port data
     'hostSidePorts_first_type',
     'hostSidePorts_first_mtpIoInterfaceType',
     'hostSidePorts_first_id'
@@ -222,10 +246,11 @@ CONFIG_HOSTS_PARAMS = [
 
 CONFIG_STORAGE_POOLS_PARAMS = [
     # Basic pool metrics
+    'name',  # Storage pool name from API (stored as pool_name_field)
     'sequenceNum',
     'offline',
     'raidLevel',
-    'raidStatus', 
+    'raidStatus',
     'state',
     'drivePhysicalType',
     'driveMediaType',
@@ -293,10 +318,8 @@ CONFIG_DRIVE_PARAMS = [
 
 # Cache for cross-referencing between configuration measurements
 # Populated by collect_config_* functions, used by collect_config_volumes
-_STORAGE_POOLS_CACHE = {}  # volumeGroupRef -> pool info  
+_STORAGE_POOLS_CACHE = {}  # volumeGroupRef -> pool info
 _HOSTS_CACHE = {}          # clusterRef -> host info
-
-
 _VOLUME_MAPPINGS_CACHE = {} # mapRef -> mapping info
 # Cache for cross-referencing drive config (driveRef -> drive info)
 _DRIVES_CACHE = {}  # driveRef -> drive info
@@ -337,12 +360,12 @@ def collect_config_drives(system_info):
 
             # Flatten interfaceType fields for each type
             interface_types = ['sas', 'nvme', 'fibre', 'scsi']
-            interfaceType = drive.get('interfaceType', {})
+            interface_type = drive.get('interfaceType', {})
             for itype in interface_types:
                 key = f'interfaceType_{itype}_deviceName'
                 val = None
-                if isinstance(interfaceType, dict):
-                    itype_obj = interfaceType.get(itype)
+                if isinstance(interface_type, dict):
+                    itype_obj = interface_type.get(itype)
                     if isinstance(itype_obj, dict):
                         raw_val = itype_obj.get('deviceName')
                         # Clean up trailing whitespace from deviceName strings
@@ -402,7 +425,7 @@ FIELD_COERCIONS = {
     'percentEnduranceUsed': int,
     'totalPower': int,
     'temp': int,
-    
+
     # Config volume fields - integers
     'blockSize': int,
     'blkSize': int,
@@ -417,24 +440,24 @@ FIELD_COERCIONS = {
     'reserved2': int,
     'repositoryCapacity': int,
     'dssMaxSegmentSize': int,
-    
-    # Config host fields - integers  
+
+    # Config host fields - integers
     'initiatorCount': int,
     'hostSidePortCount': int,
-    
+
     # Config volume fields - booleans (will be converted to strings)
-    'offline': bool,
+    'volume_offline': bool,
     'mapped': bool,
     'hostUnmapEnabled': bool,
     'volumeFull': bool,
-    'diskPool': bool,
+    'volume_diskPool': bool,
     'flashCached': bool,
     'preReadRedundancyCheckEnabled': bool,
-    'protectionInformationCapable': bool,
+    'volume_protectionInformationCapable': bool,
     'protectionType': bool,
     'dssPreReadRedundancyCheckEnabled': bool,
     'dssWriteCacheEnabled': bool,
-    
+
     # Config host fields - booleans (will be converted to strings)
     'isSAControlled': bool,
     'confirmLUNMappingCreation': bool,
@@ -442,11 +465,11 @@ FIELD_COERCIONS = {
     'isLargeBlockFormatHost': bool,
     'isLun0Restricted': bool,
     'initiators_first_initiatorInactive': bool,
-    
+
     # Config storage pools fields - integers
     'sequenceNum': int,
     'blkSizeRecommended': int,
-    
+
     # Config storage pools fields - booleans (will be converted to strings)
     'offline': bool,
     'spindleSpeedMatch': bool,
@@ -457,17 +480,17 @@ FIELD_COERCIONS = {
     'diskPool': bool,
     'blkSizeSupported_512': bool,
     'blkSizeSupported_4096': bool,
-    
+
     # Config storage pools fields - large capacity (integers converted from strings)
     'usedSpace': int,
     'totalRaidedSpace': int,
     'freeSpace': int,
     'extents_rawCapacity': int,
-    
+
     # Flattened mapping fields
     'listOfMappings_lun': int,
     'listOfMappings_ssid': int,
-    
+
     # Large capacity fields - should be floats for InfluxDB compatibility
     'capacity': float,
     'totalSizeInBytes': float,
@@ -485,7 +508,7 @@ NUMBER_OF_THREADS = 8
 
 # Configuration data collection interval (in minutes)
 # Config data changes infrequently, so collect every N minutes instead of every iteration
-CONFIG_COLLECTION_INTERVAL_MINUTES = 15  # Collect config data every 15 minutes
+CONFIG_COLLECTION_INTERVAL_MINUTES = 15  # Collect config data every 15th minute
 
 # LOGGING
 logging.basicConfig(level=logging.INFO,
@@ -586,6 +609,13 @@ PARSER.add_argument('--include', nargs='+', required=False,
                          'major_event_log, failures, config_storage_pools, config_volumes, config_hosts, config_drives. '
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
+PARSER.add_argument('--output', choices=['influxdb', 'prometheus', 'both'], default='both',
+                    help='Output destination for metrics. influxdb: send to InfluxDB only, '
+                         'prometheus: expose Prometheus metrics only (performance metrics only), both: enable both outputs (default). '
+                         'Note: Events, logs, and config data always go to InfluxDB only. Prometheus gets real-time performance metrics. '
+                         'With "both", users can choose not to expose Prometheus port (or open port on OS firewall) if not needed.')
+PARSER.add_argument('--prometheus-port', type=int, default=8080,
+                    help='Port for Prometheus metrics HTTP server. Default: 8080. Only used when --output includes prometheus.')
 CMD = PARSER.parse_args()
 
 # Set logging level based on debug flag
@@ -639,7 +669,7 @@ if CMD.dbAddress == '' or CMD.dbAddress is None:
     if not CMD.doNotPost:
         LOG.warning(
             "InfluxDB server was not provided. Default setting (influxdb:8086) "
-            "works only when collector and InfluxDB containers are on same host")
+            "works only when collector and InfluxDB containers are in same Docker Compose or Kubernetes namespace")
     influxdb_host = INFLUXDB_HOSTNAME
     influxdb_port = INFLUXDB_PORT
 else:
@@ -689,6 +719,274 @@ else:
 
 
 #######################
+# PROMETHEUS SETUP ####
+#######################
+
+# Global Prometheus registry and metrics
+prometheus_registry = None
+prometheus_metrics = {}
+prometheus_server = None
+
+def setup_prometheus():
+    """
+    Initialize Prometheus metrics and HTTP server if Prometheus output is enabled.
+    """
+    global prometheus_registry, prometheus_metrics, prometheus_server
+
+    if CMD.output not in ['prometheus', 'both']:
+        return
+
+    if not PROMETHEUS_AVAILABLE:
+        if CMD.output == 'prometheus':
+            LOG.error("Prometheus client library not available. Install with: pip install prometheus-client")
+            import sys as system
+            system.exit(1)
+        else:
+            LOG.warning("Prometheus client library not available. Continuing with InfluxDB only.")
+            return
+
+    LOG.info(f"Setting up Prometheus metrics server on port {CMD.prometheus_port}")
+
+    # Create custom registry to avoid conflicts with default registry
+    prometheus_registry = CollectorRegistry()
+
+    # Define metrics for each measurement type
+    # Drive metrics
+    prometheus_metrics['disks'] = {
+        'iops': Gauge('eseries_disk_iops_total', 'Total IOPS for disk',
+                     ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name'],
+                     registry=prometheus_registry),
+        'throughput': Gauge('eseries_disk_throughput_bytes_per_second', 'Disk throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name', 'direction'],
+                           registry=prometheus_registry),
+        'response_time': Gauge('eseries_disk_response_time_seconds', 'Disk response time in seconds',
+                              ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name', 'operation'],
+                              registry=prometheus_registry),
+        'ssd_wear': Gauge('eseries_disk_ssd_wear_percent', 'SSD wear level percentage',
+                         ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name', 'metric'],
+                         registry=prometheus_registry)
+    }
+
+    # Controller metrics
+    prometheus_metrics['controllers'] = {
+        'iops': Gauge('eseries_controller_iops_total', 'Controller IOPS',
+                     ['sys_id', 'sys_name', 'controller_id', 'operation'], registry=prometheus_registry),
+        'throughput': Gauge('eseries_controller_throughput_bytes_per_second', 'Controller throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'controller_id', 'direction'], registry=prometheus_registry),
+        'cpu_utilization': Gauge('eseries_controller_cpu_utilization_percent', 'Controller CPU utilization',
+                                ['sys_id', 'sys_name', 'controller_id', 'metric'], registry=prometheus_registry),
+        'cache_hit': Gauge('eseries_controller_cache_hit_percent', 'Controller cache hit percentage',
+                          ['sys_id', 'sys_name', 'controller_id'], registry=prometheus_registry)
+    }
+
+    # Volume metrics
+    prometheus_metrics['volumes'] = {
+        'iops': Gauge('eseries_volume_iops_total', 'Volume IOPS',
+                     ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry),
+        'throughput': Gauge('eseries_volume_throughput_bytes_per_second', 'Volume throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'vol_name', 'direction'], registry=prometheus_registry),
+        'response_time': Gauge('eseries_volume_response_time_seconds', 'Volume response time in seconds',
+                              ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry)
+    }
+
+    # System metrics
+    prometheus_metrics['systems'] = {
+        'cpu_utilization': Gauge('eseries_system_cpu_utilization_percent', 'System CPU utilization',
+                                ['sys_id', 'sys_name', 'metric'], registry=prometheus_registry)
+    }
+
+    # Interface metrics
+    prometheus_metrics['interface'] = {
+        'iops': Gauge('eseries_interface_iops_total', 'Interface IOPS',
+                     ['sys_id', 'sys_name', 'interface_id', 'channel_type', 'operation'], registry=prometheus_registry),
+        'throughput': Gauge('eseries_interface_throughput_bytes_per_second', 'Interface throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'interface_id', 'channel_type', 'direction'], registry=prometheus_registry),
+        'queue_depth': Gauge('eseries_interface_queue_depth', 'Interface queue depth',
+                            ['sys_id', 'sys_name', 'interface_id', 'channel_type', 'metric'], registry=prometheus_registry)
+    }
+
+    # Power and temperature metrics
+    prometheus_metrics['power'] = {
+        'total_power': Gauge('eseries_power_consumption_watts', 'Total power consumption in watts',
+                            ['sys_id', 'sys_name'], registry=prometheus_registry)
+    }
+
+    prometheus_metrics['temp'] = {
+        'temperature': Gauge('eseries_temperature_celsius', 'Temperature in Celsius',
+                            ['sys_id', 'sys_name', 'sensor', 'sensor_seq'], registry=prometheus_registry)
+    }
+
+    # Start HTTP server in background thread
+    start_prometheus_server()
+
+
+class PrometheusHandler(BaseHTTPRequestHandler):
+    """HTTP handler for Prometheus metrics endpoint."""
+
+    def do_GET(self):
+        if self.path == '/metrics':
+            self.send_response(200)
+            self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+            self.end_headers()
+            self.wfile.write(generate_latest(prometheus_registry))
+        elif self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        # Suppress default HTTP logging to avoid clutter
+        pass
+
+
+def start_prometheus_server():
+    """Start Prometheus metrics HTTP server in background thread."""
+    global prometheus_server
+
+    def run_server():
+        try:
+            prometheus_server = HTTPServer(('', CMD.prometheus_port), PrometheusHandler)
+            LOG.info(f"Prometheus metrics server started on port {CMD.prometheus_port}")
+            LOG.info(f"Metrics available at: http://localhost:{CMD.prometheus_port}/metrics")
+            prometheus_server.serve_forever()
+        except Exception as e:
+            LOG.error(f"Failed to start Prometheus server: {e}")
+
+    server_thread = Thread(target=run_server, daemon=True)
+    server_thread.start()
+
+
+def send_to_prometheus(measurement, tags, fields):
+    """
+    Send metrics to Prometheus.
+
+    Only sends performance metrics - skips events, logs, and config data.
+    Prometheus is for performance metrics, so only performance-related data is sent.
+
+    Args:
+        measurement (str): Measurement name (e.g., 'disks', 'controllers')
+        tags (dict): Tag dictionary with label values
+        fields (dict): Field dictionary with metric values
+    """
+    if CMD.output not in ['prometheus', 'both'] or not PROMETHEUS_AVAILABLE:
+        return
+
+    # Only send performance metrics to Prometheus, skip events/config data
+    prometheus_metrics_whitelist = {
+        'disks', 'controllers', 'volumes', 'systems', 'interface', 'power', 'temp'
+    }
+
+    if measurement not in prometheus_metrics_whitelist:
+        LOG.debug(f"Skipping {measurement} for Prometheus (events/config data not suitable for metrics)")
+        return
+
+    if measurement not in prometheus_metrics:
+        LOG.debug(f"No Prometheus metrics defined for measurement: {measurement}")
+        return
+
+    measurement_metrics = prometheus_metrics[measurement]
+
+    try:
+        if measurement == 'disks':
+            # Map disk fields to Prometheus metrics
+            if 'combinedIOps' in fields and fields['combinedIOps'] is not None:
+                measurement_metrics['iops'].labels(**tags).set(fields['combinedIOps'])
+
+            # Throughput metrics
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # Response time metrics
+            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+                if field in fields and fields[field] is not None:
+                    # Convert milliseconds to seconds for Prometheus
+                    measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
+
+            # SSD wear metrics
+            if 'spareBlocksRemainingPercent' in fields and fields['spareBlocksRemainingPercent'] is not None:
+                measurement_metrics['ssd_wear'].labels(**tags, metric='spare_blocks_remaining').set(fields['spareBlocksRemainingPercent'])
+            if 'percentEnduranceUsed' in fields and fields['percentEnduranceUsed'] is not None:
+                measurement_metrics['ssd_wear'].labels(**tags, metric='endurance_used').set(fields['percentEnduranceUsed'])
+
+        elif measurement == 'controllers':
+            # Controller IOPS
+            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
+
+            # Controller throughput
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # CPU utilization
+            for metric, field in [('max', 'maxCpuUtilization'), ('average', 'cpuAvgUtilization')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['cpu_utilization'].labels(**tags, metric=metric).set(fields[field])
+
+            # Cache hit rate
+            if 'cacheHitBytesPercent' in fields and fields['cacheHitBytesPercent'] is not None:
+                measurement_metrics['cache_hit'].labels(**tags).set(fields['cacheHitBytesPercent'])
+
+        elif measurement == 'volumes':
+            # Volume IOPS
+            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
+
+            # Volume throughput
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # Volume response time
+            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
+
+        elif measurement == 'systems':
+            # System CPU utilization
+            for metric, field in [('max', 'maxCpuUtilization'), ('average', 'cpuAvgUtilization')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['cpu_utilization'].labels(**tags, metric=metric).set(fields[field])
+
+        elif measurement == 'interface':
+            # Interface IOPS
+            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
+
+            # Interface throughput
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # Queue depth
+            for metric, field in [('total', 'queueDepthTotal'), ('max', 'queueDepthMax')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['queue_depth'].labels(**tags, metric=metric).set(fields[field])
+
+        elif measurement == 'power':
+            if 'totalPower' in fields and fields['totalPower'] is not None:
+                measurement_metrics['total_power'].labels(**tags).set(fields['totalPower'])
+
+        elif measurement == 'temp':
+            if 'temp' in fields and fields['temp'] is not None:
+                measurement_metrics['temperature'].labels(**tags).set(fields['temp'])
+
+        # Log successful Prometheus update with timestamp
+        LOG.info(f"Prometheus metrics updated for '{measurement}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+    except Exception as e:
+        LOG.debug(f"Error sending {measurement} metrics to Prometheus: {e}")
+
+
+#######################
 # HELPER FUNCTIONS ####
 #######################
 
@@ -701,6 +999,35 @@ def should_collect_config_data():
     """
     current_minute = datetime.now().minute
     return current_minute % CONFIG_COLLECTION_INTERVAL_MINUTES == 0
+
+
+def write_to_outputs(json_body, measurement_type="metrics"):
+    """
+    Write metrics to configured outputs (InfluxDB and/or Prometheus).
+
+    Smart routing: All data goes to InfluxDB, only performance metrics go to Prometheus.
+    Events, logs, and config data are InfluxDB-only since Prometheus is for real-time metrics.
+
+    Args:
+        json_body (list): List of measurement dictionaries with tags and fields
+        measurement_type (str): Type of measurement for logging purposes
+    """
+    # Write to InfluxDB if enabled (all data types)
+    if CMD.output in ['influxdb', 'both'] and not CMD.doNotPost:
+        try:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
+            client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
+            LOG.info(f"LOG: {measurement_type} sent to InfluxDB")
+        except Exception as e:
+            LOG.error(f"Failed to write {measurement_type} to InfluxDB: {e}")
+    elif CMD.output == 'prometheus':
+        LOG.debug(f"Skipped InfluxDB posting for {measurement_type} (prometheus-only mode)")
+    else:
+        LOG.debug(f"Skipped posting {measurement_type} to InfluxDB (--doNotPost enabled)")
+
+    # Prometheus data is sent during collection via send_to_prometheus() calls
+    # Only performance metrics are sent - events/config data is filtered out in send_to_prometheus()
 
 
 def get_session():
@@ -737,7 +1064,7 @@ def get_controller(query):
     if (len(CMD.api) == 0) or (CMD.api is None) or (CMD.api == ''):
         storage_controller_ep = 'https://' + \
             DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + api_path
-    elif (len(CMD.api) == 1):
+    elif len(CMD.api) == 1:
         storage_controller_ep = 'https://' + \
             CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + api_path
     else:
@@ -746,7 +1073,7 @@ def get_controller(query):
             CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
             api_path
         LOG.info(f"Controller selection: {storage_controller_ep}")
-    return (storage_controller_ep)
+    return storage_controller_ep
 
 
 def get_drive_location(sys_id, session):
@@ -803,6 +1130,8 @@ def collect_symbol_stats(system_info):
         }
         if not CMD.include or item["measurement"] in CMD.include:
             json_body.append(item)
+            # Send to Prometheus
+            send_to_prometheus(item["measurement"], item["tags"], item["fields"])
             LOG.debug(f"Added {item['measurement']} measurement to collection")
         else:
             LOG.debug(f"Skipped {item['measurement']} measurement (not in --include filter)")
@@ -831,13 +1160,12 @@ def collect_symbol_stats(system_info):
             }
             if not CMD.include or item["measurement"] in CMD.include:
                 json_body.append(item)
+                # Send to Prometheus
+                send_to_prometheus(item["measurement"], item["tags"], item["fields"])
         LOG.info("LOG: sensor data prepared")
 
-        LOG.debug(f"collect_symbol_stats: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
-            client.write_points(
-                json_body, database=INFLUXDB_DATABASE, time_precision="s")
-            LOG.info("LOG: SYMbol V2 PSU and sensor readings sent")
+        LOG.debug(f"collect_symbol_stats: Prepared {len(json_body)} measurements")
+        write_to_outputs(json_body, "SYMbol V2 PSU and sensor readings")
 
     except RuntimeError:
         LOG.error(
@@ -848,7 +1176,7 @@ def field_coerce(field_name, value):
     """
     Coerce field values to match production InfluxDB schema types.
 
-    Prevents field type conflicts that cause write failures when NetApp API
+    Prevents field type conflicts that cause write failures when SANtricity API
     returns mixed int/float values for fields that already exist as specific
     types in the production database.
 
@@ -1052,6 +1380,8 @@ def collect_storage_metrics(system_info):
                 LOG.info("Drive payload: %s", disk_item)
             if not CMD.include or disk_item["measurement"] in CMD.include:
                 json_body.append(disk_item)
+                # Send to Prometheus
+                send_to_prometheus(disk_item["measurement"], disk_item["tags"], disk_item["fields"])
 
         interface_stats_list = session.get(
             f"{get_controller('sys')}/{sys_id}/analysed-interface-statistics").json()
@@ -1077,6 +1407,8 @@ def collect_storage_metrics(system_info):
                 LOG.info("Interface payload: %s", if_item)
             if not CMD.include or if_item["measurement"] in CMD.include:
                 json_body.append(if_item)
+                # Send to Prometheus
+                send_to_prometheus(if_item["measurement"], if_item["tags"], if_item["fields"])
 
         system_stats_list = session.get(
             f"{get_controller('sys')}/{sys_id}/analysed-system-statistics").json()
@@ -1096,6 +1428,8 @@ def collect_storage_metrics(system_info):
             LOG.info("System payload: %s", sys_item)
         if not CMD.include or sys_item["measurement"] in CMD.include:
             json_body.append(sys_item)
+            # Send to Prometheus
+            send_to_prometheus(sys_item["measurement"], sys_item["tags"], sys_item["fields"])
 
         volume_stats_list = session.get(
             f"{get_controller('sys')}/{sys_id}/analysed-volume-statistics").json()
@@ -1120,14 +1454,11 @@ def collect_storage_metrics(system_info):
                 LOG.info("Volume payload: %s", vol_item)
             if not CMD.include or vol_item["measurement"] in CMD.include:
                 json_body.append(vol_item)
+                # Send to Prometheus
+                send_to_prometheus(vol_item["measurement"], vol_item["tags"], vol_item["fields"])
 
-        LOG.debug(f"collect_storage_metrics: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
-            client.write_points(
-                json_body, database=INFLUXDB_DATABASE, time_precision="s")
-            LOG.info("LOG: storage metrics sent")
-        else:
-            LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        LOG.debug(f"collect_storage_metrics: Prepared {len(json_body)} measurements")
+        write_to_outputs(json_body, "storage metrics")
 
     except RuntimeError:
         LOG.error(
@@ -1328,34 +1659,33 @@ def collect_config_volumes(system_info):
     if not should_collect_config_data():
         LOG.info("Skipping config_volumes collection - not a scheduled interval (collected every 15 minutes)")
         return
-        
+
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-        
+
         # Get volume configuration data from the API
         volumes_response = session.get(f"{get_controller('sys')}/{sys_id}/volumes").json()
-        
+
         LOG.debug(f"Retrieved {len(volumes_response)} volume configurations")
-        
+
         for volume in volumes_response:
             # Extract configuration fields (numeric/boolean values from CONFIG_VOLUME_PARAMS)
             config_fields = {}
             for param in CONFIG_VOLUME_PARAMS:
-                value = volume.get(param)
-                if value is not None:
-                    config_fields[param] = value
-            
-            # Add controller IDs as fields (not tags) for querying mismatches
-            config_fields['currentControllerId'] = volume.get('currentControllerId', 'unknown')
-            config_fields['preferredControllerId'] = volume.get('preferredControllerId', 'unknown')
-            
-            # Add raidLevel and status as fields (they can change)
-            config_fields['raidLevel'] = volume.get('raidLevel', 'unknown')
-            config_fields['status'] = volume.get('status', 'unknown')
-            
+                if param == 'name':
+                    # Handle name field specially - store as both original and renamed field
+                    value = volume.get(param)
+                    if value is not None:
+                        config_fields[param] = value
+                        config_fields['volume_name_field'] = value
+                else:
+                    value = volume.get(param)
+                    if value is not None:
+                        config_fields[param] = value
+
             # Flatten listOfMappings (take first mapping if multiple exist)
             mappings = volume.get('listOfMappings', [])
             if mappings and len(mappings) > 0:
@@ -1367,10 +1697,10 @@ def collect_config_volumes(system_info):
                 config_fields['listOfMappings_lunMappingRef'] = 'unmapped'
                 config_fields['listOfMappings_lun'] = 0
                 config_fields['listOfMappings_ssid'] = 0
-            
+
             # Apply field coercion to ensure proper types
             config_fields = coerce_fields_dict(config_fields)
-            
+
             vol_config_item = {
                 "measurement": "config_volumes",
                 "tags": {
@@ -1382,29 +1712,29 @@ def collect_config_volumes(system_info):
                     "label": volume.get("label", "unknown"),
                     "volumeRef": volume.get("volumeRef", "unknown"),
                     "wwn": volume.get("wwn", "unknown"),
-                    "name": volume.get("name", "unknown"),
+                    "volume_name": volume.get("name", "unknown"),
                     "id": volume.get("id", "unknown"),
                     # Group reference for volume grouping
                     "volumeGroupRef": volume.get("volumeGroupRef", "unknown"),
-                    # Extended identifier 
+                    # Extended identifier
                     "extendedUniqueIdentifier": volume.get("extendedUniqueIdentifier", "unknown")
                 },
                 "fields": config_fields
             }
-            
+
             if not CMD.include or vol_config_item["measurement"] in CMD.include:
                 json_body.append(vol_config_item)
                 LOG.debug(f"Added config_volumes measurement for volume {volume.get('name', 'unknown')}")
             else:
                 LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
-        
+
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: volume configuration data sent")
         else:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
-            
+
     except RuntimeError:
         LOG.error(f"Error when attempting to post volume configuration for {system_info['name']}/{system_info['wwn']}")
 
@@ -1415,28 +1745,34 @@ def collect_config_storage_pools(system_info):
     :param system_info: The JSON object of a storage_system
     """
     global _STORAGE_POOLS_CACHE
-    
+
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_storage_pools collection - not a scheduled interval (collected every 15 minutes)")
         return
-    
+
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-        
+
         # Get storage pool configuration data from the API
         storage_pools_response = session.get(f"{get_controller('sys')}/{sys_id}/storage-pools").json()
-        
+
         LOG.debug(f"Retrieved {len(storage_pools_response)} storage pool configurations")
-        
+
         for pool in storage_pools_response:
             # Extract configuration fields (numeric/boolean values from CONFIG_STORAGE_POOLS_PARAMS)
             config_fields = {}
             for param in CONFIG_STORAGE_POOLS_PARAMS:
-                if param.startswith('blkSizeSupported_'):
+                if param == 'name':
+                    # Handle name field specially - store as both original and renamed field
+                    value = pool.get(param)
+                    if value is not None:
+                        config_fields[param] = value
+                        config_fields['pool_name_field'] = value
+                elif param.startswith('blkSizeSupported_'):
                     # Handle flattened blkSizeSupported array
                     blk_size_supported = pool.get('blkSizeSupported', [])
                     if param == 'blkSizeSupported_512':
@@ -1477,10 +1813,10 @@ def collect_config_storage_pools(system_info):
                     value = pool.get(param)
                     if value is not None:
                         config_fields[param] = value
-            
+
             # Apply field coercion to ensure proper types
             config_fields = coerce_fields_dict(config_fields)
-            
+
             # Cache storage pool data for cross-referencing
             pool_ref = pool.get('volumeGroupRef', 'unknown')
             if pool_ref != 'unknown':
@@ -1491,7 +1827,7 @@ def collect_config_storage_pools(system_info):
                     'state': pool.get('state', 'unknown'),
                     'diskPool': pool.get('diskPool', False)
                 }
-            
+
             pool_config_item = {
                 "measurement": "config_storage_pools",
                 "tags": {
@@ -1501,7 +1837,7 @@ def collect_config_storage_pools(system_info):
                     "volumeGroupRef": pool.get("volumeGroupRef", "unknown"),
                     "id": pool.get("id", "unknown"),
                     "label": pool.get("label", "unknown"),
-                    "name": pool.get("name", "unknown"),
+                    "pool_name": pool.get("name", "unknown"),
                     # Pool type and RAID level as tags for easy filtering
                     "raidLevel": pool.get("raidLevel", "unknown"),
                     "state": pool.get("state", "unknown"),
@@ -1509,20 +1845,20 @@ def collect_config_storage_pools(system_info):
                 },
                 "fields": config_fields
             }
-            
+
             if not CMD.include or pool_config_item["measurement"] in CMD.include:
                 json_body.append(pool_config_item)
                 LOG.debug(f"Added config_storage_pools measurement for pool {pool.get('label', 'unknown')}")
             else:
                 LOG.debug(f"Skipped config_storage_pools measurement (not in --include filter)")
-        
+
         LOG.debug(f"collect_config_storage_pools: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: storage pool configuration data sent")
         else:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
-            
+
     except RuntimeError:
         LOG.error(f"Error when attempting to post storage pool configuration for {system_info['name']}/{system_info['wwn']}")
 
@@ -1536,23 +1872,29 @@ def collect_config_hosts(system_info):
     if not should_collect_config_data():
         LOG.info("Skipping config_hosts collection - not a scheduled interval (collected every 15 minutes)")
         return
-        
+
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-        
+
         # Get host configuration data from the API
         hosts_response = session.get(f"{get_controller('sys')}/{sys_id}/hosts").json()
-        
+
         LOG.debug(f"Retrieved {len(hosts_response)} host configurations")
-        
+
         for host in hosts_response:
             # Extract configuration fields (numeric/boolean values from CONFIG_HOSTS_PARAMS)
             config_fields = {}
             for param in CONFIG_HOSTS_PARAMS:
-                if param.startswith('initiators_first_'):
+                if param == 'name':
+                    # Handle name field specially - store as both original and renamed field
+                    value = host.get(param)
+                    if value is not None:
+                        config_fields[param] = value
+                        config_fields['host_name_field'] = value
+                elif param.startswith('initiators_first_'):
                     # Handle flattened initiator fields
                     initiators = host.get('initiators', [])
                     if initiators and len(initiators) > 0:
@@ -1588,7 +1930,7 @@ def collect_config_hosts(system_info):
                             config_fields[param] = False
                         else:
                             config_fields[param] = ''
-                            
+
                 elif param.startswith('hostSidePorts_first_'):
                     # Handle flattened host-side port fields
                     host_side_ports = host.get('hostSidePorts', [])
@@ -1603,27 +1945,27 @@ def collect_config_hosts(system_info):
                     else:
                         # No host-side ports present
                         config_fields[param] = ''
-                        
+
                 elif param == 'initiatorCount':
                     # Count of initiators
                     initiators = host.get('initiators', [])
                     config_fields[param] = len(initiators)
-                    
+
                 elif param == 'hostSidePortCount':
                     # Count of host-side ports
                     host_side_ports = host.get('hostSidePorts', [])
                     config_fields[param] = len(host_side_ports)
-                    
+
                 else:
                     # Direct field mapping (skip hostTypeIndex since it's now a tag)
                     if param != 'hostTypeIndex':
                         value = host.get(param)
                         if value is not None:
                             config_fields[param] = value
-            
+
             # Apply field coercion to ensure proper types
             config_fields = coerce_fields_dict(config_fields)
-            
+
             host_config_item = {
                 "measurement": "config_hosts",
                 "tags": {
@@ -1632,7 +1974,7 @@ def collect_config_hosts(system_info):
                     # Essential host identifiers
                     "hostRef": host.get("hostRef", "unknown"),
                     "id": host.get("id", "unknown"),
-                    "name": host.get("name", "unknown"),
+                    "host_name": host.get("name", "unknown"),
                     "label": host.get("label", "unknown"),
                     # Host type as string (safer for unknown OS types)
                     "hostTypeIndex": str(host.get("hostTypeIndex", "unknown")),
@@ -1641,20 +1983,20 @@ def collect_config_hosts(system_info):
                 },
                 "fields": config_fields
             }
-            
+
             if not CMD.include or host_config_item["measurement"] in CMD.include:
                 json_body.append(host_config_item)
                 LOG.debug(f"Added config_hosts measurement for host {host.get('name', 'unknown')}")
             else:
                 LOG.debug(f"Skipped config_hosts measurement (not in --include filter)")
-        
+
         LOG.debug(f"collect_config_hosts: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: host configuration data sent")
         else:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
-            
+
     except RuntimeError:
         LOG.error(f"Error when attempting to post host configuration for {system_info['name']}/{system_info['wwn']}")
 
@@ -1668,35 +2010,35 @@ def collect_controller_metrics(system_info):
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
-        
+
         # Since both controllers return data for all controllers in the cluster,
         # we only need to query one controller to get metrics for both
         # Use existing get_controller() logic which handles failover automatically
-        
+
         try:
             # Create a session and use existing controller selection logic
             session = get_session()
-            
+
             # Build controller URL using existing get_controller() logic (handles failover)
             controller_url = f"{get_controller('sys')}/{sys_id}/analyzed/controller-statistics"
-            
+
             # Use statisticsFetchTime as required by the API method, 60 seconds for recent data
             params = {"statisticsFetchTime": "60"}
-            
+
             LOG.debug(f"[CONTROLLER_COLLECTOR] GET {controller_url} with params {params}")
-            
+
             # Use shorter timeout for controller metrics to avoid long delays if a controller is down
             controller_response = session.get(controller_url, params=params, timeout=(6.10, 15))
-            
+
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response status: {controller_response.status_code}")
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response headers: {dict(controller_response.headers)}")
-            
+
             controller_stats_response = controller_response.json()
-            
+
             LOG.info(f"Retrieved controller statistics from controller API")
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response type: {type(controller_stats_response)}")
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response content: {controller_stats_response}")
-            
+
             # Handle different response formats with defensive programming
             if isinstance(controller_stats_response, str):
                 LOG.warning(f"API returned string instead of JSON object: {controller_stats_response}")
@@ -1717,12 +2059,12 @@ def collect_controller_metrics(system_info):
             else:
                 LOG.warning(f"Unexpected response format: {type(controller_stats_response)}")
                 return
-            
+
             # Validate we have actual controller data
             if not controller_stats_list:
                 LOG.warning("No controller statistics found in API response")
                 return
-            
+
             # Process each controller's statistics
             for controller_stats in controller_stats_list:
                 # Extract performance fields based on CONTROLLER_PARAMS
@@ -1747,48 +2089,46 @@ def collect_controller_metrics(system_info):
                                 continue
                         else:
                             controller_fields[param] = value
-                
+
                 # Ensure we have at least some fields to prevent "missing fields" error
                 if not controller_fields:
                     LOG.warning(f"No valid fields found for controller {controller_stats.get('controllerId', 'unknown')}")
                     continue
-                
+
                 # Apply field coercion to ensure proper types
                 controller_fields = coerce_fields_dict(controller_fields)
-                
+
                 # Build tags for this controller
                 tags = {
                     "sys_id": sys_id,
                     "sys_name": sys_name,
                     "controller_id": str(controller_stats.get("controllerId", "unknown"))
                 }
-                
+
                 controller_item = {
                     "measurement": "controllers",
                     "tags": tags,
                     "fields": controller_fields
                 }
-                
+
                 if CMD.showControllerMetrics:
                     LOG.info("Controller payload: %s", controller_item)
-                
+
                 if not CMD.include or controller_item["measurement"] in CMD.include:
                     json_body.append(controller_item)
+                    # Send to Prometheus
+                    send_to_prometheus(controller_item["measurement"], controller_item["tags"], controller_item["fields"])
                     LOG.debug(f"Added controllers measurement for controller {controller_stats.get('controllerId', 'unknown')}")
                 else:
                     LOG.debug(f"Skipped controllers measurement (not in --include filter)")
-                    
+
         except Exception as e:
             LOG.warning(f"Could not retrieve controller statistics: {e}")
             return
-        
-        LOG.debug(f"collect_controller_metrics: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
-            client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
-            LOG.info("LOG: controller metrics sent")
-        else:
-            LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
-            
+
+        LOG.debug(f"collect_controller_metrics: Prepared {len(json_body)} measurements")
+        write_to_outputs(json_body, "controller metrics")
+
     except Exception as e:
         LOG.error(f"Error when attempting to collect controller metrics for {system_info['name']}/{system_info['wwn']}: {e}")
 
@@ -1809,18 +2149,18 @@ def parse_retention_weeks(retention_str):
 
 def create_temporal_pruning_query(client, database):
     """
-    Creates temporal pruning queries for measurements that preserve meaningful state
-    while reducing storage overhead. Uses LAST() function to retain actual readings
-    rather than meaningless averages.
-    :param client: InfluxDB client instance  
+    Creates temporal pruning queries for measurements that preserve state
+    while reducing storage overhead. Uses LAST() function to retain readings
+    rather than averages.
+    :param client: InfluxDB client instance
     :param database: The measurement name (e.g., config_volumes, temp, power)
     """
     try:
         # Define measurement-specific tags for preserving object identity
         measurement_tags = {
-            'config_volumes': ['volumeRef', 'name', 'worldWideName'],
-            'config_storage_pools': ['poolRef', 'name'],
-            'config_hosts': ['hostRef', 'id', 'name'],
+            'config_volumes': ['volumeRef', 'volume_name', 'worldWideName', 'label', 'id'],
+            'config_storage_pools': ['volumeGroupRef', 'pool_name', 'label', 'id'],
+            'config_hosts': ['hostRef', 'host_name', 'label', 'id'],
             'config_drives': [
                 'driveRef',
                 'serialNumber',
@@ -1829,28 +2169,28 @@ def create_temporal_pruning_query(client, database):
                 'physicalLocation__trayRef',
                 'physicalLocation_slot'
             ],
-            'temp': ['sys_id', 'sys_name', 'sensor_ref'],  # Temperature sensors by location
-            'power': ['sys_id', 'sys_name', 'psu_ref']      # Power supplies by location
+            'temp': ['sys_id', 'sys_name', 'sensor', 'sensor_seq'],  # Temperature sensors by location
+            'power': ['sys_id', 'sys_name']      # Power supplies by location (no individual PSU refs in current implementation)
         }
-        
+
         if database not in measurement_tags:
             LOG.warning(f"No tag definition found for {database} - skipping pruning query")
             return
-            
+
         tags = measurement_tags[database]
         tag_clause = ', '.join([f'"{tag}"' for tag in tags])
-        
+
         # Create pruning query: retain last sample per hour for each unique object
-        pruning_select = f"""SELECT LAST(*) 
-                            INTO "{INFLUXDB_DATABASE}"."pruned_retention"."{database}" 
-                            FROM "{database}" 
-                            WHERE (time < now()-1h) 
+        pruning_select = f"""SELECT LAST(*)
+                            INTO "{INFLUXDB_DATABASE}"."pruned_retention"."{database}"
+                            FROM "{database}"
+                            WHERE (time < now()-1h)
                             GROUP BY time(1h), {tag_clause}"""
-        
+
         query_name = f"prune_{database}"
         client.create_continuous_query(query_name, pruning_select, INFLUXDB_DATABASE, "")
         LOG.debug(f"Created temporal pruning query for {database} with tags: {tags}")
-        
+
     except InfluxDBClientError as err:
         LOG.info(f"Creation of pruning query for '{database}' failed: {err}")
 
@@ -1866,11 +2206,11 @@ def create_continuous_query(client, params_list, database):
         # Handle measurements that use temporal pruning instead of downsampling
         pruning_measurements = [
             "temp",                    # Temperature sensors - preserve last reading per hour
-            "power",                   # Power readings - preserve last reading per hour  
+            "power",                   # Power readings - preserve last reading per hour
             "major_event_log",         # Event logs can't be averaged
             "failures",                # Failure events can't be averaged
         ]
-        
+
         # Handle config measurements with temporal pruning
         if database.startswith('config_') or database in pruning_measurements:
             if database in ["major_event_log", "failures"]:
@@ -1882,30 +2222,30 @@ def create_continuous_query(client, params_list, database):
 
         # Multi-tier downsampling for performance metrics
         retention_weeks = parse_retention_weeks(CMD.retention)
-        
+
         for metric in params_list:
             # Tier 1: 5-minute averages for data older than 1 week
-            ds_select_5m = f"""SELECT mean("{metric}") AS "ds_{metric}" 
-                              INTO "{INFLUXDB_DATABASE}"."downsample_retention"."{database}" 
-                              FROM "{database}" 
+            ds_select_5m = f"""SELECT mean("{metric}") AS "ds_{metric}"
+                              INTO "{INFLUXDB_DATABASE}"."downsample_retention"."{database}"
+                              FROM "{database}"
                               WHERE (time < now()-1w) GROUP BY time(5m)"""
-            
+
             client.create_continuous_query(f"downsample_5m_{database}_{metric}", ds_select_5m, INFLUXDB_DATABASE, "")
-            
+
             # Tier 2: 1-hour averages for data older than 4 weeks (only for long retention policies)
             if retention_weeks > 8:
-                ds_select_1h = f"""SELECT mean("ds_{metric}") AS "ds_hourly_{metric}" 
-                                  INTO "{INFLUXDB_DATABASE}"."longterm_retention"."{database}" 
-                                  FROM "{INFLUXDB_DATABASE}"."downsample_retention"."{database}" 
+                ds_select_1h = f"""SELECT mean("ds_{metric}") AS "ds_hourly_{metric}"
+                                  INTO "{INFLUXDB_DATABASE}"."longterm_retention"."{database}"
+                                  FROM "{INFLUXDB_DATABASE}"."downsample_retention"."{database}"
                                   WHERE (time < now()-4w) GROUP BY time(1h)"""
-                
+
                 client.create_continuous_query(f"downsample_1h_{database}_{metric}", ds_select_1h, INFLUXDB_DATABASE, "")
                 LOG.debug(f"Created 2-tier downsampling for {database}.{metric} (retention: {retention_weeks}w)")
             else:
                 LOG.debug(f"Created 1-tier downsampling for {database}.{metric} (retention: {retention_weeks}w)")
-                
+
     except InfluxDBClientError as err:
-        LOG.info(f"Creation of continuous query on '{database}' failed: {err}")
+        LOG.info(f"Creation of continuous query on '{database}' failed (possibly due to insufficient records): {err}")
 
 
 def order_sensor_response_list(response):
@@ -1921,10 +2261,10 @@ def order_sensor_response_list(response):
         osensor.append(pair)
         i = i+1
     osensor.sort()
-    orderedResponse = []
+    ordered_response = []
     for item in osensor:
-        orderedResponse.append(response['thermalSensorData'][item[1]])
-    return (orderedResponse)
+        ordered_response.append(response['thermalSensorData'][item[1]])
+    return ordered_response
 
 
 def ensure_database(client, dbname):
@@ -1956,13 +2296,19 @@ if __name__ == "__main__":
     if CMD.dbName:
         INFLUXDB_DATABASE = CMD.dbName
 
-    client = InfluxDBClient(host=influxdb_host,
-                            port=influxdb_port, database=INFLUXDB_DATABASE)
+    # Only create InfluxDB client if we're using InfluxDB output
+    client = None
+    if CMD.output in ['influxdb', 'both'] or CMD.createDb:
+        client = InfluxDBClient(host=influxdb_host,
+                                port=influxdb_port, database=INFLUXDB_DATABASE)
 
     # Handle database creation request
     if CMD.createDb:
         if not CMD.dbName:
             LOG.error("--createDb requires --dbName to be specified")
+            sys.exit(1)
+        if not client:
+            LOG.error("InfluxDB client not available for database creation")
             sys.exit(1)
         try:
             ensure_database(client, INFLUXDB_DATABASE)
@@ -1973,15 +2319,17 @@ if __name__ == "__main__":
             sys.exit(1)
 
     # Ensure database exists for normal operation (not just --createDb)
-    try:
-        ensure_database(client, INFLUXDB_DATABASE)
-        LOG.info(f"Database '{INFLUXDB_DATABASE}' is ready")
-    except (InfluxDBClientError, requests.exceptions.RequestException):
-        LOG.error(f"Failed to ensure database '{INFLUXDB_DATABASE}' exists")
-        sys.exit(1)
+    if client:  # Only if InfluxDB output is enabled
+        try:
+            ensure_database(client, INFLUXDB_DATABASE)
+            LOG.info(f"Database '{INFLUXDB_DATABASE}' is ready")
+        except (InfluxDBClientError, requests.exceptions.RequestException):
+            LOG.error(f"Failed to ensure database '{INFLUXDB_DATABASE}' exists")
+            sys.exit(1)
 
-    try:
-
+    # Setup InfluxDB retention policies and continuous queries if InfluxDB output is enabled
+    if client:
+        # Create default retention policy
         try:
             client.create_retention_policy(
                 "default_retention", "1w", "1", INFLUXDB_DATABASE, True)
@@ -1989,11 +2337,13 @@ if __name__ == "__main__":
             LOG.info("Updating retention policy to 1w...")
             client.alter_retention_policy("default_retention", INFLUXDB_DATABASE,
                                           "1w", "1", True)
+
+        # Create downsample_retention policy for 5-minute averages
         try:
             client.create_retention_policy(
                 "downsample_retention", RETENTION_DUR, "1", INFLUXDB_DATABASE, False)
         except InfluxDBClientError:
-            LOG.info(f"Updating retention policy to {RETENTION_DUR}...")
+            LOG.info(f"Updating downsample retention policy to {RETENTION_DUR}...")
             client.alter_retention_policy("downsample_retention", INFLUXDB_DATABASE,
                                           RETENTION_DUR, "1", False)
 
@@ -2050,8 +2400,8 @@ if __name__ == "__main__":
             create_continuous_query(client, CONFIG_VOLUME_PARAMS, "config_volumes")
             create_continuous_query(client, CONFIG_HOSTS_PARAMS, "config_hosts")
 
-    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
-        LOG.exception("Failed to add configured systems!")
+    # Set up Prometheus metrics server if requested
+    setup_prometheus()
 
     checksums = {}
     while True:
@@ -2122,7 +2472,7 @@ if __name__ == "__main__":
                 collect_config_hosts(sys)
                 LOG.info("Collecting drive configuration...")
                 collect_config_drives(sys)
-                
+
             LOG.info(f"Collection cycle completed for system '{sys_name}' ({sys_id})")
 
         time_difference = time.time() - time_start
@@ -2138,3 +2488,4 @@ if __name__ == "__main__":
             wait_time = time_difference
 
         time.sleep(wait_time)
+

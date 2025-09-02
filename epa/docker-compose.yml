@@ -1,13 +1,13 @@
 services:
 
   influxdb:
-    image: influxdb:1.11.8-alpine
+    image: influxdb:${CONTAINER_INFLUXDB_TAG}
     container_name: influxdb
     user: "1500:1500"
-    mem_limit: 2G
+    mem_limit: 4G
     restart: unless-stopped
     ports:
-      - 8086:8086
+      - 8086:8086      
     logging:
       driver: "json-file"
       options:
@@ -16,11 +16,11 @@ services:
     networks:
       - eseries_perf_analyzer
     volumes:
-      - influxdb_data:/var/lib/influxdb
-      # if you'd like to use in-directory volume, uncomment the following line
-      # and then run: sudo chown -R 1500:1500 ./influx-database
-      # - ./influx-database:/var/lib/influxdb
+      # Using bind mount to keep data in project directory (see SETUP.md for permissions)
+      - ./data/influxdb:/var/lib/influxdb
       - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+      # Temporary mount for database restore
+      # - ./dump:/dump:ro
 
   utils:
     image: epa/utils:${TAG}
@@ -30,15 +30,17 @@ services:
     build:
       context: ./utils
       args:
-        BASE_IMAGE: influxdb:1.11.8-alpine
+        BASE_IMAGE: influxdb:${CONTAINER_INFLUXDB_TAG}
     networks:
       - eseries_perf_analyzer
     volumes:
       - ./influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+      # Temporary mount for database backup/restore
+      # - ./dump:/dump
     command: ["tail","-f","/dev/null"]    
 
   grafana:
-    image: grafana/grafana:8.5.27
+    image: grafana/grafana:${CONTAINER_GRAFANA_TAG}
     container_name: grafana
     mem_limit: 2G
     restart: unless-stopped
@@ -48,8 +50,9 @@ services:
       - 3000:3000
     volumes:
       - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
-      - grafana_data:/var/lib/grafana
-      - grafana_dashboards:/var/lib/grafana/dashboards
+      # Using bind mounts to keep data in project directory (see SETUP.md for permissions)
+      - ./data/grafana:/var/lib/grafana
+      - ./data/grafana-dashboards:/var/lib/grafana/dashboards
     logging:
       driver: "json-file"
       options:
@@ -80,7 +83,7 @@ services:
 
   collector:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.5.0 # best build your own
+    # image: docker.io/scaleoutsean/epa-collector:${TAG} # best build your own
     container_name: collector
     build: ./collector
     mem_limit: 256m
@@ -90,15 +93,21 @@ services:
       options:
         max-file: "5"
         max-size: 10m
+    # ports:
+      # - 8080:8080  # Prometheus metrics endpoint (comment out if using --output influxdb only)
     environment: 
       - USERNAME=monitor
       - PASSWORD=monitor123
-      - SYSNAME=R26U25-EF600
+      - SYSNAME=EF600
       - SYSID=600A098000F63714000000005E79C888
-      - API=5.5.5.5
-      - RETENTION_PERIOD=52w
+      - API=5.5.5.5 7.7.7.7
+      - RETENTION_PERIOD=8w
       - DB_ADDRESS=6.6.6.6
-      - DB_PORT=8086
+      - DB_PORT=8086      
+      # Optional: Set output destination (both|influxdb|prometheus). Default: both. Prometheus port should be exposed to enable remote access.
+      - OUTPUT=both
+      # Optional: Set Prometheus port (default: 8080)
+      - PROMETHEUS_PORT=8080
       # Optional: Override default database name (eseries)
       # - DB_NAME=my_custom_db
       # Optional: Create database and exit (true/1 = enable)
@@ -110,9 +119,9 @@ services:
     networks:
       - eseries_perf_analyzer
 
-  collector-R24U04-E2824:
+  collector-e4k:
     image: epa/collector:${TAG}
-    container_name: R24U04-E2824
+    container_name: collector-e4k
     build: ./collector
     mem_limit: 256m
     restart: unless-stopped
@@ -121,13 +130,15 @@ services:
       options:
         max-file: "5"
         max-size: 10m
+    # ports:
+      # - 8081:8080  # Different host port for second collector's Prometheus endpoint in the same Docker Compose
     environment: 
       - USERNAME=monitor
       - PASSWORD=monitor123
-      - SYSNAME=R24U04-E2824
+      - SYSNAME=E4012
       - SYSID=600A098000F63714000000005E79C999
       - API=7.7.7.7
-      - RETENTION_PERIOD=52w
+      - RETENTION_PERIOD=8w
       - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086
       # Example: Using custom database name for this collector
@@ -135,14 +146,12 @@ services:
       # Optional: Only collect specific measurements (space-separated)
       # - INCLUDE=disks systems volumes
       # - INCLUDE=config_volumes
+      # Optional: Different output configuration for this collector
+      - OUTPUT=influxdb  # Disable Prometheus
+      # - PROMETHEUS_PORT=8080  # Container port (mapped to host 8081)
     networks:
       - eseries_perf_analyzer
 
 networks:
   eseries_perf_analyzer:
     driver: bridge
-
-volumes:
-  influxdb_data:
-  grafana_data:
-  grafana_dashboards:

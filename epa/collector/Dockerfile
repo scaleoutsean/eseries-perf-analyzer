@@ -1,5 +1,5 @@
 FROM python:3.10.14-alpine3.20
-ARG TAG=3.3.1
+ARG TAG=latest
 
 LABEL VERSION=${TAG}
 LABEL org.opencontainers.image.authors="@scaleoutSean (Github)"

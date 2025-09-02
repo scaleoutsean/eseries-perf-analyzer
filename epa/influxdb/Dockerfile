@@ -1,11 +1,7 @@
-ARG CONTAINER_INFLUXDB_TAG=1.11.8-alpine
-ARG TAG=latest
-FROM ntap-grafana/alpine-base:${TAG} AS builder
-LABEL autodelete="true"
-
+ARG CONTAINER_INFLUXDB_TAG=latest
 FROM influxdb:${CONTAINER_INFLUXDB_TAG}
+
 ADD influxdb.conf /etc/influxdb
-COPY --from=builder /etc/apk/repositories /etc/apk/repositories
 
 EXPOSE 8086
 
