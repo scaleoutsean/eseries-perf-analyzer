@@ -915,7 +915,7 @@
       "targets": [
         {
           "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
-          "query": "SELECT \"host_name_field\" as \"Host Name\", \"initiatorCount\" as \"Initiators\" FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT last(\"initiatorCount\") as \"Initiators\", last(\"hostSidePortCount\") as \"Host Ports\" FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"host_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
