@@ -352,7 +352,6 @@ flashCached                   string
 listOfMappings_lun            integer
 listOfMappings_lunMappingRef  string
 listOfMappings_ssid           integer
-name                          string
 preReadRedundancyCheckEnabled string
 preferredControllerId         string
 protectionInformationCapable  string
@@ -406,7 +405,6 @@ initiators_first_nodeName_remoteNodeWWN          string
 isLargeBlockFormatHost                           string
 isLun0Restricted                                 string
 isSAControlled                                   string
-name                                             string
 protectionInformationCapableAccessMethod         string
 
 Tag Keys:
@@ -440,7 +438,6 @@ extents_raidLevel            string
 extents_rawCapacity          integer
 freeSpace                    integer
 isInaccessible               string
-name                         string
 offline                      string
 pool_name_field              string
 protectionInformationCapable string

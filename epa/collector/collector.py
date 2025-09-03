@@ -324,6 +324,9 @@ _VOLUME_MAPPINGS_CACHE = {} # mapRef -> mapping info
 # Cache for cross-referencing drive config (driveRef -> drive info)
 _DRIVES_CACHE = {}  # driveRef -> drive info
 
+# Global iteration counter for config collection timing
+_CONFIG_COLLECTION_ITERATION_COUNTER = 0
+
 def collect_config_drives(system_info):
     """
     Collects drive configuration information and posts it to InfluxDB
@@ -717,6 +720,14 @@ else:
     LOG.debug(f"CMD.include value: {CMD.include}")
     LOG.debug(f"CMD.include type: {type(CMD.include)}")
 
+# Validate config collection interval against collector interval
+if not CMD.createDb:  # Only validate for normal operation, not database creation
+    collector_interval_minutes = CMD.intervalTime / 60.0
+    if CONFIG_COLLECTION_INTERVAL_MINUTES < collector_interval_minutes:
+        PARSER.error(f"Config collection interval ({CONFIG_COLLECTION_INTERVAL_MINUTES} minutes) "
+                     f"cannot be less than collector interval ({collector_interval_minutes} minutes). "
+                     f"Config data cannot be collected more frequently than the collector runs.")
+
 
 #######################
 # PROMETHEUS SETUP ####
@@ -994,11 +1005,41 @@ def send_to_prometheus(measurement, tags, fields):
 def should_collect_config_data():
     """
     Determine if config data should be collected this iteration.
-    Config data changes infrequently, so collect only every N minutes.
-    Returns True if current minute is a collection minute (0, 15, 30, 45 by default).
+    
+    Uses a smart interval-aware approach that handles different collector intervals:
+    - If config interval == collector interval: Always collect (every iteration)
+    - If config interval > collector interval: Use iteration-based timing
+    
+    Config data changes infrequently, so collect only every N minutes based on
+    the relationship between CONFIG_COLLECTION_INTERVAL_MINUTES and CMD.intervalTime.
+    
+    Returns True when config data should be collected this iteration.
     """
-    current_minute = datetime.now().minute
-    return current_minute % CONFIG_COLLECTION_INTERVAL_MINUTES == 0
+    global _CONFIG_COLLECTION_ITERATION_COUNTER
+    
+    # Increment the iteration counter
+    _CONFIG_COLLECTION_ITERATION_COUNTER += 1
+    
+    collector_interval_minutes = CMD.intervalTime / 60.0
+    
+    if CONFIG_COLLECTION_INTERVAL_MINUTES == collector_interval_minutes:
+        # Equal case: collect every iteration since interval matches exactly
+        LOG.debug(f"Config collection: Every iteration (intervals match: {CONFIG_COLLECTION_INTERVAL_MINUTES} min)")
+        return True
+    else:
+        # Greater case: config interval > collector interval, use iteration-based timing
+        config_interval_iterations = int(CONFIG_COLLECTION_INTERVAL_MINUTES * 60 // CMD.intervalTime)
+        should_collect = (_CONFIG_COLLECTION_ITERATION_COUNTER % config_interval_iterations) == 1
+        
+        if should_collect:
+            LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, "
+                     f"collecting every {config_interval_iterations} iterations "
+                     f"({CONFIG_COLLECTION_INTERVAL_MINUTES} min config / {collector_interval_minutes} min collector)")
+        else:
+            LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, "
+                     f"skipping (next collection in {config_interval_iterations - (_CONFIG_COLLECTION_ITERATION_COUNTER % config_interval_iterations)} iterations)")
+        
+        return should_collect
 
 
 def write_to_outputs(json_body, measurement_type="metrics"):
@@ -1676,10 +1717,9 @@ def collect_config_volumes(system_info):
             config_fields = {}
             for param in CONFIG_VOLUME_PARAMS:
                 if param == 'name':
-                    # Handle name field specially - store as both original and renamed field
+                    # Handle name field specially - store as renamed field only
                     value = volume.get(param)
                     if value is not None:
-                        config_fields[param] = value
                         config_fields['volume_name_field'] = value
                 else:
                     value = volume.get(param)
@@ -1767,10 +1807,9 @@ def collect_config_storage_pools(system_info):
             config_fields = {}
             for param in CONFIG_STORAGE_POOLS_PARAMS:
                 if param == 'name':
-                    # Handle name field specially - store as both original and renamed field
+                    # Handle name field specially - store as renamed field only
                     value = pool.get(param)
                     if value is not None:
-                        config_fields[param] = value
                         config_fields['pool_name_field'] = value
                 elif param.startswith('blkSizeSupported_'):
                     # Handle flattened blkSizeSupported array
@@ -1889,10 +1928,9 @@ def collect_config_hosts(system_info):
             config_fields = {}
             for param in CONFIG_HOSTS_PARAMS:
                 if param == 'name':
-                    # Handle name field specially - store as both original and renamed field
+                    # Handle name field specially - store as renamed field only
                     value = host.get(param)
                     if value is not None:
-                        config_fields[param] = value
                         config_fields['host_name_field'] = value
                 elif param.startswith('initiators_first_'):
                     # Handle flattened initiator fields
