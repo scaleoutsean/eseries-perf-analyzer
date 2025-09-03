@@ -87,6 +87,12 @@ else
         CMD="${CMD} --prometheus-port ${PROMETHEUS_PORT}"
     fi
     
+    # Add debug flag if specified
+    if [ -n "${DEBUG}" ] && [ "${DEBUG}" = "true" ]; then
+        echo "DEBUG environment variable set: enabling debug logging"
+        CMD="${CMD} --debug"
+    fi
+    
     # Add default flags for normal operation
     CMD="${CMD} -i -s"
 fi

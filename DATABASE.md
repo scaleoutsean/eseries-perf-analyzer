@@ -66,7 +66,7 @@ EPA Database Schema Dump
 ========================
 Host: influxdb:8086
 Database: eseries
-Generated: Wed Sep  3 09:16:18 AM UTC 2025
+Generated: Wed Sep  3 05:01:38 PM UTC 2025
 
 Found measurement: disks
 =================================
@@ -120,6 +120,8 @@ flashCacheReadHitBytes     float
 flashCacheReadHitOps       float
 flashCacheReadResponseTime float
 flashCacheReadThroughput   float
+mapped_host_count          integer
+mapped_host_names          string
 otherIOps                  float
 queueDepthMax              float
 queueDepthTotal            float
@@ -394,6 +396,8 @@ flashCached                   string
 listOfMappings_lun            integer
 listOfMappings_lunMappingRef  string
 listOfMappings_ssid           integer
+mapped_host_count             integer
+mapped_host_names             string
 preReadRedundancyCheckEnabled string
 preferredControllerId         string
 protectionInformationCapable  string

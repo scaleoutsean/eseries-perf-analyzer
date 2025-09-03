@@ -173,7 +173,10 @@ VOLUME_PARAMS = [
     'writeOps',
     'writePhysicalIOps',
     'writeResponseTime',
-    'writeThroughput'
+    'writeThroughput',
+    # Host mapping fields (computed during collection)
+    'mapped_host_names',  # Comma-separated list of host names this volume is mapped to
+    'mapped_host_count'   # Number of hosts this volume is mapped to
 ]
 
 MEL_PARAMS = [
@@ -212,7 +215,10 @@ CONFIG_VOLUME_PARAMS = [
     'currentControllerId',
     'preferredControllerId',
     'raidLevel',
-    'status'
+    'status',
+    # Host mapping fields (computed during collection)
+    'mapped_host_names',  # Comma-separated list of host names this volume is mapped to
+    'mapped_host_count'   # Number of hosts this volume is mapped to
 ]
 
 CONFIG_HOSTS_PARAMS = [
@@ -320,12 +326,61 @@ CONFIG_DRIVE_PARAMS = [
 # Populated by collect_config_* functions, used by collect_config_volumes
 _STORAGE_POOLS_CACHE = {}  # volumeGroupRef -> pool info
 _HOSTS_CACHE = {}          # clusterRef -> host info
-_VOLUME_MAPPINGS_CACHE = {} # mapRef -> mapping info
+# Mega-cache from mappable-objects API - contains all volume and mapping data
+_MAPPABLE_OBJECTS_CACHE = {}  # volumeRef -> complete volume object with mappings
 # Cache for cross-referencing drive config (driveRef -> drive info)
 _DRIVES_CACHE = {}  # driveRef -> drive info
 
 # Global iteration counter for config collection timing
 _CONFIG_COLLECTION_ITERATION_COUNTER = 0
+
+
+def populate_mappable_objects_cache(system_info):
+    """
+    Populate mega-cache from mappable-objects API containing all volume and mapping data.
+    
+    This function ALWAYS runs (regardless of --include filters) because
+    volume/mapping correlation is required for performance data host mapping.
+    
+    Builds _MAPPABLE_OBJECTS_CACHE containing:
+    - Volume information (name, volumeRef, volumeGroupRef, etc.)
+    - Volume mappings (listOfMappings with mapRef)
+    - Storage pool references (volumeGroupRef)
+    
+    Replaces the need for separate _VOLUME_NAME_CACHE and _VOLUME_MAPPINGS_CACHE.
+    
+    :param system_info: The JSON object of a storage_system
+    """
+    global _MAPPABLE_OBJECTS_CACHE
+    
+    # Only run during config collection intervals
+    if not should_collect_config_data():
+        LOG.debug("Skipping mappable objects cache population - not a config collection interval")
+        return
+        
+    try:
+        session = get_session()
+        
+        # Clear and populate mega-cache from mappable-objects API
+        _MAPPABLE_OBJECTS_CACHE.clear()
+        
+        # Get comprehensive mapping data from mappable-objects API
+        mappable_objects_response = session.get(f"{get_controller('sys')}/{sys_id}/mappable-objects").json()
+        LOG.debug(f"Retrieved {len(mappable_objects_response)} mappable objects for mega-cache")
+        
+        # Build comprehensive cache indexed by volumeRef
+        for obj in mappable_objects_response:
+            volume_ref = obj.get('volumeRef')
+            if volume_ref:
+                _MAPPABLE_OBJECTS_CACHE[volume_ref] = obj
+                LOG.debug(f"Cached mappable object: '{obj.get('label')}' -> {volume_ref}")
+        
+        LOG.info(f"Built mappable objects mega-cache with {len(_MAPPABLE_OBJECTS_CACHE)} volume objects")
+        
+    except Exception as e:
+        LOG.warning(f"Could not retrieve mappable-objects for mega-cache: {e}")
+        LOG.warning("Performance collector host mapping may be incomplete")
+
 
 def collect_config_drives(system_info):
     """
@@ -501,6 +556,10 @@ FIELD_COERCIONS = {
     # All other numeric fields should be floats to match production schema
     # This includes all performance metrics, utilization percentages, etc.
     # String fields (MEL descriptions, failure names) are left unchanged
+    
+    # Host mapping fields (computed during collection)
+    'mapped_host_count': int,  # Number of hosts mapped to volume
+    # mapped_host_names is a string (comma-separated), no coercion needed
 }
 
 #######################
@@ -606,6 +665,8 @@ PARSER.add_argument('-n', '--doNotPost', action='store_true', default=0,
                     help='Pull information from SANtricity, but do not send it to InfluxDB. Optional. <switch>')
 PARSER.add_argument('--debug', action='store_true', default=False,
                     help='Enable debug logging to show detailed collection and filtering information. Optional. <switch>')
+PARSER.add_argument('--debug-force-config', action='store_true', default=False,
+                    help='Force config data collection every iteration (for testing). Optional. <switch>')
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
                          'disks, interface, systems, volumes, controllers, power, temp, '
@@ -619,6 +680,8 @@ PARSER.add_argument('--output', choices=['influxdb', 'prometheus', 'both'], defa
                          'With "both", users can choose not to expose Prometheus port (or open port on OS firewall) if not needed.')
 PARSER.add_argument('--prometheus-port', type=int, default=8080,
                     help='Port for Prometheus metrics HTTP server. Default: 8080. Only used when --output includes prometheus.')
+PARSER.add_argument('--max-iterations', type=int, default=0,
+                    help='Maximum number of collection iterations to run (0 = unlimited). Useful for testing. Default: 0.')
 CMD = PARSER.parse_args()
 
 # Set logging level based on debug flag
@@ -1009,6 +1072,8 @@ def should_collect_config_data():
     Uses a smart interval-aware approach that handles different collector intervals:
     - If config interval == collector interval: Always collect (every iteration)
     - If config interval > collector interval: Use iteration-based timing
+    - Special case: Always collect on iteration 1 to populate caches immediately
+    - Debug mode: Force collection every iteration with --debug-force-config
     
     Config data changes infrequently, so collect only every N minutes based on
     the relationship between CONFIG_COLLECTION_INTERVAL_MINUTES and CMD.intervalTime.
@@ -1017,8 +1082,18 @@ def should_collect_config_data():
     """
     global _CONFIG_COLLECTION_ITERATION_COUNTER
     
-    # Increment the iteration counter
-    _CONFIG_COLLECTION_ITERATION_COUNTER += 1
+    # Note: Iteration counter is incremented once per cycle in the main loop
+    
+    # Force collection every iteration in debug mode
+    if CMD.debug_force_config:
+        LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, forced collection (--debug-force-config)")
+        return True
+    
+    # Always collect on first iteration to populate caches immediately
+    # This ensures volume name correlation cache is available for performance data
+    if _CONFIG_COLLECTION_ITERATION_COUNTER == 1:
+        LOG.debug(f"Config collection: Iteration 1, collecting config data (first iteration cache population)")
+        return True
     
     collector_interval_minutes = CMD.intervalTime / 60.0
     
@@ -1285,6 +1360,8 @@ def collect_storage_metrics(system_info):
     interfaces, and volumes
     :param sys: The JSON object of a storage system
     """
+    global _MAPPABLE_OBJECTS_CACHE, _HOSTS_CACHE
+    
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
@@ -1481,6 +1558,37 @@ def collect_storage_metrics(system_info):
             volume_fields = dict((metric, stats.get(metric))
                                  for metric in VOLUME_PARAMS)
             volume_fields = coerce_fields_dict(volume_fields)
+
+            # Add host mapping information from mega-cache
+            volume_name = stats["volumeName"]
+            host_names = []
+            
+            # Find volume object by name in mega-cache
+            volume_obj = None
+            for volume_ref, obj in _MAPPABLE_OBJECTS_CACHE.items():
+                if obj.get('label') == volume_name:  # 'label' is volume name
+                    volume_obj = obj
+                    break
+            
+            if volume_obj:
+                # Extract host mappings from volume object
+                list_of_mappings = volume_obj.get('listOfMappings', [])
+                for mapping in list_of_mappings:
+                    map_ref = mapping.get('mapRef')
+                    if map_ref and map_ref in _HOSTS_CACHE:
+                        # Found matching volume mapping - get host names
+                        host_list = _HOSTS_CACHE[map_ref]
+                        for host_info in host_list:
+                            host_name = host_info.get('name', 'unknown')
+                            if host_name not in host_names:  # Avoid duplicates
+                                host_names.append(host_name)
+                LOG.debug(f"Found host mapping for volume '{volume_name}' -> {host_names}")
+            else:
+                LOG.debug(f"No volume object found for volume name '{volume_name}' in mega-cache")
+            
+            # Add host mapping fields to volume metrics
+            volume_fields['mapped_host_names'] = ','.join(host_names) if host_names else ''
+            volume_fields['mapped_host_count'] = len(host_names)
 
             vol_item = {
                 "measurement": "volumes",
@@ -1696,6 +1804,8 @@ def collect_config_volumes(system_info):
     Collects volume configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
+    global _HOSTS_CACHE, _MAPPABLE_OBJECTS_CACHE
+    
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_volumes collection - not a scheduled interval (collected every 15 minutes)")
@@ -1710,9 +1820,40 @@ def collect_config_volumes(system_info):
         # Get volume configuration data from the API
         volumes_response = session.get(f"{get_controller('sys')}/{sys_id}/volumes").json()
 
+        # Use mega-cache for host mapping resolution (consistent with config collection timing)
+        # Build volumeRef -> [host_names] mapping from mega-cache
+        volume_to_hosts = {}
+        
+        # Use _MAPPABLE_OBJECTS_CACHE and _HOSTS_CACHE populated by config collection
+        for volume_ref, volume_obj in _MAPPABLE_OBJECTS_CACHE.items():
+            list_of_mappings = volume_obj.get('listOfMappings', [])
+            for mapping in list_of_mappings:
+                map_ref = mapping.get('mapRef')
+                if map_ref and map_ref in _HOSTS_CACHE:
+                    # _HOSTS_CACHE now contains lists of hosts per cluster
+                    host_list = _HOSTS_CACHE[map_ref]
+                    if volume_ref not in volume_to_hosts:
+                        volume_to_hosts[volume_ref] = []
+                    # Add all hosts in the cluster to this volume
+                    for host_info in host_list:
+                        host_name = host_info.get('name', 'unknown')
+                        if host_name not in volume_to_hosts[volume_ref]:  # Avoid duplicates
+                            volume_to_hosts[volume_ref].append(host_name)
+
         LOG.debug(f"Retrieved {len(volumes_response)} volume configurations")
+        LOG.debug(f"Using cached data: {len(_HOSTS_CACHE)} hosts, {len(_MAPPABLE_OBJECTS_CACHE)} mappable objects")
 
         for volume in volumes_response:
+            # Add computed host mapping fields to the volume object
+            volume_ref = volume.get('volumeRef')
+            if volume_ref and volume_ref in volume_to_hosts:
+                host_names = volume_to_hosts[volume_ref]
+                volume['mapped_host_names'] = ','.join(host_names)
+                volume['mapped_host_count'] = len(host_names)
+            else:
+                volume['mapped_host_names'] = ''  # Empty string for unmapped volumes
+                volume['mapped_host_count'] = 0
+
             # Extract configuration fields (numeric/boolean values from CONFIG_VOLUME_PARAMS)
             config_fields = {}
             for param in CONFIG_VOLUME_PARAMS:
@@ -1907,6 +2048,8 @@ def collect_config_hosts(system_info):
     Collects host configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
+    global _HOSTS_CACHE, _VOLUME_MAPPINGS_CACHE, _VOLUME_NAME_CACHE
+    
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_hosts collection - not a scheduled interval (collected every 15 minutes)")
@@ -1923,7 +2066,30 @@ def collect_config_hosts(system_info):
 
         LOG.debug(f"Retrieved {len(hosts_response)} host configurations")
 
+        # Clear and populate _HOSTS_CACHE for cross-referencing with volumes
+        _HOSTS_CACHE.clear()
+
         for host in hosts_response:
+            # Populate _HOSTS_CACHE for cross-referencing with volumes
+            cluster_ref = host.get('clusterRef')
+            host_ref = host.get('hostRef')
+            host_info = {
+                'name': host.get('name', 'unknown'),
+                'hostRef': host_ref,
+                'id': host.get('id', 'unknown')
+            }
+            
+            if cluster_ref:
+                # Store multiple hosts per cluster (for HA pairs)
+                if cluster_ref not in _HOSTS_CACHE:
+                    _HOSTS_CACHE[cluster_ref] = []
+                _HOSTS_CACHE[cluster_ref].append(host_info)
+                
+                # For single hosts (clusterRef = all zeros), also index by hostRef
+                # since volume mappings use hostRef as mapRef for single hosts
+                if cluster_ref == "0000000000000000000000000000000000000000" and host_ref:
+                    _HOSTS_CACHE[host_ref] = [host_info]
+
             # Extract configuration fields (numeric/boolean values from CONFIG_HOSTS_PARAMS)
             config_fields = {}
             for param in CONFIG_HOSTS_PARAMS:
@@ -2027,6 +2193,8 @@ def collect_config_hosts(system_info):
                 LOG.debug(f"Added config_hosts measurement for host {host.get('name', 'unknown')}")
             else:
                 LOG.debug(f"Skipped config_hosts measurement (not in --include filter)")
+
+        LOG.debug(f"Populated _HOSTS_CACHE with {len(_HOSTS_CACHE)} hosts")
 
         LOG.debug(f"collect_config_hosts: Prepared {len(json_body)} measurements for InfluxDB")
         if not CMD.doNotPost:
@@ -2442,7 +2610,15 @@ if __name__ == "__main__":
     setup_prometheus()
 
     checksums = {}
+    iteration_count = 0
     while True:
+        iteration_count += 1
+        
+        # Check iteration limit for lab testing
+        if CMD.max_iterations > 0 and iteration_count > CMD.max_iterations:
+            LOG.info(f"Reached maximum iterations limit ({CMD.max_iterations}), exiting...")
+            break
+            
         time_start = time.time()
         try:
             response = SESSION.get(get_controller("sys"))
@@ -2457,6 +2633,14 @@ if __name__ == "__main__":
             sys = {'name': sys_name, 'wwn': sys_id}
             if CMD.showStorageNames:
                 LOG.info(sys_name)
+
+            # Increment config collection iteration counter once per collection cycle
+            _CONFIG_COLLECTION_ITERATION_COUNTER += 1
+            
+            # Always populate mappable objects mega-cache (required for performance host mapping)
+            # This runs regardless of --include filters since volume/mapping correlation is needed
+            # for performance data even when config measurements aren't being collected
+            populate_mappable_objects_cache(sys)
 
             # Conditionally collect measurements based on --include filter
             if hasattr(CMD, 'include') and CMD.include:
