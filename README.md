@@ -217,11 +217,13 @@ docker run -e INCLUDE="power temp" epa/collector:${DOCKER_TAG}
 
 Grafana is exposed over HTTP (3000/tcp) as per usual Grafana defaults (and credentials).
 
-InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB. If you want to remove external access from the InfluxDB container, remove `- 8086:8086` and the line with `ports` above it in `./epa/docker-compose.yaml` and restart the container.
+InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able to run several collectors in various locations (closer to E-Series, for example) and send data to a centrally managed InfluxDB. If you want to remove external access from the InfluxDB container, remove `- 8086:8086` and the line with `ports` above it in `./epa/docker-compose.yaml` and restart the container. Influx RPC port 8088 is supposed to be accessible only to trusted users (e.g. the `utils` container), so do not expose it externally.
 
 ### Add or remove a monitored array
 
 Add another collector service (e.g. `collector-ef300c`) to `docker-compose.yaml`, build it and start it. You may use the same (existing) or own (new) InfluxDB database instance. Enter the `utils` container or use Collector to create it in advance. You may also just run collector with `--dbName` to have it created automatically.
+
+**NOTE:** pay attetion to Prometheus ports if you use them. Mutiple collectors in same Docker Compose need different external ports for Prometheus exporter.
 
 To remove a collector that monitors an array, run `docker compose down <collector-name>`, enter the `utils` container to drop the database - if it's not shared with other collectors.
 
