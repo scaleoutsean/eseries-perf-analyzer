@@ -50,17 +50,17 @@ services:
       INFLUX_PORT: ${INFLUXDB_PORT}
       INFLUX_DB: ${INFLUXDB_DB}
       INFLUXDB3_AUTH_TOKEN_FILE: /influxdb_tokens/epa.token
-      INFLUXDB3_TLS_CA: /home/sfcuser/sfc_certs/ca.crt
-      CA_CHAIN: /home/sfcuser/sfc_certs/sf_ca.crt,/home/sfcuser/sfc_certs/influxdb_ca.crt      
+      INFLUXDB3_TLS_CA: /home/app/certs/ca.crt
+      CA_CHAIN: /home/app/certs/ca.crt,/home/app/certs/influxdb_ca.crt      
       API: ${API}
-      SF_USERNAME: ${USERNAME}
-      SF_PASSWORD: ${PASSWORD}
+      USERNAME: ${SANTRICITY_USERNAME}
+      PASSWORD: ${SANTRICITY_PASSWORD}
     depends_on:
       - influxdb
     volumes:
-      - ./certs/epa:/home/appuser/app_certs:ro
+      - ./certs/epa:/home/app/certs:ro
       - ./data/influxdb_tokens:/influxdb_tokens:ro
-      - ./certs/_master/ca.crt:/home/appuser/app_certs/ca.crt:ro
+      - ./certs/_master/ca.crt:/home/app/certs/ca.crt:ro
     networks:
       epa:
         ipv4_address: ${EPA_COLLECTOR}
@@ -164,4 +164,3 @@ networks:
     ipam:
       config:
         - subnet: ${EPA_SUBNET}
-          gateway:

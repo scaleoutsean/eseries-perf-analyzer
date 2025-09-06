@@ -70,8 +70,8 @@ RUN echo "=== SFC InfluxDB3 Embedded Plugin Summary ===" && \
 # Copy downsampling configuration
 COPY downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
 
-COPY influxdb3-entrypoint.sh /home/influx/influxdb3-entrypoint.sh
-RUN chmod +x /home/influx/influxdb3-entrypoint.sh
+COPY entrypoint.sh /home/influx/entrypoint.sh
+RUN chmod +x /home/influx/entrypoint.sh
 
 USER influx
 

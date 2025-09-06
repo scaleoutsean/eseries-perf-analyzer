@@ -1,6 +1,7 @@
 FROM python:3.13-alpine
 
-ARG TAG=4.0.0-beta
+ENV EPA_VERSION=${COLLECTOR_VERSION}
+ARG TAG=${EPA_VERSION}
 
 LABEL VERSION=${TAG}
 LABEL org.opencontainers.image.authors="@scaleoutSean (Github)"
@@ -16,13 +17,13 @@ RUN apk update && apk upgrade --no-cache
 # RUN apk add --no-cache ca-certificates && update-ca-certificates
 RUN python -m pip install --upgrade pip
 WORKDIR /app
-COPY app/requirements.txt .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
 RUN pip --default-timeout=5 --retries 15 install --upgrade -r requirements.txt && rm -rf /root/.cache
-COPY app/collector.py ./
-COPY app /app/app
+COPY collector.py ./
+COPY *.py /app/
 # bring in entrypoint
-COPY app/docker-entrypoint.sh ./
+COPY entrypoint.sh ./
 RUN chmod +x *.sh
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["./entrypoint.sh"]

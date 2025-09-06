@@ -1,7 +1,9 @@
-FROM influxdata/influxdb3-ui:${INFLUXD_EXPLORER_BUILD_VERSION}
+ARG INFLUXDB3_EXPLORER_VERSION
+FROM influxdata/influxdb3-ui:${INFLUXDB3_EXPLORER_VERSION}
 
 # Copy CA certificate and add to system trust store (try both Alpine and Ubuntu approaches)
 COPY ./certs/_master/ca.crt /usr/local/share/ca-certificates/sfc-ca.crt
+
 RUN (update-ca-certificates || true) && \
     (apk update && apk add ca-certificates && update-ca-certificates || true) && \
     # Ensure CA is in both common locations
