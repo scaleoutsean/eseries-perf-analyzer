@@ -59,10 +59,61 @@ htmlcov/
 Thumbs.db
 
 #### INCLUDE ####
+
 # basic stuff
 !/.gitignore
 !/README.md
 !/LICENSE
+
+# Docker stuff
+!docker-compose.yml
+!app/Dockerfile
+!influxdb/Dockerfile
+!utils/Dockerfile
+!nginx/Dockerfile
+!explorer/Dockerfile
+
+# Uility scripts
+!/utils/*.sh
+!/scripts/*.sh
+!/scripts/*.py
+
+# Certs and keys
+!certs/_master/gen_ca_tls_certs.py
+!certs/.gitkeep
+!certs/_master/.gitkeep
+!certs/proxy/.gitkeep
+!certs/s3/.gitkeep
+!certs/collector/.gitkeep
+!certs/explorer/.gitkeep
+!certs/utils/.gitkeep
+!certs/influxdb/.gitkeep
+
+# Proxy container
+!proxy/Dockerfile
+!proxy/entrypoint.sh
+
+# S3 container
+!s3/Dockerfile
+!s3/entrypoint.sh
+
+# InfluxDB container
+!influxdb/Dockerfile
+!influxdb/entrypoint.sh
+
+# Explorer container
+!explorer/Dockerfile
+
+# EPA/Collector container
+!app/Dockerfile
+!app/entrypoint.sh
+!app/*.py
+!app/requirements.txt
+
+# Utilities container
+!utils/entrypoint.sh
+!utils/Dockerfile
+!utils/readme.txt
 
 # Python app
 !/app/*.py
@@ -75,4 +126,3 @@ Thumbs.db
 !/images/epa-v4-tls.png
 !/images/influxdb3-explorer.png
 !/images/epa-storage-analytics-exploration.png
-

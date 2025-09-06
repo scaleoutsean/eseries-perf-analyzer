@@ -1,0 +1,167 @@
+services:
+  influxdb:
+    container_name: influxdb3-core
+    image: epa/influxdb:${INFLUXDB3_VERSION}
+    build:
+      context: influxdb
+      dockerfile: Dockerfile
+      args:
+        INFLUXDB3_BUILD_VERSION: ${INFLUXDB3_BUILD_VERSION}
+    ports:
+      - "${INFLUXDB_PORT}:8181"
+      # Port 8182 (admin token recovery) is NOT exposed externally for security
+      # It's only accessible within the Docker network for internal token generation
+    environment:
+      # Removed S3-related environment variables since we're using local file storage
+      TLS_KEY: /home/influxdb3/certs/influxdb.key
+      TLS_CERT: /home/influxdb3/certs/influxdb.crt
+      TLS_MIN_VERSION: tls-1.3
+      INFLUXDB3_TLS_CA: /home/influxdb3/certs/ca.crt
+      TLS_CA: /home/influxdb3/certs/ca.crt
+      NODE_ID: ${INFLUXDB_NODE_ID}
+      INFLUXDB3_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
+      TOKEN_FILE: /influxdb_tokens/epa.token
+      # Disable anonymous usage analytics (InfluxDB3 specific)
+      INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb3
+      - ./certs/influxdb:/home/influxdb3/certs:ro
+      - ./data/influxdb_tokens:/influxdb_tokens
+      - ./certs/_master/ca.crt:/home/influxdb3/certs/ca.crt:ro
+    # Removed S3 dependency since we're using local file storage
+    entrypoint: ["/home/influx/influxdb3-entrypoint.sh"]
+    command: []
+    networks:
+      epa:
+        ipv4_address: ${INFLUXDB_IP}
+
+  collector:
+    image: epa/collector:${COLLECTOR_VERSION}
+    build:
+      context: app
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION}
+        PYTHON_DIGEST: ${PYTHON_DIGEST}
+    container_name: sfc
+    command: ["--no-instrumenting"]
+    environment:
+      INFLUX_HOST: influxdb
+      INFLUX_PORT: ${INFLUXDB_PORT}
+      INFLUX_DB: ${INFLUXDB_DB}
+      INFLUXDB3_AUTH_TOKEN_FILE: /influxdb_tokens/epa.token
+      INFLUXDB3_TLS_CA: /home/sfcuser/sfc_certs/ca.crt
+      CA_CHAIN: /home/sfcuser/sfc_certs/sf_ca.crt,/home/sfcuser/sfc_certs/influxdb_ca.crt      
+      API: ${API}
+      SF_USERNAME: ${USERNAME}
+      SF_PASSWORD: ${PASSWORD}
+    depends_on:
+      - influxdb
+    volumes:
+      - ./certs/epa:/home/appuser/app_certs:ro
+      - ./data/influxdb_tokens:/influxdb_tokens:ro
+      - ./certs/_master/ca.crt:/home/appuser/app_certs/ca.crt:ro
+    networks:
+      epa:
+        ipv4_address: ${EPA_COLLECTOR}
+
+  utils:
+    image: epa/utils:${COLLECTOR_VERSION}
+    build:
+      context: ./utils
+    container_name: utils
+    restart: "no"
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+      S3_ENDPOINT: https://s3:7070
+      BUCKET: ${S3_BUCKET}
+      CRED_DIR: /influxdb_credentials
+      # InfluxDB3 Environment Variables
+      INFLUX_HOST: influxdb
+      INFLUX_PORT: ${INFLUXDB_PORT}
+      INFLUX_DB: ${INFLUXDB_DB}
+      INFLUXDB3_TLS_CA: /influxdb_certs/ca.crt
+      INFLUXDB3_AUTH_TOKEN_FILE: /influxdb_tokens/epa.token
+    networks:
+      epa:
+        ipv4_address: ${UTILS_IP}
+    volumes:
+      - ./certs/utils:/s3_certs:ro
+      - ./data/influxdb_credentials:/influxdb_credentials/
+      - ./certs/influxdb:/influxdb_certs:ro
+      - ./data/influxdb_tokens:/influxdb_tokens:ro
+      - ./certs/_master/ca.crt:/s3_certs/ca.crt:ro
+      - ./certs/_master/ca.crt:/influxdb_certs/ca.crt:ro
+    # No depends_on - utils should be independent for troubleshooting
+    command: ["tail","-f","/dev/null"]
+
+  grafana:
+    image: epa/grafana:${GRAFANA_VERSION}
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      # HTTPS Configuration
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
+      GF_SERVER_CERT_KEY: /etc/grafana/certs/grafana.key
+      # Trust custom CA for InfluxDB connections
+      GF_SERVER_ROOT_URL: https://localhost:${GRAFANA_PORT}
+      # Workaround for Grafana 12.1 custom CA bug
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "false"
+      GF_DATABASE_SSL_MODE: "disable"
+      GF_PLUGIN_ENABLE_ALPHA: "true"
+    volumes:
+      - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
+      - ./certs/grafana:/etc/grafana/certs:ro
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - influxdb
+    networks:
+      epa:
+        ipv4_address: ${GRAFANA_IP}
+
+  explorer:
+    image: epa/influxdb3-explorer:${INFLUXDB3_EXPLORER_VERSION}
+    build:
+      context: .
+      dockerfile: explorer/Dockerfile
+      args:
+        INFLUXDB3_EXPLORER_VERSION: ${INFLUXDB3_EXPLORER_VERSION}
+    container_name: influxdb3-explorer
+    restart: unless-stopped
+    ports:
+      - "${EXPLORER_PORT}:443"
+      # - "8080:80" # For non-TLS access (not recommended)
+    environment:
+      SSL_CERT_PATH: /etc/nginx/ssl/cert.pem
+      SSL_KEY_PATH: /etc/nginx/ssl/key.pem
+      DATABASE_URL: /db/sqlite.db
+      NODE_ENV: production
+    command:
+      - "--mode=admin"
+    volumes:
+      - ./data/explorer/db:/db:rw
+      - ./data/explorer/config:/app-root/config:ro
+      # InfluxDB Explorer's TLS certificates (expects cert.pem and key.pem)
+      - ./certs/explorer:/etc/nginx/ssl:ro
+      - ./certs/explorer/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
+    depends_on:
+      - influxdb
+    networks:
+      epa:
+        ipv4_address: ${EXPLORER_IP}
+
+volumes:
+  grafana-storage:
+
+networks:
+  epa:
+    ipam:
+      config:
+        - subnet: ${EPA_SUBNET}
+          gateway:
