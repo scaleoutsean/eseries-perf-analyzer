@@ -4,6 +4,7 @@
 influx-database/*
 # ignore the web services working directory
 .venv
+epa/data
 epa/collector/__pycache__
 epa/tests/*.sh
 # other

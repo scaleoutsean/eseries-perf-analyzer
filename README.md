@@ -25,7 +25,7 @@
 This is a fork of the now-archived [E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. This fork's objectives:
 
 - Continue development of an OSS monitoring solution for NetApp E-Series
-- Disentangle E-Series Collector from the rest of EPA stac and make it easy to run it stand-alone and anywhere
+- Disentangle E-Series Collector from the rest of EPA stack and make it easy to run it stand-alone and anywhere
 - Remove SANtricity Web Services Proxy (WSP) dependency from Collector and remove WSP from EPA, so that one collector container or script captures data for one and only one E-Series array
 
 EPA Collector collects metrics from E-Series and sends them to InfluxDB.
