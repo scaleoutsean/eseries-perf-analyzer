@@ -7,3 +7,4 @@ images
 explorer
 grafana
 .venv
+!certs/_master/ca.crt
