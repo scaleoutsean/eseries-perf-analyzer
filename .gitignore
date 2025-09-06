@@ -74,7 +74,6 @@ Thumbs.db
 !explorer/Dockerfile
 
 # Uility scripts
-!/utils/*.sh
 !/scripts/*.sh
 !/scripts/*.py
 
@@ -88,6 +87,12 @@ Thumbs.db
 !certs/explorer/.gitkeep
 !certs/utils/.gitkeep
 !certs/influxdb/.gitkeep
+
+# Data dir
+!data/.gitkeep
+!data/influxdb/.gitkeep
+!data/nginx/.gitkeep
+!data/utils/.gitkeep
 
 # Proxy container
 !proxy/Dockerfile

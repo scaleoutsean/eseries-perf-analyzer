@@ -1,7 +1,7 @@
 services:
   
   proxy:
-    image: epa/proxy:${PROXY_VERSION}
+    image: docker.io/nginx:${NGINX_IMAGE}
     container_name: proxy
     restart: unless-stopped
     ports:
@@ -16,7 +16,7 @@ services:
         ipv4_address: ${PROXY_IP}
 
   influxdb:
-    container_name: influxdb3-core
+    container_name: epa4-influxdb
     image: epa/influxdb:${INFLUXDB3_VERSION}
     build:
       context: influxdb
@@ -113,11 +113,13 @@ services:
     command: ["tail","-f","/dev/null"]
 
   grafana:
-    image: epa/grafana:${GRAFANA_VERSION}
+    image: epa/grafana:latest
+    # Until 12.2 with custom CA bug is resolved, use own build from the main branch
+    # image: docker.io/grafana/grafana:${GRAFANA_VERSION}
     container_name: grafana
     restart: unless-stopped
     ports:
-      - "${GRAFANA_PORT}:3000"
+      - "${GRAFANA_PORT}:3000" # HTTPS only
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
