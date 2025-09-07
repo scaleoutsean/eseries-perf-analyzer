@@ -111,13 +111,13 @@ services:
       INFLUX_PORT: ${INFLUXDB_PORT}
       INFLUX_DB: ${INFLUXDB_DB}
       INFLUXDB3_TLS_CA: /home/influx/ca.crt
-      INFLUXDB3_AUTH_TOKEN_FILE: /home/influxd/epa.token
+      INFLUXDB3_AUTH_TOKEN_FILE: /home/influx/epa.token
     networks:
       epa:
         ipv4_address: ${UTILS_IP}
     volumes:
       - ./certs/_master/ca.crt:/home/influx/certs/ca.crt:ro
-      - ./certs/influxdb/influxdb.crt:/home/influx/influxdb.crt:ro
+      - ./certs/influxdb/influxdb.crt:/home/influx/certs/influxdb.crt:ro
       - ./data/influxdb_tokens/epa.token:/home/influx/epa.token:ro
     command: ["tail","-f","/dev/null"]
 

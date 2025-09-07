@@ -26,12 +26,14 @@ export INFLUXDB3_TLS_CA="${INFLUXDB3_TLS_CA:-/home/influxdb/certs/ca.crt}"
 # Load auth token from file if available
 if [ -n "$INFLUXDB3_AUTH_TOKEN_FILE" ] && [ -f "$INFLUXDB3_AUTH_TOKEN_FILE" ]; then
     export INFLUXDB3_AUTH_TOKEN=$(cat "$INFLUXDB3_AUTH_TOKEN_FILE" | sed 's/\x1b\[[0-9;]*m//g' | tr -d '\n')
+    # cat "$INFLUXDB3_AUTH_TOKEN_FILE"
     echo "Loaded InfluxDB auth token from $INFLUXDB3_AUTH_TOKEN_FILE"
+    echo "Token: $INFLUXDB3_AUTH_TOKEN"
 fi
 
 # Set up convenient aliases for InfluxDB CLI
-alias influx='/home/influx/.influxdb/influxdb3'
-alias influx-cli='/home/influx/.influxdb/influxdb3'
+alias influx='/home/influx/.influxd/influxdb3'
+alias influx-cli='/home/influx/.influxd/influxdb3'
 
 # Add InfluxDB CLI to PATH
 export PATH="/home/influx/.influxdb:$PATH"

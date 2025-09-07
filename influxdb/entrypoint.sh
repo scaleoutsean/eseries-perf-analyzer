@@ -90,13 +90,13 @@ generate_tokens() {
     
     if [ -n "$EPA_TOKEN" ]; then
       echo -n "$EPA_TOKEN" > "$TOKEN_FILE"
-      chmod 640 "$TOKEN_FILE"
+      # chmod 640 "$TOKEN_FILE"
       echo "New EPA token saved to $TOKEN_FILE"
     else
       echo "Failed to extract EPA token from response:"
       echo "$TOKEN_RESPONSE"
       echo "dummy-token-extraction-failed" > "$TOKEN_FILE"
-      chmod 640 "$TOKEN_FILE"
+      # chmod 640 "$TOKEN_FILE"
     fi
   fi
   
