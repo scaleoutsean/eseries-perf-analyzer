@@ -7,7 +7,7 @@ if [ "$(basename "$PWD")" == "scripts" ]; then
 fi
 
 # if we're not in the root directory and ./data directory does not exist, exit with error
-if [ ! -f "docker-compose.yml" && ! -d "data" ]; then
+if [ ! -f "docker-compose.yml" ] && [ ! -d "data" ]; then
     echo "Error: Please run this script from the root directory of the project"
     exit 1
 fi
