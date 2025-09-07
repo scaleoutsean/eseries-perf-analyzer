@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-#
+# Ensure correct ownership of data directories for current user
 
 # if we're in scripts/, go up one directory
 if [ "$(basename "$PWD")" == "scripts" ]; then
@@ -16,11 +16,12 @@ fi
 
 for dir in data/influxdb_tokens data/influxdb_credentials; do
     if [ -d "$dir" ]; then
-        echo "Changing ownership of $dir to $(id -u):$(id -g)"
+        echo "Ensuring ownership of $dir to $(id -u):$(id -g)"
         sudo chown -R "$(id -u):$(id -g)" "$dir"
     else
         echo "Directory $dir does not exist, creating it and setting ownership to $(id -u):$(id -g)"
         mkdir -p "$dir"
+        echo "Setting ownership of $dir to $(id -u):$(id -g)"
         sudo chown -R "$(id -u):$(id -g)" "$dir"
     fi
 done
