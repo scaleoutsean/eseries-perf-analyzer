@@ -404,10 +404,34 @@ def create_explorer_config():
     logging.info("InfluxDB Explorer TLS material created at %s", str(dest))
     return (key_path, cert_path)
 
+def create_influx_mcp_config():
+    # Create InfluxDB MCP server CSR, sign it with CA key, copy to ./certs/influx-mcp
+    master = pathlib.Path("./certs/_master")
+    ca_key = master / "ca.key"
+    ca_crt = master / "ca.crt"
+
+    if not (ca_key.exists() and ca_crt.exists()):
+        create_certificates()
+
+    dest = pathlib.Path("./certs/influx-mcp")
+    key_path, cert_path = gen_sign_csr(dest, "influx-mcp", "/CN=influx-mcp")
+
+    conf_path = dest / "influx_mcp_tls.conf"
+    conf_text = (
+        "# Minimal Influx MCP TLS configuration (example)\n"
+        f"cert_file = {str(cert_path)}\n"
+        f"cert_key = {str(key_path)}\n"
+        f"ca_file = {str(dest / 'ca.crt')}\n"
+    )
+    with open(str(conf_path), "w", encoding="utf-8") as fh:
+        fh.write(conf_text)
+
+    logging.info("Influx MCP TLS material created at %s", str(dest))
+    return (key_path, cert_path)
 
 def copy_ca_to_all():
-    # Copies CA public key to all services
-    for service in ["s3", "influxdb", "grafana", "collector", "utils", "explorer"]:
+    # Copies CA public key to all locations
+    for service in ALL_CONTAINERS:
         src = pathlib.Path("./certs/_master/ca.crt")
         dst = pathlib.Path(f"./certs/{service}/ca.crt")
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -418,11 +442,15 @@ def copy_ca_to_all():
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate CA and per-service TLS certificates.")
-    parser.add_argument("--service", choices=["all", "proxy", "s3", "influxdb", "grafana", "explorer", "ca"], default="all", help="Which certs to generate")
+    # EPA Collector and Utils don't provide user-facing services and "CA" is just for generating the CA
+    parser.add_argument("--service", choices=["all", "proxy", "s3", "influxdb", "grafana", "explorer", "influx-mcp", "utils", "ca"], default="all", help="Which certs to generate")
     args = parser.parse_args()
-
+    ALL_CONTAINERS = ["proxy", "s3", "influxdb", "grafana", "explorer", "collector", "influx-mcp", "utils"]
     if args.service == "ca":
         create_certificates()
+    elif args.service == "proxy":
+        create_proxy_config()
+        copy_ca_to_all()
     elif args.service == "s3":
         create_s3_config()
         copy_ca_to_all()
@@ -431,12 +459,19 @@ if __name__ == "__main__":
         copy_ca_to_all()
     elif args.service == "grafana":
         create_grafana_config()
+        copy_ca_to_all()
+    elif args.service == "explorer":
         create_explorer_config()
+        copy_ca_to_all()
+    elif args.service == "influx-mcp":
+        create_influx_mcp_config()
         copy_ca_to_all()
     else:
         create_certificates()
-        create_influxdb_config()
+        create_proxy_config()
         create_s3_config()
+        create_influxdb_config()        
         create_grafana_config()
         create_explorer_config()
+        create_influx_mcp_config()
         copy_ca_to_all()

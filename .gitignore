@@ -87,16 +87,20 @@ Thumbs.db
 !certs/explorer/.gitkeep
 !certs/utils/.gitkeep
 !certs/influxdb/.gitkeep
+!certs/influx-mcp/.gitkeep
 
 # Data dir
 !data/.gitkeep
 !data/influxdb/.gitkeep
 !data/nginx/.gitkeep
+!data/nginx/nginx.conf
+!data/nginx/index.html
 !data/utils/.gitkeep
+!data/grafana/storage/.gitkeep
 
 # Proxy container
-!proxy/Dockerfile
-!proxy/entrypoint.sh
+# !proxy/Dockerfile # needed to build in CA especially external-facing
+# !proxy/entrypoint.sh
 
 # S3 container
 !s3/Dockerfile
@@ -106,6 +110,10 @@ Thumbs.db
 !influxdb/Dockerfile
 !influxdb/entrypoint.sh
 
+# Influx MCP container
+!data/influx-mcp/host.docker.internal
+!influx-mcp/Dockerfile
+!influx-mcp/entrypoint.sh
 # Explorer container
 !explorer/Dockerfile
 
@@ -118,9 +126,12 @@ Thumbs.db
 # Utilities container
 !utils/entrypoint.sh
 !utils/Dockerfile
-!utils/readme.txt
+!utils/README.md
 
-# Python app
+# Grafana
+# !grafana/.gitkeep
+
+# EPA Collector Python app
 !/app/*.py
 !/app/requirements.txt
 

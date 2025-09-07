@@ -6,11 +6,20 @@ services:
     restart: unless-stopped
     ports:
       - "${PROXY_HTTP_PORT}:80"
-      - "${PROXY_HTTPS_PORT}:48443"
+      - "${PROXY_HTTPS_PORT}:443"
+      - "${EXPLORER_PORT}:8443"
+      - "${GRAFANA_PORT}:3443"
+      - "${INFLUXDB_PORT}:8181"
+      # Optional for Versity S3 Gateway access
+      # - "${S3_PORT}:7070"
     volumes:
-      - ./certs/proxy:/etc/nginx/ssl:ro
-      - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
+      - ./certs/proxy/ca.crt:/etc/nginx/ssl/ca.crt:ro
+      - ./certs/proxy/external/pub_ca.crt:/etc/nginx/ssl/pub_ca.crt:ro
+      - ./certs/proxy/external/server.crt:/etc/nginx/ssl/server.crt:ro
+      - ./certs/proxy/external/server.key:/etc/nginx/ssl/server.key:ro
       - ./nginx/proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      
+      # ssl_ecdh_curve X25519MLKEM768; use PQC - https://github.com/nginx/nginx/issues/288      
     networks:
       epa:
         ipv4_address: ${PROXY_IP}
@@ -97,21 +106,43 @@ services:
       INFLUX_HOST: influxdb
       INFLUX_PORT: ${INFLUXDB_PORT}
       INFLUX_DB: ${INFLUXDB_DB}
-      INFLUXDB3_TLS_CA: /influxdb_certs/ca.crt
-      INFLUXDB3_AUTH_TOKEN_FILE: /influxdb_tokens/epa.token
+      INFLUXDB3_TLS_CA: /home/influx/ca.crt
+      INFLUXDB3_AUTH_TOKEN_FILE: /home/influxd/epa.token
     networks:
       epa:
         ipv4_address: ${UTILS_IP}
     volumes:
-      - ./certs/utils:/s3_certs:ro
-      - ./data/influxdb_credentials:/influxdb_credentials/
-      - ./certs/influxdb:/influxdb_certs:ro
-      - ./data/influxdb_tokens:/influxdb_tokens:ro
-      - ./certs/_master/ca.crt:/s3_certs/ca.crt:ro
-      - ./certs/_master/ca.crt:/influxdb_certs/ca.crt:ro
-    # No depends_on - utils should be independent for troubleshooting
+      - ./certs/_master/ca.crt:/home/influx/certs/ca.crt:ro
+      - ./certs/influxdb/influxdb.crt:/home/influx/influxdb.crt:ro
+      - ./data/influxdb_tokens/epa.token:/home/influx/epa.token:ro
     command: ["tail","-f","/dev/null"]
 
+  influx-mcp:
+    image: epa/influxdb-mcp:${INFLUXDB_MCP_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: influx-mcp/Dockerfile
+    container_name: influx-mcp
+    restart: "no"
+    environment:
+      # InfluxDB3 Environment Variables
+      # INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
+      # INFLUX_PORT: ${INFLUXDB_PORT}
+      INFLUX_DB: ${INFLUXDB_DB}
+      INFLUX_DB_INSTANCE_URL: https://${INFLUXDB_HOST}:${INFLUXDB_PORT}
+      INFLUXDB3_TLS_CA: /etc/ssl/certs/ca.crt
+      INFLUXDB3_AUTH_TOKEN_FILE: /home/influxd/epa.token
+      INFLUX_DB_PRODUCT_TYPE: core
+      NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca.crt
+      SSL_CERT_FILE:       /etc/ssl/certs/server.crt
+      SSL_KEY_FILE:        /etc/ssl/private/server.key
+    volumes:
+      - ./certs/_master/ca.crt:/etc/ssl/certs/ca.crt:ro
+      - ./certs/mcp/server.crt:/etc/ssl/certs/server.crt:ro
+      - ./certs/mcp/server.key:/etc/ssl/private/server.key:ro
+    networks:
+      epa:
+        ipv4_address: ${INFLUX_MCP_IP}
   grafana:
     image: epa/grafana:latest
     # Until 12.2 with custom CA bug is resolved, use own build from the main branch
@@ -121,8 +152,8 @@ services:
     ports:
       - "${GRAFANA_PORT}:3000" # HTTPS only
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       # HTTPS Configuration
       GF_SERVER_PROTOCOL: https
       GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
@@ -136,7 +167,7 @@ services:
     volumes:
       - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
       - ./certs/grafana:/etc/grafana/certs:ro
-      - grafana-storage:/var/lib/grafana
+      - ./data/grafana/storage:/var/lib/grafana
     depends_on:
       - influxdb
     networks:
@@ -173,9 +204,6 @@ services:
     networks:
       epa:
         ipv4_address: ${EXPLORER_IP}
-
-volumes:
-  grafana-storage:
 
 networks:
   epa:

@@ -1,0 +1,13 @@
+<!-- data/nginx/html/index.html -->
+<!doctype html>
+<html>
+<head><title>EPA 4 Services</title></head>
+<body>
+  <h1>EPA Service Directory</h1>
+  <ul>
+    <li><a href="https://{{ proxy_host }}:{{ explorer_port }}">InfluxDB Explorer</a></li>
+    <li><a href="https://{{ proxy_host }}:{{ grafana_port }}">Grafana 12</a></li>
+    <li>https://{{ proxy_host }}:{{ influxdb_port }} - InfluxDB 3 API endpoint (InfluxDB Bearer Token required)</li>
+  </ul>
+</body>
+</html>
