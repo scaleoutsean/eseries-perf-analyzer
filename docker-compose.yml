@@ -108,8 +108,8 @@ services:
       CRED_DIR: /influxdb_credentials
       # InfluxDB3 Environment Variables
       INFLUX_HOST: influxdb
-      INFLUX_PORT: ${INFLUXDB_PORT}
-      INFLUX_DB: ${INFLUXDB_DB}
+      INFLUX_PORT: ${INFLUXDB_PORT:-8181}
+      INFLUX_DB: ${INFLUXDB_DB:-epa}
       INFLUXDB3_TLS_CA: /home/influx/ca.crt
       INFLUXDB3_AUTH_TOKEN_FILE: /home/influx/epa.token
     networks:

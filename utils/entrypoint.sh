@@ -19,9 +19,9 @@ cat > /home/influx/setup.sh << 'INFLUX_EOF'
 # Source this script to set up InfluxDB environment variables
 
 shopt -s expand_aliases
-export INFLUXDB3_HOST_URL="${INFLUX_HOST:-https://influxdb:8181}"
+export INFLUXDB3_HOST_URL="https://${INFLUX_HOST:-influxdb}:${INFLUX_PORT:-8181}"
 export INFLUX_DB="${INFLUX_DB:-epa}"
-export INFLUXDB3_TLS_CA="${INFLUXDB3_TLS_CA:-/home/influxdb/certs/ca.crt}"
+export INFLUXDB3_TLS_CA="${INFLUXDB3_TLS_CA:-/home/influx/certs/ca.crt}"
 
 # Load auth token from file if available
 if [ -n "$INFLUXDB3_AUTH_TOKEN_FILE" ] && [ -f "$INFLUXDB3_AUTH_TOKEN_FILE" ]; then
