@@ -1,6 +1,7 @@
 FROM debian:trixie-slim
 ENV HOME=/home/influx
 ENV PATH="/home/influx/.influxdb:${PATH}"
+ENV INFLUXDB3_BUILD_VERSION=${INFLUXDB3_BUILD_VERSION:-3.4.0}
 LABEL maintainer="@scaleoutSean"
 
 # Install python and awscli
@@ -12,12 +13,12 @@ RUN apt-get update && \
 
 RUN mkdir -p /home/influx/.influxdb && \
     cd /home/influx/.influxdb && \
-    curl -sSL 'https://dl.influxdata.com/influxdb/releases/influxdb3-core-3.4.0_linux_amd64.tar.gz' -O && \
-    curl -sSL 'https://dl.influxdata.com/influxdb/releases/influxdb3-core-3.4.0_linux_amd64.tar.gz.sha256' -O && \
-    sha256sum -c influxdb3-core-3.4.0_linux_amd64.tar.gz.sha256 && \
-    rm influxdb3-core-3.4.0_linux_amd64.tar.gz.sha256 && \
-    tar -xf influxdb3-core-3.4.0_linux_amd64.tar.gz --strip-components=1 -C /home/influx/.influxdb && \
-    rm influxdb3-core-3.4.0_linux_amd64.tar.gz
+    curl -sSL "https://dl.influxdata.com/influxdb/releases/influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz" -O && \
+    curl -sSL "https://dl.influxdata.com/influxdb/releases/influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz.sha256" -O && \
+    sha256sum -c influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz.sha256 && \
+    rm influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz.sha256 && \
+    tar -xf influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz --strip-components=1 -C /home/influx/.influxdb && \
+    rm influxdb3-core-${INFLUXDB3_BUILD_VERSION}_linux_amd64.tar.gz
 
 # create influx system user and group, and fix permissions
 RUN groupadd --system influx || true && \
