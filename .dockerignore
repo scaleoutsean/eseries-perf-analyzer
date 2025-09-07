@@ -1,10 +1,6 @@
 **/__pycache__
 **/*.pyc
-influxdb
-utils
 data
 images
-explorer
-grafana
 .venv
 !certs/_master/ca.crt
