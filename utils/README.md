@@ -1,7 +1,7 @@
 # InfluxDB CLI and API 
 
 ## API
-curl --cacert --cacert=/home/influx/ca.crt --get https://influxdb:8181/api/v3/query_sql  --header "${HEADER}" --data-urlencode "db=epa" --data-urlencode "q=SELECT * FROM volumes LIMIT 2"
+curl --cacert /home/influx/certs/ca.crt --get https://influxdb:8181/api/v3/query_sql  --header "${HEADER}" --data-urlencode "db=epa" --data-urlencode "q=SELECT * FROM volumes LIMIT 2"
 
 ## CLI (influx is alias for influxdb3)
 
