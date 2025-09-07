@@ -32,8 +32,8 @@ if [ -n "$INFLUXDB3_AUTH_TOKEN_FILE" ] && [ -f "$INFLUXDB3_AUTH_TOKEN_FILE" ]; t
 fi
 
 # Set up convenient aliases for InfluxDB CLI
-alias influx='/home/influx/.influxd/influxdb3'
-alias influx-cli='/home/influx/.influxd/influxdb3'
+alias influx='/home/influx/.influxdb/influxdb3'
+alias influx-cli='/home/influx/.influxdb/influxdb3'
 
 # Add InfluxDB CLI to PATH
 export PATH="/home/influx/.influxdb:$PATH"
@@ -66,7 +66,7 @@ cat >> /home/influx/.bashrc << 'EOF'
 # Load InfluxDB environment on shell startup
 [ -f /home/influx/setup.sh ] && source /home/influx/setup.sh
 alias influx='/home/influx/.influxdb/influxdb3'
-alias influx-cli='/home/influx/.influxdb/influxdb3'
+alias influx-cli='/home/influx/.influxdb/influxdb3 --tls-ca ./certs/ca.crt'
 EOF
 
 # Keep container running for debugging/cli use

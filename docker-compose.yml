@@ -110,7 +110,7 @@ services:
       INFLUX_HOST: influxdb
       INFLUX_PORT: ${INFLUXDB_PORT:-8181}
       INFLUX_DB: ${INFLUXDB_DB:-epa}
-      INFLUXDB3_TLS_CA: /home/influx/ca.crt
+      INFLUXDB3_TLS_CA: /home/influx/certs/ca.crt
       INFLUXDB3_AUTH_TOKEN_FILE: /home/influx/epa.token
     networks:
       epa:
