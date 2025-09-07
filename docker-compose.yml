@@ -27,6 +27,7 @@ services:
   influxdb:
     container_name: epa4-influxdb
     image: epa/influxdb:${INFLUXDB3_VERSION}
+    restart: unless-stopped
     build:
       context: .
       dockerfile: influxdb/Dockerfile
@@ -47,7 +48,7 @@ services:
       INFLUXDB3_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
       TOKEN_FILE: /home/influx/tokens/epa.token
       # Disable anonymous usage analytics (InfluxDB3 specific)
-      INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}
+      INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}    
     volumes:
       - ./data/influxdb:/var/lib/influxdb3
       - ./certs/influxdb/influxdb.crt:/home/influx/certs/influxdb.crt:ro
@@ -69,13 +70,14 @@ services:
       args:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
-    container_name: sfc
+    # container_name: collector
+    restart: unless-stopped
     command: ["--no-instrumenting"]
     environment:
-      INFLUX_HOST: influxdb
+      INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
       INFLUX_PORT: ${INFLUXDB_PORT}
       INFLUX_DB: ${INFLUXDB_DB}
-      INFLUXDB3_AUTH_TOKEN_FILE: /influxdb_tokens/epa.token
+      INFLUXDB3_AUTH_TOKEN_FILE: /home/app/tokens/epa.token
       INFLUXDB3_TLS_CA: /home/app/certs/ca.crt
       CA_CHAIN: /home/app/certs/ca.crt,/home/app/certs/influxdb_ca.crt      
       API: ${API}
@@ -84,9 +86,10 @@ services:
     depends_on:
       - influxdb
     volumes:
-      - ./certs/epa:/home/app/certs:ro
-      - ./data/influxdb_tokens:/influxdb_tokens:ro
-      - ./certs/_master/ca.crt:/home/app/certs/ca.crt:ro
+      - ./certs/collector:/home/app/certs:ro
+      - ./data/influxdb_tokens/epa.token:/home/app/tokens/epa.token:ro
+      - ./data/samples/in:/home/app/samples/in:rw
+      - ./data/samples/out:/home/app/samples/out:rw
     networks:
       epa:
         ipv4_address: ${EPA_COLLECTOR}
