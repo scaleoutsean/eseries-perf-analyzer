@@ -97,6 +97,8 @@ Thumbs.db
 !data/nginx/index.html
 !data/utils/.gitkeep
 !data/grafana/storage/.gitkeep
+!data/influxdb_tokens/.gitkeep
+!data/influxdb_credentials/.gitkeep
 
 # Proxy container
 # !proxy/Dockerfile # needed to build in CA especially external-facing
