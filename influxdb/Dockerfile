@@ -12,7 +12,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy CA cert to container
-COPY ./ca.crt /home/influxdb3/certs/ca.crt 
+COPY ./certs/_master/ca.crt /home/influxdb3/certs/ca.crt 
 RUN chmod 774 /home/influxdb3/certs/ca.crt
 
 # Create influx user and home directory
@@ -70,7 +70,7 @@ RUN echo "=== SFC InfluxDB3 Embedded Plugin Summary ===" && \
 # Copy downsampling configuration
 # COPY downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
 
-COPY entrypoint.sh /home/influx/entrypoint.sh
+COPY influxdb/entrypoint.sh /home/influx/entrypoint.sh
 RUN chmod +x /home/influx/entrypoint.sh
 
 USER influx
