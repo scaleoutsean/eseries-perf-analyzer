@@ -21,6 +21,14 @@ generate_tokens() {
   
   # Create directory if it doesn't exist
   mkdir -p "$(dirname "$TOKEN_FILE")"   
+  
+  # Check if we can write to the token directory
+  if [ ! -w "$(dirname "$TOKEN_FILE")" ]; then
+    echo "ERROR: Cannot write to token directory $(dirname "$TOKEN_FILE")"
+    echo "Please ensure the directory exists and has proper permissions"
+    echo "You may need to run: sudo chown -R $(id -u):$(id -g) $(dirname "$TOKEN_FILE")"
+    return 1
+  fi
 
   # Set CLI to use HTTPS with the correct hostname that matches the certificate
   export INFLUXDB3_HOST_URL="https://influxdb:8181"
