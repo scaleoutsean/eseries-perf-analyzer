@@ -28,8 +28,8 @@ services:
     container_name: epa4-influxdb
     image: epa/influxdb:${INFLUXDB3_VERSION}
     build:
-      context: influxdb
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: influxdb/Dockerfile
       args:
         INFLUXDB3_BUILD_VERSION: ${INFLUXDB3_BUILD_VERSION}
     ports:

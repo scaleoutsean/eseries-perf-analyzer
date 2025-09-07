@@ -68,7 +68,7 @@ RUN echo "=== SFC InfluxDB3 Embedded Plugin Summary ===" && \
     echo "Embedded plugin architecture ready"
 
 # Copy downsampling configuration
-COPY downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
+# COPY downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
 
 COPY entrypoint.sh /home/influx/entrypoint.sh
 RUN chmod +x /home/influx/entrypoint.sh

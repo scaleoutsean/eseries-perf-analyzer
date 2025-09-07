@@ -132,8 +132,11 @@ Thumbs.db
 # !grafana/.gitkeep
 
 # EPA Collector Python app
-!/app/*.py
-!/app/requirements.txt
+!app/*.py
+!app/requirements.txt
+
+# Scripts
+!scripts/fetch-external.sh
 
 # Images
 !/images/epa-eseries-perf-analyzer.png
