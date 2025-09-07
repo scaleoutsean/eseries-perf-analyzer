@@ -2,7 +2,7 @@
 
 ###############################################################################
 # Synopsis:                                                                   #
-# Entrypoint script for utils container in E-Series Performance Analyzser     #
+# Entrypoint script for utils container in E-Series Performance Analyzer      #
 #   version 4.0 and above.                                                    #
 #                                                                             #
 # Author: @scaleoutSean (Github)                                              #

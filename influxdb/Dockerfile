@@ -12,9 +12,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy CA cert to container
-COPY ./certs/_master/ca.crt /home/influxdb3/certs/ca.crt 
-RUN chmod 774 /home/influxdb3/certs/ca.crt
-
+# COPY certs/_master/ca.crt /home/influx/certs/ca.crt
+# RUN chmod 774 /home/influx/certs/ca.crt
+RUN mkdir -p /home/influx/certs /home/influx/tokens/
 # Create influx user and home directory
 RUN useradd -m -d /home/influx -s /bin/bash influx
 
@@ -58,17 +58,17 @@ RUN mkdir -p /tmp/plugins/official /tmp/plugins/sfc && \
     echo "Official plugins download attempt completed"
 
 # Display embedded plugin summary
-RUN echo "=== SFC InfluxDB3 Embedded Plugin Summary ===" && \
+RUN echo "=== EPA InfluxDB3 Embedded Plugin Summary ===" && \
     echo "Plugin directory: /tmp/plugins" && \
     ls -la /tmp/plugins/ && \
     echo "Official plugins:" && \
     ls -la /tmp/plugins/official/ 2>/dev/null || echo "Official plugins directory not found" && \
-    echo "SFC plugins:" && \
-    ls -la /tmp/plugins/sfc/ 2>/dev/null || echo "SFC plugins directory not found" && \
+    echo "EPA plugins:" && \
+    ls -la /tmp/plugins/sfc/ 2>/dev/null || echo "EPA plugins directory not found" && \
     echo "Embedded plugin architecture ready"
 
 # Copy downsampling configuration
-# COPY downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
+COPY influxdb/downsampling-config.yaml /tmp/plugins/downsampling-config.yaml
 
 COPY influxdb/entrypoint.sh /home/influx/entrypoint.sh
 RUN chmod +x /home/influx/entrypoint.sh

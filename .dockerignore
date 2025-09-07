@@ -2,5 +2,6 @@
 **/*.pyc
 data
 images
-.venv
-!certs/_master/ca.crt
+.venv/
+.env
+

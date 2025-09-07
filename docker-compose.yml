@@ -38,23 +38,24 @@ services:
       # It's only accessible within the Docker network for internal token generation
     environment:
       # Removed S3-related environment variables since we're using local file storage
-      TLS_KEY: /home/influxdb3/certs/influxdb.key
-      TLS_CERT: /home/influxdb3/certs/influxdb.crt
+      TLS_KEY: /home/influx/certs/influxdb.key
+      TLS_CERT: /home/influx/certs/influxdb.crt
       TLS_MIN_VERSION: tls-1.3
-      INFLUXDB3_TLS_CA: /home/influxdb3/certs/ca.crt
-      TLS_CA: /home/influxdb3/certs/ca.crt
+      INFLUXDB3_TLS_CA: /home/influx/certs/ca.crt
+      TLS_CA: /home/influx/certs/ca.crt
       NODE_ID: ${INFLUXDB_NODE_ID}
       INFLUXDB3_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
-      TOKEN_FILE: /influxdb_tokens/epa.token
+      TOKEN_FILE: /home/influx/tokens/epa.token
       # Disable anonymous usage analytics (InfluxDB3 specific)
       INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}
     volumes:
       - ./data/influxdb:/var/lib/influxdb3
-      - ./certs/influxdb:/home/influxdb3/certs:ro
-      - ./data/influxdb_tokens:/influxdb_tokens
-      - ./certs/_master/ca.crt:/home/influxdb3/certs/ca.crt:ro
+      - ./certs/influxdb/influxdb.crt:/home/influx/certs/influxdb.crt:ro
+      - ./certs/influxdb/influxdb.key:/home/influx/certs/influxdb.key:ro
+      - ./certs/influxdb/ca.crt:/home/influx/certs/ca.crt:ro
+      - ./data/influxdb_tokens:/home/influx/tokens
     # Removed S3 dependency since we're using local file storage
-    entrypoint: ["/home/influx/influxdb3-entrypoint.sh"]
+    entrypoint: ["/home/influx/entrypoint.sh"]
     command: []
     networks:
       epa:
