@@ -109,6 +109,7 @@ Thumbs.db
 # InfluxDB container
 !influxdb/Dockerfile
 !influxdb/entrypoint.sh
+!influxdb/downsampling-config.yaml
 
 # Influx MCP container
 !data/influx-mcp/host.docker.internal

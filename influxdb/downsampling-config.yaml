@@ -1,0 +1,87 @@
+# SFC Down-sampling Configuration Reference
+# 
+# (c) 2025 scaleoutSean @ Github 
+# License: MIT
+# Repository: https://github.com/scaleoutsean/sfc
+#
+# This file documents the current down-sampling settings configured in
+# entrypoint.sh. To customize down-sampling behavior, edit the
+# setup_down-sampling_triggers() function in entrypoint.sh.
+#
+# Current Active Configuration:
+# - DS01: Data older than 7 days is down-sampled to 5-minute intervals
+# - DS02 and DS03 use longer ranges (see the file)
+# - Source and target table: volume_performance -> volume_performance_<range><time_unit>_auto
+# - Schedule: every 10 minutes (0 */10 * * * *) for shorter intervals, longer intervals for DS02 and DS03
+#
+# To add more down-sampling layers, you may add the trigger creation
+# blocks in the entrypoint script entrypoint.sh and/or modify the parameters below and 
+# have the script load them.
+
+# Default Production Settings (already active, so no need to enable DS01)
+active_down-sampling:
+  DS01:
+    description: "Active: Recent data optimization - 5min intervals for 7d+ data"
+    source_table: "volume_performance"
+    target_table: "volume_performance_5m_auto"
+    age_threshold: "7 days"
+    interval: "5 minutes"
+    schedule: "every 10 minutes"
+    aggregations:
+      read_ops: "sum"      # Total operations
+      write_ops: "sum"     # Total operations  
+      read_latency: "avg"  # Average latency
+      write_latency: "avg" # Average latency
+      utilization: "avg"   # Average utilization
+
+# Additional down-sampling (similar triggers are already enabled, these are presented for reference)
+
+additional_down-sampling:
+  DS02:
+    description: "Planned: Medium-term optimization - 10min intervals for 14d+ data"
+    source_table: "volume_performance_5m_auto"
+    target_table: "volume_performance_1h_auto" 
+    age_threshold: "14 days"
+    interval: "1 hour"
+    schedule: "every 1 hour (offset +5min)"
+
+  DS03:
+    description: "Planned: Long-term optimization - 1h intervals for 30d+ data"
+    source_table: "volume_performance_1h_auto"
+    target_table: "volume_performance_1d_auto"
+    age_threshold: "60 days" 
+    interval: "1 day"
+    schedule: "every 1 day (2:10 AM)"
+
+# Implementation steps:
+# 1. Edit influxdb/entrypoint.sh
+# 2. Find setup_down-sampling_triggers() function
+# 3. Copy the existing trigger creation block
+# 4. Modify source/target tables and thresholds as needed
+# 5. Rebuild containers: docker-compose down && docker-compose up -d --build influxdb
+# 6. Verify trigger creation in ds.log and target table creation in InfluxDB
+# 7. Monitor down-sampling activity in ds.log
+# 8. Adjust Grafana dashboards to use down-sampled tables as needed
+
+# Current field mappings (active in DS01 trigger):
+# - read_ops_last_sample becomes sum (total operations)
+# - write_ops_last_sample becomes sum (total operations)  
+# - latency_usec becomes avg (average response time)
+# - volume_utilization becomes avg (average utilization percentage)
+
+# Field aggregation guidelines (used by the official InfluxDB down-sampling plugin):
+# aggregation_rules:
+#  counters: ["read_ops_last_sample", "write_ops_last_sample"]  # Use SUM
+#  averages: ["latency_usec", "volume_utilization"]            # Use AVG
+#  tags_preserved: ["account_id", "volume_id", "volume_name", "cluster_id", "cluster_name"]
+
+# Monitoring:
+# - Check ds.log every 15 minutes for down-sampling activity
+# - Monitor volume_performance_5m_auto table creation
+# - Verify trigger execution with simple_monitor.sh
+
+# Notes:
+# - Current system runs three schedules for volume_performance only
+# - All target tables automatically created by processing engine
+# - Tags preserved for proper grouping and filtering
+# - System is production-ready with embedded plugin architecture
