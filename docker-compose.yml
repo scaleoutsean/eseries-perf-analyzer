@@ -16,9 +16,8 @@ services:
       - ./certs/proxy/ca.crt:/etc/nginx/ssl/ca.crt:ro
       - ./certs/proxy/external/pub_ca.crt:/etc/nginx/ssl/pub_ca.crt:ro
       - ./certs/proxy/external/server.crt:/etc/nginx/ssl/server.crt:ro
-      - ./certs/proxy/external/server.key:/etc/nginx/ssl/server.key:ro
+      - ./certs/proxy/external/private.key:/etc/nginx/ssl/private.key:ro
       - ./nginx/proxy.conf:/etc/nginx/conf.d/default.conf:ro
-      
       # ssl_ecdh_curve X25519MLKEM768; use PQC - https://github.com/nginx/nginx/issues/288      
     networks:
       epa:
@@ -131,7 +130,7 @@ services:
     environment:
       # InfluxDB3 Environment Variables
       # INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
-      # INFLUX_PORT: ${INFLUXDB_PORT}
+      # INFLUX_PORT: ${INFLUXDB_PORT:-8181}
       INFLUX_DB: ${INFLUXDB_DB}
       INFLUX_DB_INSTANCE_URL: https://${INFLUXDB_HOST}:${INFLUXDB_PORT}
       INFLUXDB3_TLS_CA: /etc/ssl/certs/ca.crt
