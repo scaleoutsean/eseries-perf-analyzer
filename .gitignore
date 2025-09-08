@@ -140,6 +140,8 @@ Thumbs.db
 
 # Scripts
 !scripts/fetch-external.sh
+!scripts/data-dir-ownership.sh
+!scripts/proxy-home-page.sh
 
 # Images
 !/images/epa-eseries-perf-analyzer.png
