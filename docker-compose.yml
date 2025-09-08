@@ -147,7 +147,8 @@ services:
       epa:
         ipv4_address: ${INFLUX_MCP_IP}
   grafana:
-    image: epa/grafana:latest
+    # image: epa/grafana:latest
+    # image: scaleoutsean/grafana:latest
     # Until 12.2 with custom CA bug is resolved, use own build from the main branch
     # image: docker.io/grafana/grafana:${GRAFANA_VERSION}
     build:
