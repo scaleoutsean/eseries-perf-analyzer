@@ -7,9 +7,9 @@ services:
     ports:
       - "${PROXY_HTTP_PORT}:80"
       - "${PROXY_HTTPS_PORT}:443"
-      - "${EXPLORER_PORT}:8443"
-      - "${GRAFANA_PORT}:3443"
-      - "${INFLUXDB_PORT}:8181"
+      - "${PROXY_EXPLORER_PORT}:8443"
+      - "${PROXY_GRAFANA_PORT}:3443"
+      - "${PROXY_INFLUXDB_PORT}:8181"
       # Optional for Versity S3 Gateway access
       # - "${S3_PORT}:7070"
     volumes:
