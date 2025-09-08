@@ -150,6 +150,11 @@ services:
     image: epa/grafana:latest
     # Until 12.2 with custom CA bug is resolved, use own build from the main branch
     # image: docker.io/grafana/grafana:${GRAFANA_VERSION}
+    build:
+      context: grafana
+      dockerfile: Dockerfile
+      args:
+        GRAFANA_BUILD_VERSION: ${GRAFANA_VERSION}
     container_name: grafana
     restart: unless-stopped
     ports:
