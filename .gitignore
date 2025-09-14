@@ -7,6 +7,7 @@ __pycache__/
 app/collector/__pycache__/
 app/cache/__init__.py
 app/collectors/__init__.py
+app/collectors/__init__.py
 # C extensions
 *.so
 
