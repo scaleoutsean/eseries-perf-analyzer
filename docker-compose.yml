@@ -64,18 +64,18 @@ services:
   collector:
     image: epa/collector:${COLLECTOR_VERSION}
     build:
-      context: app
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: app/Dockerfile
       args:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
     restart: unless-stopped
-    command: ["--no-instrumenting"]
+    command: ["--fromJson", "/home/app/samples/in", "--output", "influxdb", "--maxIterations", "1", "--loglevel", "DEBUG", "--tlsCa", "/home/app/certs/ca.crt"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
-      INFLUX_PORT: ${INFLUXDB_PORT}
-      INFLUX_DB: ${INFLUXDB_DB}
+      INFLUX_PORT: ${INFLUXDB_PORT:-8181}
+      INFLUX_DB: ${INFLUXDB_DB:-epa}
       INFLUXDB3_AUTH_TOKEN_FILE: /home/app/tokens/epa.token
       INFLUXDB3_TLS_CA: /home/app/certs/ca.crt
       CA_CHAIN: /home/app/certs/ca.crt,/home/app/certs/influxdb_ca.crt      
@@ -87,7 +87,8 @@ services:
     volumes:
       - ./certs/collector:/home/app/certs:ro
       - ./data/influxdb_tokens/epa.token:/home/app/tokens/epa.token:ro
-      - ./data/samples/in:/home/app/samples/in:rw
+      # - ./data/samples/in:/home/app/samples/in:rw
+      - ./tests/10.113.13.4/:/home/app/samples/in:rw
       - ./data/samples/out:/home/app/samples/out:rw
     networks:
       epa:
@@ -99,6 +100,8 @@ services:
       context: ./utils
     container_name: utils
     restart: "no"
+    tty: true
+    stdin_open: true
     environment:
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}

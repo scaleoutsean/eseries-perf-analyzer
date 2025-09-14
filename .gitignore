@@ -4,7 +4,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
-epa/collector/__pycache__/
+app/collector/__pycache__/
+app/cache/__init__.py
+app/collectors/__init__.py
 # C extensions
 *.so
 
@@ -137,6 +139,10 @@ Thumbs.db
 # EPA Collector Python app
 !app/*.py
 !app/requirements.txt
+!app/cache/
+!app/collectors/
+!app/enrichment/
+!app/schema/
 
 # Scripts
 !scripts/fetch-external.sh

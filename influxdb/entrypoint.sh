@@ -54,31 +54,37 @@ generate_tokens() {
   fi
   
   if [ "$CREATE_NEW_TOKEN" = "true" ]; then
-    echo "Attempting to create admin token..."
-    # Try to create the admin token
-    ADMIN_TOKEN_OUTPUT=$(/home/influx/.influxdb/influxdb3 create token --admin --host "https://influxdb:8181" --tls-ca "${INFLUXDB3_TLS_CA}" 2>&1)
-    echo "Admin token creation attempt:"
-    echo "$ADMIN_TOKEN_OUTPUT"
+    echo "Checking if admin token already exists, otherwise creating new one..."
+    # First try to use existing admin token if available
+    ADMIN_TOKEN_FILE="$(dirname "$TOKEN_FILE")/admin.token"
+    if [ -f "$ADMIN_TOKEN_FILE" ] && [ -s "$ADMIN_TOKEN_FILE" ]; then
+      echo "Found existing admin token, using it..."
+      ADMIN_TOKEN=$(cat "$ADMIN_TOKEN_FILE")
+    else
+      echo "No existing admin token found, creating new one..."
+      # Try to create the admin token
+      ADMIN_TOKEN_OUTPUT=$(/home/influx/.influxdb/influxdb3 create token --admin --host "https://influxdb:8181" --tls-ca "${INFLUXDB3_TLS_CA}" 2>&1)
+      echo "Admin token creation attempt:"
+      echo "$ADMIN_TOKEN_OUTPUT"
     
-    # Write raw output to file for debugging
-    # echo "$ADMIN_TOKEN_OUTPUT" > "${TOKEN_FILE}.raw"
-    
-    # Extract the admin token from CLI output (strip ANSI codes first)
-    ADMIN_TOKEN=$(echo "$ADMIN_TOKEN_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | sed -n '/^Token:/s/^Token: //p')
-    
-    if [ -z "$ADMIN_TOKEN" ]; then
-      echo "Failed to extract admin token from output."
-      echo "Writing dummy token as fallback"
-      echo "dummy-token-failed" > "$TOKEN_FILE"
-      chmod 640 "$TOKEN_FILE"
-      return
+      # Extract the admin token from CLI output (strip ANSI codes first)
+      ADMIN_TOKEN=$(echo "$ADMIN_TOKEN_OUTPUT" | sed 's/\x1b\[[0-9;]*m//g' | sed -n '/^Token:/s/^Token: //p')
+      
+      if [ -z "$ADMIN_TOKEN" ]; then
+        echo "Failed to extract admin token from output."
+        echo "Writing dummy token as fallback"
+        echo "dummy-token-failed" > "$TOKEN_FILE"
+        chmod 644 "$TOKEN_FILE"  # Readable by all users for container access
+        return
+      fi
+      
+      # Save admin token for future administrative operations
+      # Save to the mounted volume directory for persistence
+      echo -n "$ADMIN_TOKEN" > "$(dirname "$TOKEN_FILE")/admin.token"
+      chmod 644 "$(dirname "$TOKEN_FILE")/admin.token"  # Readable by all users for container access
     fi
     
     echo "Admin token obtained successfully."
-    
-    # Save admin token for future administrative operations
-    echo -n "$ADMIN_TOKEN" > "${TOKEN_FILE}.admin"
-    chmod 640 "${TOKEN_FILE}.admin"
     
     # Now create the EPA token using the admin token
     echo "Creating EPA token..."
@@ -90,13 +96,13 @@ generate_tokens() {
     
     if [ -n "$EPA_TOKEN" ]; then
       echo -n "$EPA_TOKEN" > "$TOKEN_FILE"
-      # chmod 640 "$TOKEN_FILE"
+      chmod 644 "$TOKEN_FILE"  # Readable by all users for container access
       echo "New EPA token saved to $TOKEN_FILE"
     else
       echo "Failed to extract EPA token from response:"
       echo "$TOKEN_RESPONSE"
       echo "dummy-token-extraction-failed" > "$TOKEN_FILE"
-      # chmod 640 "$TOKEN_FILE"
+      chmod 644 "$TOKEN_FILE"  # Readable by all users for container access
     fi
   fi
   
@@ -130,7 +136,7 @@ exec /home/influx/.influxdb/influxdb3 serve \
   --tls-cert="${TLS_CERT}" \
   --tls-minimum-version="${TLS_MIN_VERSION:-tls-1.3}" \
   --http-bind="${HTTP_BIND:-0.0.0.0:8181}" \
-  --wal-flush-interval="${WAL_FLUSH_INTERVAL:-30s}" \
+  --wal-flush-interval="${WAL_FLUSH_INTERVAL:-10s}" \
   --admin-token-recovery-http-bind="0.0.0.0:8182" \
   --plugin-dir="/tmp/plugins"
 

@@ -24,3 +24,14 @@ for dir in data/influxdb_tokens data/influxdb_credentials; do
         sudo chown -R "$(id -u):$(id -g)" "$dir"
     fi
 done
+
+# Grafana
+
+sudo chown -R 472:472 ./data/grafana/storage
+sudo chown -R 472:472 ./certs/grafana/
+
+
+# Check all private keys have restrictive permissions
+find ./certs/ -name "*.key" -o -name "*private*" -type f -exec ls -la {} \;
+# Should all show: -rw------- (600 permissions)
+

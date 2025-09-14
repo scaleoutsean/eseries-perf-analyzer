@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM python:3.12-alpine
 
 ENV EPA_VERSION=${COLLECTOR_VERSION}
 ARG TAG=${EPA_VERSION}
@@ -16,14 +16,17 @@ RUN apk update && apk upgrade --no-cache
 # Optionally we could add CA certificate to container OS but we recommend to use CLI args or .env/YAML
 # RUN apk add --no-cache ca-certificates && update-ca-certificates
 RUN python -m pip install --upgrade pip
-WORKDIR /app
-COPY requirements.txt .
+WORKDIR /home/app
+# Set Python path to include the app directory
+ENV PYTHONPATH=/home/app:$PYTHONPATH
+COPY app/requirements.txt .
 RUN pip install -r requirements.txt
 RUN pip --default-timeout=5 --retries 15 install --upgrade -r requirements.txt && rm -rf /root/.cache
-COPY collector.py ./
-COPY *.py /app/
-# bring in entrypoint
-COPY entrypoint.sh ./
-RUN chmod +x *.sh
+# Copy the entire app module structure 
+COPY app/ /home/app/app/
+# Copy entrypoint
+COPY app/entrypoint.sh /home/app/
+# Ensure executable permissions
+RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ["./entrypoint.sh"]
