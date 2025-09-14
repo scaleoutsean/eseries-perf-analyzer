@@ -37,6 +37,9 @@ from app.collectors.config_collector import ConfigCollector
 from app.collectors.performance_collector import PerformanceCollector
 from app.collectors.event_collector import EventCollector
 
+# Import enrichment classes
+from app.enrichment.event_enrichment import EventEnrichment
+
 class EnrichmentProcessor:
     """Enrich performance data with configuration information."""
     def __init__(self, config_collector=None):
@@ -688,6 +691,14 @@ def main():
     
     enrichment_processor = EnrichmentProcessor(config_collector)
     
+    # Initialize event enrichment for deduplication
+    event_enrichment = EventEnrichment({
+        'enable_event_deduplication': True,
+        'event_dedup_window_minutes': 5,
+        'enable_grafana_annotations': False
+    })
+    LOG.info("EventEnrichment initialized with deduplication enabled")
+    
     # Initialize thread pool
     executor = concurrent.futures.ThreadPoolExecutor(CMD.threads)
     
@@ -765,8 +776,10 @@ def main():
                             vol = volumes[0]
                             LOG.info(f"First volume - ID: {vol.id}, Label: {vol.label}, Capacity: {vol.capacity}")
                         
-                        # Collect performance data from current batch
-                        from app.schema.models import AnalysedVolumeStatistics
+                        # Collect all performance data types from current batch
+                        from app.schema.models import AnalysedVolumeStatistics, AnalysedDriveStatistics, AnalysedSystemStatistics, AnalysedInterfaceStatistics, AnalyzedControllerStatistics
+                        
+                        # Volume performance
                         volume_perf = eseries_collector.collect_performance_data_from_current_batch(
                             AnalysedVolumeStatistics, 'analysed-volume-statistics')
                         LOG.info(f"Collected {len(volume_perf)} volume performance records from current batch")
@@ -774,31 +787,89 @@ def main():
                             perf = volume_perf[0]
                             LOG.info(f"First perf record - Volume: {perf.volumeId}, IOPs: {perf.combinedIOps}, Observed: {perf.observedTime}")
                         
+                        # Drive performance
+                        drive_perf = eseries_collector.collect_performance_data_from_current_batch(
+                            AnalysedDriveStatistics, 'analysed-drive-statistics')
+                        LOG.info(f"Collected {len(drive_perf)} drive performance records from current batch")
+                        
+                        # System performance  
+                        system_perf = eseries_collector.collect_performance_data_from_current_batch(
+                            AnalysedSystemStatistics, 'analysed-system-statistics')
+                        LOG.info(f"Collected {len(system_perf)} system performance records from current batch")
+                        
+                        # Interface performance
+                        interface_perf = eseries_collector.collect_performance_data_from_current_batch(
+                            AnalysedInterfaceStatistics, 'analysed-interface-statistics')
+                        LOG.info(f"Collected {len(interface_perf)} interface performance records from current batch")
+                        
+                        # Controller performance (note: 'analyzed' with 'z')
+                        controller_perf = eseries_collector.collect_performance_data_from_current_batch(
+                            AnalyzedControllerStatistics, 'analyzed-controller-statistics')
+                        LOG.info(f"Collected {len(controller_perf)} controller performance records from current batch")
+                        
                         # Advance to next batch after processing all data types
                         batch_advanced = eseries_collector.advance_batch()
                         LOG.info(f"Advanced to next batch: {batch_advanced}")
                         
-                        config_data = {"json_mode": True, "batch_processed": 1, "total_batches": batch_info['available_batches']}
-                        # Pass volume performance records directly as a list for enrichment
-                        # Convert dataclass instances to dictionaries for enrichment processor
-                        perf_data = []
-                        for perf_record in volume_perf:
-                            if hasattr(perf_record, '_raw_data'):
-                                perf_data.append(perf_record._raw_data)
-                            elif hasattr(perf_record, '__dict__'):
-                                perf_data.append(perf_record.__dict__)
+                        # Collect configuration data in JSON mode
+                        try:
+                            config_data = config_collector.collect_config(sys_info)
+                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON: config_data = {config_data}")
+                            # Add JSON mode metadata
+                            if isinstance(config_data, dict):
+                                config_data["json_mode"] = True
+                                config_data["batch_processed"] = 1
+                                config_data["total_batches"] = batch_info['available_batches']
                             else:
-                                # Fallback if it's already a dict
-                                perf_data.append(perf_record)
+                                config_data = {"json_mode": True, "batch_processed": 1, "total_batches": batch_info['available_batches'], "original_data": config_data}
+                        except Exception as e:
+                            LOG.error(f"Failed to collect config data in JSON mode: {e}")
+                            config_data = {"json_mode": True, "batch_processed": 1, "total_batches": batch_info['available_batches'], "error": str(e)}
+                        
+                        # Combine all performance data types for processing
+                        all_performance_data = {
+                            'analysed_volume_statistics': volume_perf,
+                            'analysed_drive_statistics': drive_perf, 
+                            'analysed_system_statistics': system_perf,
+                            'analysed_interface_statistics': interface_perf,
+                            'analyzed_controller_statistics': controller_perf
+                        }
+                        
+                        # Convert performance records to dictionaries for processing
+                        perf_data = {}
+                        for perf_type, records in all_performance_data.items():
+                            perf_data[perf_type] = []
+                            for perf_record in records:
+                                if hasattr(perf_record, '_raw_data'):
+                                    perf_data[perf_type].append(perf_record._raw_data)
+                                elif hasattr(perf_record, '__dict__'):
+                                    perf_data[perf_type].append(perf_record.__dict__)
+                                else:
+                                    # Fallback if it's already a dict
+                                    perf_data[perf_type].append(perf_record)
                     else:
                         LOG.warning("No more batches available for processing - stopping iterations")
-                        config_data = {"json_mode": True, "batch_processed": 0, "total_batches": batch_info['available_batches'], "exhausted": True}
+                        # Try to collect config data even when exhausted
+                        try:
+                            config_data = config_collector.collect_config(sys_info)
+                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON-EXHAUSTED: config_data = {config_data}")
+                        except Exception as e:
+                            LOG.error(f"Failed to collect config data when exhausted: {e}")
+                            config_data = {}
+                        
                         perf_data = {}
                         
                         # Signal that we should stop looping
-                        if 'exhausted' in config_data:
-                            LOG.info("All JSON batches processed - exiting")
-                            break
+                        LOG.info("All JSON batches processed - exiting")
+                        break
+                    
+                    # Collect event data in JSON mode
+                    try:
+                        event_data = event_collector.collect_events(sys_info)
+                        LOG.info(f"Collected event data from JSON: {event_data.get('total_active', 0)} active events")
+                    except Exception as e:
+                        LOG.error(f"Failed to collect event data from JSON: {e}")
+                        event_data = {}
                     
                 except Exception as e:
                     LOG.error(f"Failed to process JSON data: {e}", exc_info=True)
@@ -817,11 +888,11 @@ def main():
                 
                 # Collect performance data
                 try:
-                    # Collect performance data (assuming a collect_performance method)
+                    # Collect performance data from all performance types
                     perf_result = perf_collector.collect_metrics(sys_info)
                     # Extract actual performance data from wrapper structure
                     perf_data = perf_result.get('performance_data', {}) if isinstance(perf_result, dict) and 'performance_data' in perf_result else perf_result
-                    LOG.info(f"Collected performance data successfully")
+                    LOG.info(f"Collected performance data successfully: {list(perf_data.keys()) if isinstance(perf_data, dict) else 'single type'}")
                 except Exception as e:
                     LOG.error(f"Failed to collect performance data: {e}")
                     perf_data = {}
@@ -848,9 +919,25 @@ def main():
                         if isinstance(value, list) and len(value) > 0:
                             LOG.info(f"🔍 DEBUG - {key}: {len(value)} items, first item keys: {list(value[0].keys()) if isinstance(value[0], dict) else 'Not a dict'}")
                 
-                # Process and enrich data
-                enriched_data = enrichment_processor.process(perf_data)
-                LOG.info(f"Enriched performance data successfully - type: {type(enriched_data)}")
+                # Process and enrich data - handle multiple performance types
+                enriched_data = {}
+                if isinstance(perf_data, dict):
+                    # Process each performance type separately
+                    for perf_type, perf_records in perf_data.items():
+                        if isinstance(perf_records, list) and len(perf_records) > 0:
+                            LOG.info(f"Enriching {perf_type}: {len(perf_records)} records")
+                            enriched_records = enrichment_processor.process(perf_records, measurement_type=perf_type)
+                            enriched_data[perf_type] = enriched_records
+                            LOG.info(f"✅ Enriched {perf_type}: {len(enriched_records)} records")
+                        elif isinstance(perf_records, list):
+                            LOG.info(f"No {perf_type} data to enrich (empty list)")
+                        else:
+                            LOG.warning(f"Unexpected {perf_type} data type: {type(perf_records)}")
+                else:
+                    # Legacy handling for single performance type (backwards compatibility)
+                    enriched_data = enrichment_processor.process(perf_data)
+                
+                LOG.info(f"Enriched performance data successfully - {len(enriched_data)} performance types processed")
                 
                 # Debug: Check enriched_data structure after enrichment
                 if isinstance(enriched_data, dict):
@@ -866,28 +953,461 @@ def main():
             
             # Send enriched data to writer if available
             if writer:
+                LOG.error("🔥🔥🔥 ENTERING WRITER SECTION - DEBUG CHECKPOINT 1")
+                print("🔥🔥🔥 ENTERING WRITER SECTION - DEBUG CHECKPOINT 1")
                 try:
-                    # Structure data properly for writer - use measurement type names as keys
-                    if isinstance(enriched_data, list):
-                        # For lists of performance records, wrap in appropriate measurement type name
-                        writer_data = {"analysed_volume_statistics": enriched_data}
-                    elif isinstance(enriched_data, dict):
-                        # Already a dictionary, pass through
-                        writer_data = enriched_data
+                    # Initialize writer_data with performance data
+                    writer_data = {}
+                    
+                    # Add performance data - map performance types to InfluxDB measurement names
+                    performance_type_mapping = {
+                        'volume_performance': 'analysed_volume_statistics',
+                        'drive_performance': 'analysed_drive_statistics', 
+                        'controller_performance': 'analysed_controller_statistics',
+                        'system_performance': 'analysed_system_statistics',
+                        'interface_performance': 'analysed_interface_statistics'
+                    }
+                    
+                    if isinstance(enriched_data, dict):
+                        # Handle multiple performance types
+                        for perf_type, perf_records in enriched_data.items():
+                            if isinstance(perf_records, list) and len(perf_records) > 0:
+                                # Map to correct measurement name
+                                measurement_name = performance_type_mapping.get(perf_type, perf_type)
+                                writer_data[measurement_name] = perf_records
+                                LOG.info(f"Adding {len(perf_records)} {measurement_name} records to write")
+                    elif isinstance(enriched_data, list):
+                        # Legacy handling - assume volume performance
+                        writer_data["analysed_volume_statistics"] = enriched_data
+                        LOG.info(f"Adding {len(enriched_data)} volume performance records to write (legacy mode)")
+                    else:
+                        # Fallback
+                        writer_data["performance_data"] = enriched_data
+                    
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2 - Data preparation complete")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 2 - Data preparation complete")
+                    
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2A - About to check config data")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 2A - About to check config data")
+                    
+                    # Add config data if collection was scheduled for this iteration
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2C - About to process config data")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 2C - About to process config data")
+                    
+                    if isinstance(config_data, dict) and config_data.get("status") == "scheduled_collection":
+                        collected_config = config_data.get("collected_data", {})
+                        if isinstance(collected_config, dict) and collected_config:
+                            LOG.info(f"Adding config data to write: {list(collected_config.keys())}")
+                            # Add each config type as a separate measurement
+                            for config_type, config_items in collected_config.items():
+                                if config_items:  # Only add non-empty config data
+                                    writer_data[f"config_{config_type.lower()}"] = config_items
+                    
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2D - Config processing complete, about to process events")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 2D - Config processing complete, about to process events")
+                    
+                    # Process event data with deduplication
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2E - Starting event processing check")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 2E - Starting event processing check")
+                    
+                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2F - event_data type: {type(event_data)}")
+                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2F - event_data type: {type(event_data)}")
+                    
+                    if isinstance(event_data, dict) and event_data:
+                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2H - Inside event processing block")
+                        print("🔥🔥🔥 DEBUG CHECKPOINT 2H - Inside event processing block")
+                        processed_events = []
+                        events_to_process = None
+                        
+                        # Extract events from the event_data structure
+                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2I - About to extract events")
+                        print("🔥🔥🔥 DEBUG CHECKPOINT 2I - About to extract events")
+                        
+                        if "events" in event_data and event_data["events"]:
+                            events_to_process = event_data["events"]
+                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2J - Found events: {len(event_data['events'])} types")
+                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2J - Found events: {len(event_data['events'])} types")
+                        elif "active_events" in event_data and event_data["active_events"]:
+                            events_to_process = event_data["active_events"]
+                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2K - Found active_events: {len(event_data['active_events'])} types")
+                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2K - Found active_events: {len(event_data['active_events'])} types")
+                        
+                        LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2L - events_to_process: {events_to_process is not None}")
+                        print(f"🔥🔥🔥 DEBUG CHECKPOINT 2L - events_to_process: {events_to_process is not None}")
+                        
+                        if events_to_process:
+                            # Process each event type through deduplication
+                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2M - Starting event loop processing")
+                            print("🔥🔥🔥 DEBUG CHECKPOINT 2M - Starting event loop processing")
+                            total_events_before = 0
+                            total_events_after = 0
+                            
+                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2N - About to iterate over {len(events_to_process)} event types")
+                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2N - About to iterate over {len(events_to_process)} event types")
+                            
+                            for endpoint_name, event_list in events_to_process.items():
+                                LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2O - Processing {endpoint_name}")
+                                print(f"🔥🔥🔥 DEBUG CHECKPOINT 2O - Processing {endpoint_name}")
+                                if isinstance(event_list, list) and event_list:
+                                    # Skip volume expansion progress events - mostly inactive placeholder data
+                                    # TODO: Re-evaluate when we understand what constitutes meaningful expansion events
+                                    if "volume_expansion_progress" in endpoint_name.lower():
+                                        LOG.info(f"Event {endpoint_name}: {len(event_list)} → 0 (skipped - mostly inactive data)")
+                                        continue
+                                    
+                                    total_events_before += len(event_list)
+                                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2P - About to enrich {len(event_list)} {endpoint_name} events")
+                                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2P - About to enrich {len(event_list)} {endpoint_name} events")
+                                    
+                                    # Apply deduplication
+                                    enriched_events = event_enrichment.enrich_event_data(
+                                        endpoint_name, event_list, sys_info
+                                    )
+                                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
+                                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
+                                    if enriched_events:
+                                        processed_events.extend(enriched_events)
+                                        total_events_after += len(enriched_events)
+                                        LOG.info(f"Event {endpoint_name}: {len(event_list)} → {len(enriched_events)} (after dedup)")
+                                    else:
+                                        LOG.info(f"Event {endpoint_name}: {len(event_list)} → 0 (duplicate/filtered)")
+                            
+                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - About to check processed_events")
+                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - About to check processed_events")
+                            
+                            if processed_events:
+                                LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2B-1 - Adding {len(processed_events)} events to writer_data")
+                                print(f"🔥🔥🔥 DEBUG CHECKPOINT 2B-1 - Adding {len(processed_events)} events to writer_data")
+                                try:
+                                    writer_data["system_events"] = processed_events
+                                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-2 - Successfully assigned events to writer_data")
+                                    print("🔥🔥🔥 DEBUG CHECKPOINT 2B-2 - Successfully assigned events to writer_data")
+                                except Exception as events_e:
+                                    LOG.error(f"🚨 EXCEPTION assigning events to writer_data: {events_e}")
+                                    print(f"🚨 EXCEPTION assigning events to writer_data: {events_e}")
+                                    raise
+                                LOG.info(f"Adding {len(processed_events)} events to write (filtered from {total_events_before} total)")
+                            else:
+                                LOG.info(f"No events to write after deduplication (filtered {total_events_before} duplicates)")
+                                
+                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B - Event processing loop completed")
+                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B - Event processing loop completed")
+                    
+                    try:
+                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 3 PRE-CHECK - Before checkpoint 3")
+                        print("🔥🔥🔥 DEBUG CHECKPOINT 3 PRE-CHECK - Before checkpoint 3")
+                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 3 - Event processing complete, about to convert data")
+                        print("🔥🔥🔥 DEBUG CHECKPOINT 3 - Event processing complete, about to convert data")
+                    except Exception as checkpoint_e:
+                        LOG.error(f"🚨 EXCEPTION caught at checkpoint 3: {checkpoint_e}")
+                        print(f"🚨 EXCEPTION caught at checkpoint 3: {checkpoint_e}")
+                        raise  # Re-raise to maintain original behavior
                     
                     # Debug: Check what we're sending to the writer
-                    LOG.info(f"🔍 DEBUG - Sending to writer: {list(writer_data.keys())}")
+                    LOG.info(f"� WRITER DEBUG - About to process {len(writer_data)} data types")
+                    LOG.info(f"�🔍 DEBUG - Sending to writer: {list(writer_data.keys())}")
                     for key, value in writer_data.items():
                         if isinstance(value, list) and len(value) > 0:
                             item_type = type(value[0]).__name__
                             LOG.info(f"🔍 DEBUG - {key}: {len(value)} items of type {item_type}")
-                            if hasattr(value[0], '__dict__'):
-                                LOG.info(f"🔍 DEBUG - First {key} item attrs: {list(value[0].__dict__.keys())[:10]}")
-                    else:
-                        # Fallback
-                        writer_data = {"performance_data": enriched_data}
+                            LOG.info(f"🔍 DEBUG - First {key} item type check - hasattr model_dump: {hasattr(value[0], 'model_dump')}")
+                            LOG.info(f"🔍 DEBUG - First {key} item type check - hasattr __dict__: {hasattr(value[0], '__dict__')}")
+                            LOG.info(f"🔍 DEBUG - First {key} item type check - is BaseModel: {value[0].__class__.__name__}")
                     
-                    success = writer.write(writer_data)
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 4 - About to start BaseModel conversion")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 4 - About to start BaseModel conversion")
+                    
+                    # Convert BaseModel objects to dictionaries for JSON serialization
+                    def convert_to_serializable(obj, depth=0, max_depth=10):
+                        """Recursively convert objects to JSON-serializable format."""
+                        # Prevent infinite recursion
+                        if depth > max_depth:
+                            return f"<MAX_DEPTH_REACHED:{type(obj).__name__}>"
+                        
+                        # Log problematic types for debugging
+                        obj_type = type(obj)
+                        type_name = obj_type.__name__
+                        module_name = getattr(obj_type, '__module__', 'unknown')
+                        
+                        # Handle None first
+                        if obj is None:
+                            return None
+                        
+                        # Handle basic JSON-serializable types
+                        if isinstance(obj, (str, int, float, bool)):
+                            return obj
+                        
+                        # Handle BaseModel objects with comprehensive checks
+                        if (hasattr(obj, 'model_dump') or 
+                            type_name == 'BaseModel' or 
+                            'BaseModel' in str(obj_type.__bases__) or
+                            'pydantic' in module_name.lower() or
+                            hasattr(obj, 'model_fields')):
+                            LOG.debug(f"Converting BaseModel object: {type_name} from {module_name}")
+                            if hasattr(obj, 'model_dump'):
+                                return convert_to_serializable(obj.model_dump(), depth + 1, max_depth)
+                            elif hasattr(obj, 'dict'):
+                                return convert_to_serializable(obj.dict(), depth + 1, max_depth)
+                            elif hasattr(obj, '__dict__'):
+                                return convert_to_serializable(obj.__dict__, depth + 1, max_depth)
+                            else:
+                                LOG.warning(f"BaseModel object {type_name} has no serialization method")
+                                return str(obj)
+                        
+                        # Handle dictionaries recursively
+                        elif isinstance(obj, dict):
+                            return {key: convert_to_serializable(value, depth + 1, max_depth) for key, value in obj.items()}
+                        
+                        # Handle lists recursively
+                        elif isinstance(obj, list):
+                            return [convert_to_serializable(item, depth + 1, max_depth) for item in obj]
+                        
+                        # Handle tuples recursively
+                        elif isinstance(obj, tuple):
+                            return tuple(convert_to_serializable(item, depth + 1, max_depth) for item in obj)
+                        
+                        # Handle datetime objects
+                        elif hasattr(obj, 'isoformat'):
+                            return obj.isoformat()
+                        
+                        # Handle objects with __dict__ (custom classes)
+                        elif hasattr(obj, '__dict__') and not isinstance(obj, type):
+                            LOG.debug(f"Converting custom object: {type_name} from {module_name}")
+                            return convert_to_serializable(obj.__dict__, depth + 1, max_depth)
+                        
+                        # Last resort: convert to string with warning
+                        else:
+                            LOG.warning(f"Converting unknown object type to string: {type_name} from {module_name}")
+                            return str(obj)
+
+                    serializable_data = {}
+                    for key, value in writer_data.items():
+                        try:
+                            LOG.info(f"Converting {key} data: {len(value) if hasattr(value, '__len__') else 1} items")
+                            serializable_data[key] = convert_to_serializable(value)
+                            LOG.info(f"Successfully converted {key} to serializable format")
+                        except Exception as conv_e:
+                            LOG.error(f"Failed to convert {key}: {conv_e}")
+                            LOG.error(f"Value type: {type(value)}")
+                            if hasattr(value, '__len__') and len(value) > 0:
+                                LOG.error(f"First item type: {type(value[0])}")
+                            # Try simple dict conversion as fallback
+                            if hasattr(value, '__dict__'):
+                                serializable_data[key] = value.__dict__
+                            elif isinstance(value, list):
+                                # Try converting each item individually
+                                fallback_items = []
+                                for item in value:
+                                    if hasattr(item, '__dict__'):
+                                        fallback_items.append(item.__dict__)
+                                    else:
+                                        fallback_items.append(item)
+                                serializable_data[key] = fallback_items
+                            else:
+                                serializable_data[key] = value
+                    
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 5 - BaseModel conversion completed")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 5 - BaseModel conversion completed")
+                    
+                    # Final check before writing - ensure complete JSON serializability
+                    LOG.info(f"🔍 DEBUG - About to write: {list(serializable_data.keys())}")
+                    for key, value in serializable_data.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items, first type: {type(value[0])}")
+                    
+                    # Final safety check - try JSON serializing to catch any BaseModel objects
+                    try:
+                        import json
+                        json.dumps(serializable_data, default=str)
+                        LOG.debug("Data passed JSON serialization check")
+                    except (TypeError, ValueError) as json_error:
+                        LOG.error(f"Data serialization check failed: {json_error}")
+                        # Force convert any remaining non-serializable objects to strings
+                        def force_serialize_dict(data_dict):
+                            """Force serialize a dictionary, ensuring it remains a dictionary."""
+                            if not isinstance(data_dict, dict):
+                                LOG.error(f"Expected dict, got {type(data_dict)}")
+                                return {"error": "Invalid data structure", "data": str(data_dict)}
+                            
+                            def serialize_value(obj):
+                                try:
+                                    json.dumps(obj)
+                                    return obj
+                                except (TypeError, ValueError):
+                                    if isinstance(obj, dict):
+                                        return {k: serialize_value(v) for k, v in obj.items()}
+                                    elif isinstance(obj, list):
+                                        return [serialize_value(item) for item in obj]
+                                    else:
+                                        return str(obj)
+                            
+                            return {k: serialize_value(v) for k, v in data_dict.items()}
+                        
+                        serializable_data = force_serialize_dict(serializable_data)
+                        LOG.info("Applied emergency serialization conversion")
+                    
+                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 6 - JSON safety check completed")
+                    print("🔥🔥🔥 DEBUG CHECKPOINT 6 - JSON safety check completed")
+                    
+                    # Debug: Check for remaining BaseModel objects before write (ALWAYS RUN)
+                    LOG.info("🔧 ALWAYS RUN - Starting comprehensive BaseModel detection")
+                    
+                    def find_basemodel_objects(obj, path="root", depth=0):
+                        from pydantic import BaseModel
+                        found_objects = []
+                        
+                        # Limit recursion depth to prevent infinite loops
+                        if depth > 50:
+                            return found_objects
+                        
+                        try:
+                            if isinstance(obj, BaseModel):
+                                # Safe way to represent BaseModel without triggering serialization
+                                obj_type = str(type(obj).__name__)
+                                obj_repr = f"<BaseModel {obj_type} at {hex(id(obj))}>"
+                                found_objects.append((path, obj_type, obj_repr))
+                            elif isinstance(obj, dict):
+                                for k, v in obj.items():
+                                    found_objects.extend(find_basemodel_objects(v, f"{path}.{k}", depth + 1))
+                            elif isinstance(obj, list):
+                                for i, item in enumerate(obj):
+                                    found_objects.extend(find_basemodel_objects(item, f"{path}[{i}]", depth + 1))
+                        except Exception as e:
+                            # If any operation fails, record it but continue
+                            found_objects.append((path, "ERROR", f"Detection failed: {str(e)}"))
+                        
+                        return found_objects
+                    
+                    # Test the function with a known BaseModel to verify it works
+                    LOG.info("🧪 Testing BaseModel detection function...")
+                    try:
+                        from pydantic import BaseModel
+                        class TestModel(BaseModel):
+                            test_field: str = "test"
+                        test_model = TestModel()
+                        test_result = find_basemodel_objects({"test": test_model}, "test_data")
+                        LOG.info(f"🧪 Test result: {len(test_result)} objects found (should be 1)")
+                    except Exception as test_e:
+                        LOG.error(f"🧪 Test failed: {test_e}")
+                    
+                    LOG.info(f"� WRITER DEBUG - About to scan serializable_data with {len(serializable_data) if isinstance(serializable_data, dict) else 'unknown'} keys")
+                    
+                    try:
+                        basemodel_objects = find_basemodel_objects(serializable_data, path="serializable_data")
+                        LOG.info(f"🔧 BaseModel scan returned {len(basemodel_objects) if basemodel_objects else 0} objects")
+                        if basemodel_objects:
+                            LOG.error(f"❌ FOUND BaseModel objects in data - this WILL cause JSON error:")
+                            for obj_path, obj_type, obj_repr in basemodel_objects[:5]:  # Show first 5
+                                LOG.error(f"  - Path: {obj_path}")
+                                LOG.error(f"    Type: {obj_type}")
+                                LOG.error(f"    Repr: {obj_repr[:100]}...")
+                            if len(basemodel_objects) > 5:
+                                LOG.error(f"  ... and {len(basemodel_objects) - 5} more BaseModel objects")
+                        else:
+                            LOG.info("✅ NO BaseModel objects found in data")
+                    except Exception as e:
+                        LOG.error(f"❌ BaseModel detection FAILED: {e}")
+                        import traceback
+                        LOG.error(f"❌ Traceback: {traceback.format_exc()}")
+                    
+                    LOG.info("🔧 BaseModel detection complete")
+                    
+                    # Also check the top-level keys of serializable_data
+                    LOG.info(f"🔍 serializable_data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else 'not a dict'}")
+                    for key in serializable_data:
+                        if hasattr(serializable_data[key], '__len__') and not isinstance(serializable_data[key], str):
+                            LOG.info(f"  - {key}: {len(serializable_data[key])} items")
+                    
+                    LOG.error("🚨🚨🚨 CRITICAL DEBUG CHECKPOINT - About to call writer.write()")
+                    print("🚨🚨🚨 CRITICAL DEBUG CHECKPOINT - About to call writer.write()")
+                    
+                    # FINAL BaseModel check and data dump before writer.write()
+                    LOG.error("🔥 FINAL CHECKPOINT - Just before writer.write() call")
+                    print("🔥 FINAL CHECKPOINT - Just before writer.write() call")
+                    try:
+                        import pickle
+                        import os
+                        
+                        debug_dir = "/home/app/samples/out"
+                        os.makedirs(debug_dir, exist_ok=True)
+                        
+                        LOG.error(f"🔍 FINAL DEBUG - About to call writer.write() with data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else type(serializable_data)}")
+                        
+                        # First, safely pickle the data (this should always work)
+                        try:
+                            with open(f"{debug_dir}/writer_input_final.pkl", "wb") as f:
+                                pickle.dump(serializable_data, f)
+                            LOG.error(f"✅ Successfully pickled final writer input")
+                        except Exception as pickle_e:
+                            LOG.error(f"❌ Pickle dump failed: {pickle_e}")
+                        
+                        # Force BaseModel detection one more time
+                        def find_basemodel_final_check(obj, path="root", max_depth=3):
+                            if max_depth <= 0:
+                                return []
+                            
+                            findings = []
+                            try:
+                                if hasattr(obj, '__class__'):
+                                    obj_type_str = str(type(obj))
+                                    obj_mro_str = str(type(obj).__mro__)
+                                    if 'BaseModel' in obj_type_str or 'BaseModel' in obj_mro_str:
+                                        findings.append(f"🚨 BASEMODEL FOUND: {path} -> {type(obj)} | MRO: {obj_mro_str}")
+                                
+                                if isinstance(obj, dict):
+                                    for key, value in obj.items():
+                                        findings.extend(find_basemodel_final_check(value, f"{path}.{key}", max_depth-1))
+                                elif isinstance(obj, (list, tuple)) and len(obj) > 0:
+                                    # Check first few items
+                                    for i in range(min(3, len(obj))):
+                                        findings.extend(find_basemodel_final_check(obj[i], f"{path}[{i}]", max_depth-1))
+                            except Exception as e:
+                                findings.append(f"❌ Error checking {path}: {e}")
+                            
+                            return findings
+                        
+                        basemodel_findings = find_basemodel_final_check(serializable_data)
+                        if basemodel_findings:
+                            LOG.error(f"🚨 CRITICAL: BaseModel objects found RIGHT BEFORE writer.write():")
+                            for finding in basemodel_findings:
+                                LOG.error(f"  {finding}")
+                            
+                            # Save to file
+                            try:
+                                with open(f"{debug_dir}/CRITICAL_basemodel_before_write.txt", "w") as f:
+                                    f.write("BaseModel objects found RIGHT BEFORE writer.write() call:\n")
+                                    for finding in basemodel_findings:
+                                        f.write(f"{finding}\n")
+                                LOG.error(f"✅ Saved BaseModel findings to file")
+                            except Exception as file_e:
+                                LOG.error(f"❌ Failed to save findings: {file_e}")
+                        else:
+                            LOG.error("✅ Final check: No BaseModel objects detected before writer.write()")
+                        
+                        # Try JSON dump LAST (this might fail due to BaseModel)
+                        try:
+                            import json
+                            with open(f"{debug_dir}/writer_input_final.json", "w") as f:
+                                json.dump(serializable_data, f, indent=2, default=str)
+                            LOG.error(f"✅ Successfully dumped final writer input to JSON")
+                        except Exception as json_e:
+                            LOG.error(f"❌ JSON dump failed (expected if BaseModel present): {json_e}")
+                        
+                    except Exception as final_debug_e:
+                        LOG.error(f"❌ Final debug check failed: {final_debug_e}")
+                        # Make sure we still try to create a basic dump
+                        try:
+                            debug_dir = "/home/app/samples/out"
+                            os.makedirs(debug_dir, exist_ok=True)
+                            with open(f"{debug_dir}/debug_failure.txt", "w") as f:
+                                f.write(f"Final debug failed: {final_debug_e}\n")
+                                f.write(f"Data type: {type(serializable_data)}\n")
+                                if isinstance(serializable_data, dict):
+                                    f.write(f"Data keys: {list(serializable_data.keys())}\n")
+                        except:
+                            pass
+                    
+                    success = writer.write(serializable_data)
                     if success:
                         LOG.info("Data successfully written to output destination")
                     else:
@@ -901,18 +1421,19 @@ def main():
             time_end = time.time()
             elapsed = time_end - time_start
             
-            # Increment loop counter
-            loop_iteration += 1
-            
-            # Check if we've reached the maximum number of iterations
-            if CMD.maxIterations > 0 and loop_iteration > CMD.maxIterations:
-                LOG.info(f"Reached maximum number of iterations ({CMD.maxIterations}). Exiting gracefully.")
+            # Check if this is the final iteration BEFORE sleeping
+            if CMD.maxIterations > 0 and loop_iteration == (CMD.maxIterations - 1):
+                LOG.info(f"Completed final iteration ({CMD.maxIterations}). Exiting gracefully.")
                 break
+            LOG.info(f"Current iteration before increment: {loop_iteration}, Max iterations: {CMD.maxIterations}")
             
-            # Sleep for the remaining interval time
+            # Sleep for the remaining interval time only if we have more iterations to do
             if elapsed < CMD.intervalTime:
                 LOG.info(f"Sleeping for {CMD.intervalTime - elapsed:.2f} seconds until next collection")
                 time.sleep(CMD.intervalTime - elapsed)
+                        
+            # Increment loop counter for next iteration
+            loop_iteration += 1
     
     except KeyboardInterrupt:
         LOG.info("Interrupted by user. Exiting gracefully.")

@@ -12,6 +12,10 @@ from datetime import datetime
 from influxdb_client_3 import InfluxDBClient3
 from app.writer.base import Writer
 from app.schema.base_model import BaseModel
+from app.schema.models import (
+    AnalysedDriveStatistics, AnalysedSystemStatistics, 
+    AnalysedInterfaceStatistics, AnalyzedControllerStatistics
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -90,9 +94,13 @@ class InfluxDBWriter(Writer):
                 'Accept': 'application/json'
             }
             
+            # Determine TLS verification - use custom CA if available, otherwise strict validation
+            ca_cert_path = self.tls_ca or os.getenv('INFLUXDB3_TLS_CA')
+            verify_tls = ca_cert_path if ca_cert_path and os.path.exists(ca_cert_path) else True
+            
             # GET existing databases - always use strict TLS validation for InfluxDB
             get_url = f"{self.url}/api/v3/configure/database?format=json"
-            response = requests.get(get_url, headers=headers, timeout=10, verify=True)
+            response = requests.get(get_url, headers=headers, timeout=10, verify=verify_tls)
             
             if response.status_code == 200:
                 databases_data = response.json()
@@ -101,10 +109,10 @@ class InfluxDBWriter(Writer):
                 if self.database not in databases:
                     LOG.info(f"Database '{self.database}' does not exist, creating it")
                     
-                    # POST to create database - always use strict TLS validation for InfluxDB
+                    # POST to create database - use same TLS validation as GET request
                     create_url = f"{self.url}/api/v3/configure/database"
                     create_data = {"db": self.database}
-                    create_response = requests.post(create_url, json=create_data, headers=headers, timeout=10, verify=True)
+                    create_response = requests.post(create_url, json=create_data, headers=headers, timeout=10, verify=verify_tls)
                     
                     if create_response.status_code in [200, 201, 204]:
                         LOG.info(f"Successfully created database '{self.database}'")
@@ -130,6 +138,83 @@ class InfluxDBWriter(Writer):
         Returns:
             bool: True if all writes succeeded, False otherwise
         """
+        # DEBUG: Dump what InfluxDB writer receives
+        try:
+            import json
+            import pickle
+            import os
+            debug_dir = "/home/app/samples/out"
+            os.makedirs(debug_dir, exist_ok=True)
+            
+            LOG.info(f"DEBUG: About to dump measurements with keys: {list(measurements.keys()) if measurements else 'None'}")
+            
+            # Comprehensive BaseModel detection
+            def find_basemodels_in_measurements(obj, path="root"):
+                """Recursively find BaseModel objects in measurement data"""
+                findings = []
+                
+                try:
+                    # Check if this object itself is a BaseModel
+                    if hasattr(obj, '__class__'):
+                        obj_mro = str(type(obj).__mro__)
+                        if 'BaseModel' in obj_mro:
+                            findings.append(f"BaseModel at {path}: {type(obj)} (MRO: {obj_mro})")
+                    
+                    # Recursively check containers
+                    if isinstance(obj, dict):
+                        for key, value in obj.items():
+                            findings.extend(find_basemodels_in_measurements(value, f"{path}.{key}"))
+                    elif isinstance(obj, (list, tuple)):
+                        for i, item in enumerate(obj):
+                            findings.extend(find_basemodels_in_measurements(item, f"{path}[{i}]"))
+                except Exception as e:
+                    findings.append(f"Error checking {path}: {e}")
+                
+                return findings
+            
+            # Check for BaseModel objects
+            basemodel_findings = find_basemodels_in_measurements(measurements, "measurements")
+            if basemodel_findings:
+                LOG.error(f"DEBUG: BaseModel objects found in writer input:")
+                for finding in basemodel_findings:
+                    LOG.error(f"  {finding}")
+                
+                # Save findings to file
+                with open(f"{debug_dir}/writer_input_basemodel_findings.txt", "w") as f:
+                    f.write("BaseModel objects found in InfluxDB writer input:\n")
+                    for finding in basemodel_findings:
+                        f.write(f"{finding}\n")
+            else:
+                LOG.info(f"DEBUG: No BaseModel objects found in writer input")
+            
+            # Try JSON dump
+            try:
+                with open(f"{debug_dir}/influxdb_writer_input.json", "w") as f:
+                    json.dump(measurements, f, indent=2, default=str)
+                LOG.info(f"DEBUG: Successfully dumped InfluxDB writer input to JSON")
+            except Exception as json_e:
+                LOG.error(f"DEBUG: JSON dump failed: {json_e}")
+                # Try pickle as fallback
+                try:
+                    with open(f"{debug_dir}/influxdb_writer_input.pkl", "wb") as f:
+                        pickle.dump(measurements, f)
+                    LOG.info(f"DEBUG: Successfully pickled InfluxDB writer input")
+                except Exception as pickle_e:
+                    LOG.error(f"DEBUG: Pickle dump also failed: {pickle_e}")
+            
+        except Exception as dump_e:
+            LOG.error(f"DEBUG: Failed to dump writer input: {dump_e}")
+            # Try to dump structure info at least
+            try:
+                with open(f"{debug_dir}/influxdb_writer_structure.txt", "w") as f:
+                    for key, value in measurements.items():
+                        f.write(f"{key}: {type(value)}\n")
+                        if isinstance(value, list) and value:
+                            f.write(f"  List item type: {type(value[0])}\n")
+                LOG.info(f"DEBUG: Dumped structure info to {debug_dir}/influxdb_writer_structure.txt")
+            except Exception as struct_e:
+                LOG.error(f"DEBUG: Failed to dump structure info: {struct_e}")
+        
         if not self.client:
             LOG.error("InfluxDB client not available")
             return False
@@ -187,6 +272,61 @@ class InfluxDBWriter(Writer):
                         
                         try:
                             LOG.debug(f"Writing batch {batch_num}/{total_batches} ({len(batch)} records)")
+                            
+                            # DEBUG: Dump what we're about to send to InfluxDB client
+                            try:
+                                import json
+                                import pickle
+                                debug_dir = "/home/app/samples/out"
+                                
+                                # Try JSON dump first
+                                try:
+                                    with open(f"{debug_dir}/influxdb_client_batch_{measurement_name}_{batch_num}.json", "w") as f:
+                                        json.dump(batch, f, indent=2, default=str)
+                                    LOG.info(f"DEBUG: Successfully dumped JSON batch {batch_num} for {measurement_name}")
+                                except Exception as json_e:
+                                    LOG.error(f"DEBUG: JSON dump failed for batch {batch_num}: {json_e}")
+                                    # If JSON fails, it might be a BaseModel issue - let's pickle it
+                                    try:
+                                        with open(f"{debug_dir}/influxdb_client_batch_{measurement_name}_{batch_num}.pkl", "wb") as f:
+                                            pickle.dump(batch, f)
+                                        LOG.info(f"DEBUG: Successfully pickled batch {batch_num} for {measurement_name}")
+                                    except Exception as pickle_e:
+                                        LOG.error(f"DEBUG: Pickle dump also failed: {pickle_e}")
+                                
+                                # Detailed BaseModel detection on the batch data
+                                def find_basemodels_recursive(obj, path="root"):
+                                    """Recursively find BaseModel objects in data structure"""
+                                    findings = []
+                                    
+                                    if hasattr(obj, '__class__') and 'BaseModel' in str(type(obj).__mro__):
+                                        findings.append(f"BaseModel at {path}: {type(obj)}")
+                                    elif isinstance(obj, dict):
+                                        for key, value in obj.items():
+                                            findings.extend(find_basemodels_recursive(value, f"{path}.{key}"))
+                                    elif isinstance(obj, (list, tuple)):
+                                        for i, item in enumerate(obj):
+                                            findings.extend(find_basemodels_recursive(item, f"{path}[{i}]"))
+                                    
+                                    return findings
+                                
+                                basemodel_findings = find_basemodels_recursive(batch, f"batch_{batch_num}")
+                                if basemodel_findings:
+                                    LOG.error(f"DEBUG: BaseModel objects found in batch {batch_num}:")
+                                    for finding in basemodel_findings:
+                                        LOG.error(f"  {finding}")
+                                    
+                                    # Save findings to file
+                                    with open(f"{debug_dir}/basemodel_findings_batch_{batch_num}.txt", "w") as f:
+                                        f.write(f"BaseModel objects found in {measurement_name} batch {batch_num}:\n")
+                                        for finding in basemodel_findings:
+                                            f.write(f"{finding}\n")
+                                else:
+                                    LOG.info(f"DEBUG: No BaseModel objects found in batch {batch_num}")
+                                    
+                            except Exception as batch_dump_e:
+                                LOG.error(f"DEBUG: Failed to dump batch {batch_num}: {batch_dump_e}")
+                            
                             # NOTE: no_sync=True provides significant write performance improvement (19s vs 30+ seconds)
                             # but comes with durability risk - data may be lost on unexpected shutdown before WAL flush.
                             # This is acceptable for performance metrics collection where some data loss is tolerable
@@ -248,7 +388,11 @@ class InfluxDBWriter(Writer):
                     continue
                 
                 # Determine measurement type and convert accordingly
-                if 'volume' in measurement_name.lower():
+                if measurement_name.startswith('config_'):
+                    record = self._convert_config_record(measurement_name, item_dict)
+                elif measurement_name == 'system_events':
+                    record = self._convert_event_record(measurement_name, item_dict)
+                elif 'volume' in measurement_name.lower():
                     record = self._convert_volume_record(measurement_name, item_dict)
                 elif 'drive' in measurement_name.lower():
                     record = self._convert_drive_record(measurement_name, item_dict)
@@ -322,29 +466,329 @@ class InfluxDBWriter(Writer):
         }
     
     def _convert_drive_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Convert drive performance data to InfluxDB record format."""
-        # TODO: Implement when we add drive performance data
-        LOG.debug(f"Drive record conversion not implemented yet for {measurement_name}")
-        return None
+        """Convert drive performance data to InfluxDB record format using schema."""
+        return self._convert_schema_record(measurement_name, data, AnalysedDriveStatistics, {
+            'drive_id': ('diskId', 'unknown'),
+            'drive_slot': ('driveSlot', 'unknown'),
+            'controller_id': ('sourceController', 'unknown'),
+            'volume_group_id': ('volGroupId', 'unknown'),
+            'volume_group_name': ('volGroupName', 'unknown'),
+            'tray_id': ('trayId', 'unknown')
+        }, [
+            'combined_iops', 'read_iops', 'write_iops', 'other_iops',
+            'combined_throughput', 'read_throughput', 'write_throughput',
+            'combined_response_time', 'read_response_time', 'write_response_time',
+            'average_queue_depth', 'queue_depth_max', 'average_read_op_size', 'average_write_op_size',
+            'read_physical_iops', 'write_physical_iops', 'read_time_max', 'write_time_max',
+            'random_bytes_percent', 'random_ios_percent'
+        ])
     
     def _convert_controller_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Convert controller performance data to InfluxDB record format."""
-        # TODO: Implement when we add controller performance data  
-        LOG.debug(f"Controller record conversion not implemented yet for {measurement_name}")
-        return None
+        """Convert controller performance data to InfluxDB record format using schema."""
+        # Controller statistics come wrapped in a "statistics" array
+        if isinstance(data, dict) and 'statistics' in data:
+            results = []
+            for stat in data['statistics']:
+                record = self._convert_schema_record(measurement_name, stat, AnalyzedControllerStatistics, {
+                    'controller_id': ('controllerId', 'unknown'),
+                    'source_controller': ('sourceController', 'unknown')
+                }, [
+                    'combined_iops', 'read_iops', 'write_iops', 'other_iops',
+                    'combined_throughput', 'read_throughput', 'write_throughput',
+                    'combined_response_time', 'read_response_time', 'write_response_time',
+                    'average_read_op_size', 'average_write_op_size', 'read_physical_iops', 'write_physical_iops',
+                    'cache_hit_bytes_percent', 'random_ios_percent', 'mirror_bytes_percent',
+                    'full_stripe_writes_bytes_percent', 'max_cpu_utilization', 'cpu_avg_utilization'
+                ])
+                if record:
+                    results.append(record)
+            return results[0] if results else None
+        else:
+            return self._convert_schema_record(measurement_name, data, AnalyzedControllerStatistics, {
+                'controller_id': ('controllerId', 'unknown'),
+                'source_controller': ('sourceController', 'unknown')
+            }, [
+                'combined_iops', 'read_iops', 'write_iops', 'other_iops',
+                'combined_throughput', 'read_throughput', 'write_throughput',
+                'combined_response_time', 'read_response_time', 'write_response_time',
+                'average_read_op_size', 'average_write_op_size', 'read_physical_iops', 'write_physical_iops',
+                'cache_hit_bytes_percent', 'random_ios_percent', 'mirror_bytes_percent',
+                'full_stripe_writes_bytes_percent', 'max_cpu_utilization', 'cpu_avg_utilization'
+            ])
     
     def _convert_interface_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Convert interface performance data to InfluxDB record format."""
-        # TODO: Implement when we add interface performance data
-        LOG.debug(f"Interface record conversion not implemented yet for {measurement_name}")
-        return None
+        """Convert interface performance data to InfluxDB record format using schema."""
+        return self._convert_schema_record(measurement_name, data, AnalysedInterfaceStatistics, {
+            'interface_id': ('interfaceId', 'unknown'),
+            'controller_id': ('controllerId', 'unknown'),
+            'channel_type': ('channelType', 'unknown'),
+            'channel_number': ('channelNumber', 'unknown')
+        }, [
+            'combined_iops', 'read_iops', 'write_iops', 'other_iops',
+            'combined_throughput', 'read_throughput', 'write_throughput',
+            'combined_response_time', 'read_response_time', 'write_response_time',
+            'average_read_op_size', 'average_write_op_size', 'queue_depth_total', 'queue_depth_max',
+            'channel_error_counts'
+        ])
     
     def _convert_system_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Convert system performance data to InfluxDB record format."""
-        # TODO: Implement when we add system performance data
-        LOG.debug(f"System record conversion not implemented yet for {measurement_name}")
-        return None
+        """Convert system performance data to InfluxDB record format using schema."""
+        return self._convert_schema_record(measurement_name, data, AnalysedSystemStatistics, {
+            'storage_system_wwn': ('storageSystemWWN', 'unknown'),
+            'storage_system_name': ('storageSystemName', 'unknown'),
+            'source_controller': ('sourceController', 'unknown')
+        }, [
+            'combined_iops', 'read_iops', 'write_iops', 'other_iops',
+            'combined_throughput', 'read_throughput', 'write_throughput',
+            'combined_response_time', 'read_response_time', 'write_response_time',
+            'average_read_op_size', 'average_write_op_size', 'read_physical_iops', 'write_physical_iops',
+            'cache_hit_bytes_percent', 'random_ios_percent', 'mirror_bytes_percent',
+            'full_stripe_writes_bytes_percent', 'max_cpu_utilization', 'cpu_avg_utilization',
+            'raid0_bytes_percent', 'raid1_bytes_percent', 'raid5_bytes_percent', 'raid6_bytes_percent',
+            'ddp_bytes_percent', 'read_hit_response_time', 'write_hit_response_time',
+            'combined_hit_response_time', 'max_possible_bps_under_current_load', 'max_possible_iops_under_current_load'
+        ])
+
+    def _convert_config_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert configuration data to InfluxDB record format."""
+        try:
+            # Extract config type from measurement name (e.g., config_storage_pools -> storage_pools)
+            config_type = measurement_name.replace('config_', '')
+            
+            # Create basic tags for configuration records
+            tags = {
+                'config_type': self._sanitize_tag_value(config_type),
+                'storage_system': self._sanitize_tag_value(str(data.get('storageSystemWWN', data.get('wwn', 'unknown'))))
+            }
+            
+            # Add specific tags based on config type
+            if 'storage_pool' in config_type:
+                tags.update({
+                    'pool_id': self._sanitize_tag_value(str(data.get('volumeGroupRef', data.get('id', 'unknown')))),
+                    'pool_name': self._sanitize_tag_value(str(data.get('label', data.get('name', 'unknown')))),
+                    'raid_level': self._sanitize_tag_value(str(data.get('raidLevel', 'unknown')))
+                })
+            elif 'volume' in config_type:
+                tags.update({
+                    'volume_id': self._sanitize_tag_value(str(data.get('volumeRef', data.get('id', 'unknown')))),
+                    'volume_name': self._sanitize_tag_value(str(data.get('label', data.get('name', 'unknown')))),
+                    'pool_id': self._sanitize_tag_value(str(data.get('volumeGroupRef', 'unknown')))
+                })
+            elif 'controller' in config_type:
+                tags.update({
+                    'controller_id': self._sanitize_tag_value(str(data.get('controllerRef', data.get('id', 'unknown')))),
+                    'controller_status': self._sanitize_tag_value(str(data.get('status', 'unknown')))
+                })
+            elif 'drive' in config_type:
+                tags.update({
+                    'drive_id': self._sanitize_tag_value(str(data.get('driveRef', data.get('id', 'unknown')))),
+                    'drive_type': self._sanitize_tag_value(str(data.get('driveMediaType', 'unknown'))),
+                    'drive_status': self._sanitize_tag_value(str(data.get('status', 'unknown')))
+                })
+            else:
+                # Generic config record - try to find common ID fields
+                for id_field in ['id', 'ref', 'wwn', 'controllerRef', 'volumeRef']:
+                    if id_field in data:
+                        tags['config_id'] = self._sanitize_tag_value(str(data[id_field]))
+                        break
+            
+            # Extract numeric fields for configuration (capacity, counts, etc.)
+            fields = {}
+            numeric_config_fields = [
+                'capacity', 'totalSizeInBytes', 'usableCapacity', 'freeSpace', 'usedSpace',
+                'driveCount', 'volumeCount', 'sequenceNum', 'trayId', 'slot'
+            ]
+            
+            for field_name in numeric_config_fields:
+                value = self._get_field_value(data, field_name)
+                if value is not None:
+                    try:
+                        fields[field_name] = float(value)
+                    except (ValueError, TypeError):
+                        # Store as string if not numeric
+                        fields[f"{field_name}_str"] = str(value)
+            
+            # Add boolean fields as integers (0/1)
+            boolean_config_fields = [
+                'active', 'offline', 'optimal', 'enabled', 'online', 'present'
+            ]
+            
+            for field_name in boolean_config_fields:
+                value = data.get(field_name)
+                if isinstance(value, bool):
+                    fields[field_name] = int(value)
+            
+            # Use current timestamp for config records (they don't have observedTime)
+            import time
+            timestamp = int(time.time())
+            
+            if not fields:
+                # If no numeric fields, add at least one field to make it a valid InfluxDB record
+                fields['config_present'] = 1
+            
+            return {
+                'measurement': measurement_name,
+                'tags': tags,
+                'fields': fields,
+                'time': timestamp
+            }
+            
+        except Exception as e:
+            LOG.warning(f"Failed to convert config record {measurement_name}: {e}")
+            return None
+
+    def _convert_event_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert event data to InfluxDB record format."""
+        try:
+            # Create tags for event records
+            tags = {
+                'event_type': self._sanitize_tag_value(str(data.get('eventType', data.get('type', 'unknown')))),
+                'storage_system': self._sanitize_tag_value(str(data.get('storageSystemId', data.get('systemId', 'unknown')))),
+                'severity': self._sanitize_tag_value(str(data.get('severity', data.get('priority', 'info'))))
+            }
+            
+            # Add event-specific tags
+            if 'eventNumber' in data:
+                tags['event_number'] = self._sanitize_tag_value(str(data['eventNumber']))
+            
+            if 'component' in data:
+                tags['component'] = self._sanitize_tag_value(str(data['component']))
+                
+            if 'volumeId' in data:
+                tags['volume_id'] = self._sanitize_tag_value(str(data['volumeId']))
+                
+            if 'volumeName' in data:
+                tags['volume_name'] = self._sanitize_tag_value(str(data['volumeName']))
+                
+            if 'controllerId' in data:
+                tags['controller_id'] = self._sanitize_tag_value(str(data['controllerId']))
+            
+            # Extract numeric fields from events
+            fields = {}
+            
+            # Event counts and durations
+            numeric_event_fields = [
+                'count', 'duration', 'progress', 'percentage', 'collectionTime',
+                'lastCollectionTime', 'currentCollectionTime'
+            ]
+            
+            for field_name in numeric_event_fields:
+                value = self._get_field_value(data, field_name)
+                if value is not None:
+                    try:
+                        fields[field_name] = float(value)
+                    except (ValueError, TypeError):
+                        pass  # Skip non-numeric values
+            
+            # Convert timestamp to seconds since epoch
+            # For events, try timestamp field first, then fall back to observedTime
+            timestamp = None
+            if 'timestamp' in data:
+                try:
+                    # Parse ISO timestamp like "2025-09-13T14:26:10.195+00:00"
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00'))
+                    timestamp = int(dt.timestamp())
+                except:
+                    timestamp = None
+            
+            if timestamp is None:
+                timestamp = self._extract_timestamp(data)
+            
+            # Add at least one field for InfluxDB
+            if not fields:
+                fields['event_occurred'] = 1
+            
+            return {
+                'measurement': 'system_events',  # Use consistent measurement name
+                'tags': tags,
+                'fields': fields,
+                'time': timestamp
+            }
+            
+        except Exception as e:
+            LOG.warning(f"Failed to convert event record: {e}")
+            return None
     
+    def _convert_schema_record(self, measurement_name: str, data: Dict[str, Any], 
+                             schema_class, tag_fields: Dict[str, tuple], 
+                             numeric_fields: List[str]) -> Optional[Dict[str, Any]]:
+        """Generic conversion using schema model."""
+        try:
+            # Create schema instance from data
+            schema_instance = schema_class.from_api_response(data)
+            
+            # DEBUG: Log when BaseModel objects are created in writer
+            if hasattr(schema_instance, '__class__') and 'BaseModel' in str(type(schema_instance)):
+                LOG.info(f"🔍 WRITER DEBUG: Created BaseModel instance in _convert_schema_record: {type(schema_instance)} for {measurement_name}")
+            
+            # Extract tags using provided mapping
+            tags = {}
+            for tag_name, (field_name, default_value) in tag_fields.items():
+                # Get value from schema instance using camelCase field name
+                value = getattr(schema_instance, field_name, None)
+                if value is None:
+                    # Try getting from raw data
+                    value = schema_instance.get_raw(field_name, default_value)
+                tags[tag_name] = self._sanitize_tag_value(str(value))
+            
+            # Extract numeric fields
+            fields = {}
+            for field_name in numeric_fields:
+                # Convert snake_case to camelCase for schema access
+                camel_field = BaseModel.snake_to_camel(field_name)
+                value = getattr(schema_instance, camel_field, None)
+                if value is None:
+                    # Try getting from raw data
+                    value = schema_instance.get_raw(camel_field, None)
+                
+                if value is not None:
+                    try:
+                        fields[field_name] = float(value)
+                    except (ValueError, TypeError):
+                        LOG.debug(f"Could not convert {field_name} to float: {value}")
+            
+            # Extract timestamp
+            timestamp = self._extract_timestamp(data)
+            
+            # Clean up the schema instance reference to avoid BaseModel serialization issues
+            del schema_instance
+            
+            if not fields:
+                LOG.debug(f"No valid fields found for {measurement_name}")
+                return None
+            
+            # Create the return record with primitive values only
+            record = {
+                'measurement': measurement_name,
+                'tags': tags,
+                'fields': fields,
+                'time': timestamp
+            }
+            
+            # DEBUG: Check for BaseModel objects in the record before returning
+            def find_basemodel_in_record(obj, path=""):
+                if hasattr(obj, '__class__') and 'BaseModel' in str(type(obj)):
+                    LOG.error(f"🔍 WRITER DEBUG: Found BaseModel in record at {path}: {type(obj)}")
+                    return True
+                elif isinstance(obj, dict):
+                    for k, v in obj.items():
+                        if find_basemodel_in_record(v, f"{path}.{k}"):
+                            return True
+                elif isinstance(obj, (list, tuple)):
+                    for i, v in enumerate(obj):
+                        if find_basemodel_in_record(v, f"{path}[{i}]"):
+                            return True
+                return False
+            
+            find_basemodel_in_record(record, f"{measurement_name}_record")
+                
+            return record
+            
+        except Exception as e:
+            LOG.warning(f"Error converting {measurement_name} using schema: {e}")
+            return None
+
     def _convert_generic_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Convert generic record data to InfluxDB record format."""
         # Special handling for performance_data wrapper - treat as volume performance

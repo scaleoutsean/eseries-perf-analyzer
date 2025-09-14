@@ -102,7 +102,7 @@ class EventCollector:
         try:
             if self.eseries_collector.from_json:
                 # In JSON mode, try to find matching files
-                pattern = f"*{endpoint_name.replace('_', '*')}*"
+                pattern = f"*{endpoint_name}*"
                 return self.eseries_collector.collect_from_json_directory(
                     directory=self.eseries_collector.json_directory,
                     pattern=pattern,

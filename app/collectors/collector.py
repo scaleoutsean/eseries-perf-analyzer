@@ -931,10 +931,20 @@ class ESeriesCollector(APICollector):
         
         # Filter files for the specified endpoint
         endpoint_files = []
+        endpoint_pattern = endpoint.lower().replace('-', '_')
+        logger.debug(f"🔍 Filtering files for endpoint '{endpoint}' → pattern '{endpoint_pattern}'")
+        logger.debug(f"🔍 Total batch files: {len(batch_files)}")
+        
         for file_path in batch_files:
             filename = os.path.basename(file_path).lower()
-            if endpoint.lower().replace('-', '_') in filename:
+            if endpoint_pattern in filename:
                 endpoint_files.append(file_path)
+                logger.debug(f"🔍 MATCH: {filename}")
+            else:
+                if 'performance' in filename and any(x in filename for x in ['volume', 'drive', 'system', 'interface', 'controller']):
+                    logger.debug(f"🔍 NO MATCH: {filename}")
+        
+        logger.info(f"🔍 Found {len(endpoint_files)} files for endpoint '{endpoint}'")
         
         all_data = []
         

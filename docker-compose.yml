@@ -71,7 +71,7 @@ services:
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
     restart: unless-stopped
-    command: ["--fromJson", "/home/app/samples/in", "--output", "influxdb", "--maxIterations", "1", "--loglevel", "DEBUG", "--tlsCa", "/home/app/certs/ca.crt"]
+    command: ["--fromJson", "/home/app/samples/in", "--output", "influxdb", "--loglevel", "DEBUG", "--tlsCa", "/home/app/certs/ca.crt"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
       INFLUX_PORT: ${INFLUXDB_PORT:-8181}
@@ -88,7 +88,7 @@ services:
       - ./certs/collector:/home/app/certs:ro
       - ./data/influxdb_tokens/epa.token:/home/app/tokens/epa.token:ro
       # - ./data/samples/in:/home/app/samples/in:rw
-      - ./tests/10.113.13.4/:/home/app/samples/in:rw
+      - ./tests/10.113.1.158/:/home/app/samples/in:rw
       - ./data/samples/out:/home/app/samples/out:rw
     networks:
       epa:

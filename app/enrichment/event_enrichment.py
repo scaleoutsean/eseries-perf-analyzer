@@ -14,7 +14,7 @@ import logging
 import json
 import hashlib
 import time
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 
 from app.schema.base_model import BaseModel
@@ -60,14 +60,14 @@ class EventEnrichment:
         logger.info(f"EventEnrichment initialized: dedup={self.enable_deduplication}, "
                    f"window={self.dedup_window_minutes}min, grafana={self.enable_grafana_annotations}")
     
-    def enrich_event_data(self, endpoint_name: str, raw_data: List[Dict[str, Any]], 
+    def enrich_event_data(self, endpoint_name: str, raw_data: List[Any], 
                          system_info: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Enrich event data with alerting metadata
         
         Args:
             endpoint_name: Name of the event endpoint
-            raw_data: Raw event data from API
+            raw_data: Raw event data from API (may contain BaseModel instances)
             system_info: System information for tagging
             
         Returns:
@@ -76,15 +76,51 @@ class EventEnrichment:
         if not raw_data:
             return []
         
+        # Convert BaseModel objects to dictionaries for JSON serialization
+        serializable_data = []
+        for item in raw_data:
+            try:
+                # Check for BaseModel objects (more robust detection)
+                if hasattr(item, '__class__') and 'BaseModel' in str(type(item).__mro__):
+                    # This is a BaseModel - try different conversion methods
+                    if hasattr(item, 'model_dump'):
+                        # Pydantic v2 BaseModel
+                        serializable_data.append(item.model_dump())
+                    elif hasattr(item, 'dict'):
+                        # Pydantic v1 BaseModel
+                        serializable_data.append(item.dict())
+                    elif hasattr(item, '_raw_data'):
+                        # Our BaseModel with raw data
+                        serializable_data.append(item._raw_data)
+                    elif hasattr(item, '__dict__'):
+                        # Fallback to __dict__
+                        serializable_data.append(item.__dict__)
+                    else:
+                        logger.warning(f"BaseModel object {type(item)} has no known conversion method")
+                        continue
+                elif isinstance(item, dict):
+                    # Already a dictionary
+                    serializable_data.append(item)
+                else:
+                    # Try to convert to dict if possible
+                    try:
+                        serializable_data.append(dict(item))
+                    except (TypeError, ValueError):
+                        logger.warning(f"Unable to serialize event item of type {type(item)}, skipping")
+                        continue
+            except Exception as e:
+                logger.warning(f"Error processing event item {type(item)}: {e}")
+                continue
+        
         # Check if this is a duplicate event (if deduplication enabled)
-        if self.enable_deduplication and self._is_duplicate_event(endpoint_name, raw_data):
+        if self.enable_deduplication and self._is_duplicate_event(endpoint_name, serializable_data):
             logger.debug(f"Skipping duplicate event for {endpoint_name}")
             return []
         
         enriched_records = []
         current_time = int(time.time())
         
-        for event_item in raw_data:
+        for event_item in serializable_data:
             # Create enriched record with alert metadata
             enriched_record = {
                 # Original event data
@@ -110,7 +146,7 @@ class EventEnrichment:
         
         # Optional: Generate Grafana annotation
         if self.enable_grafana_annotations:
-            self._create_grafana_annotation(endpoint_name, raw_data, system_info)
+            self._create_grafana_annotation(endpoint_name, serializable_data, system_info)
         
         logger.info(f"Enriched {len(enriched_records)} {endpoint_name} events for system {system_info.get('name')}")
         return enriched_records

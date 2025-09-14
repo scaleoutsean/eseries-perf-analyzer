@@ -50,31 +50,64 @@ class JsonWriter(Writer):
         Returns:
             JSON-serializable representation
         """
-        if isinstance(obj, (list, tuple)):
-            # Handle lists/tuples - convert each item
+        # Handle None first
+        if obj is None:
+            return None
+        
+        # Handle basic JSON-serializable types
+        if isinstance(obj, (str, int, float, bool)):
+            return obj
+        
+        # Handle BaseModel objects with comprehensive detection
+        obj_type = type(obj)
+        type_name = obj_type.__name__
+        module_name = getattr(obj_type, '__module__', 'unknown')
+        
+        if (hasattr(obj, 'model_dump') or 
+            type_name == 'BaseModel' or 
+            'BaseModel' in str(obj_type.__bases__) or
+            'pydantic' in module_name.lower() or
+            hasattr(obj, 'model_fields')):
+            LOG.debug(f"JsonWriter: Converting BaseModel object: {type_name} from {module_name}")
+            if hasattr(obj, 'model_dump'):
+                return self._make_serializable(obj.model_dump())
+            elif hasattr(obj, 'dict'):
+                return self._make_serializable(obj.dict())
+            elif hasattr(obj, '__dict__'):
+                return self._make_serializable(obj.__dict__)
+            else:
+                LOG.warning(f"JsonWriter: BaseModel object {type_name} has no serialization method")
+                return str(obj)
+        
+        # Handle lists/tuples - convert each item
+        elif isinstance(obj, (list, tuple)):
             return [self._make_serializable(item) for item in obj]
+        
+        # Handle dictionaries - convert each value
         elif isinstance(obj, dict):
-            # Handle dictionaries - convert each value
             return {key: self._make_serializable(value) for key, value in obj.items()}
+        
+        # Handle objects with _raw_data attribute
         elif hasattr(obj, '_raw_data') and obj._raw_data:
-            # Use the raw API response data (BaseModel objects)
-            return obj._raw_data
-        elif hasattr(obj, 'dict'):
-            # Fallback to Pydantic's dict() method
-            return obj.dict()
+            return self._make_serializable(obj._raw_data)
+        
+        # Handle datetime objects
+        elif hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        
+        # Handle objects with __dict__ (custom classes)
         elif hasattr(obj, '__dict__'):
-            # Convert dataclass to dictionary using __dict__
+            LOG.debug(f"JsonWriter: Converting custom object: {type_name} from {module_name}")
             item_dict = {}
             for key, value in obj.__dict__.items():
                 if not key.startswith('_'):  # Skip private attributes
                     item_dict[key] = self._make_serializable(value)  # Recursive call
             return item_dict
+        
+        # Last resort: convert to string
         else:
-            # Already serializable (str, int, float, bool, None) or convert to string
-            if obj is None or isinstance(obj, (str, int, float, bool)):
-                return obj
-            else:
-                return str(obj)
+            LOG.warning(f"JsonWriter: Converting unknown object type to string: {type_name} from {module_name}")
+            return str(obj)
     
     def _generate_filename(self, endpoint: str, timestamp_str: str, object_id: Optional[str] = None) -> str:
         """
@@ -150,7 +183,7 @@ class JsonWriter(Writer):
                                 filepath = os.path.join(self.output_dir, filename)
                                 
                                 with open(filepath, 'w') as f:
-                                    json.dump(item, f, indent=2)
+                                    json.dump(item, f, indent=2, default=str)
                                 LOG.info(f"Wrote {data_type} item for {object_id_field}={object_id} to {filepath}")
                     else:
                         # No ID field found, write as single array file
@@ -158,7 +191,7 @@ class JsonWriter(Writer):
                         filepath = os.path.join(self.output_dir, filename)
                         
                         with open(filepath, 'w') as f:
-                            json.dump(json_data, f, indent=2)
+                            json.dump(json_data, f, indent=2, default=str)
                         LOG.info(f"Wrote {len(json_data)} {data_type} items to {filepath}")
                 else:
                     # Single object or empty list - write as single file
@@ -166,7 +199,7 @@ class JsonWriter(Writer):
                     filepath = os.path.join(self.output_dir, filename)
                     
                     with open(filepath, 'w') as f:
-                        json.dump(json_data, f, indent=2)
+                        json.dump(json_data, f, indent=2, default=str)
                     LOG.info(f"Wrote {data_type} data to {filepath}")
                     
             except Exception as e:

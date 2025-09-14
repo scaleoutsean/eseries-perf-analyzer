@@ -145,7 +145,7 @@ class JsonReader:
             
         try:
             # All our models have from_api_response method
-            return model_class.from_api_response(data)
+            return model_class.from_api_response(data)  # type: ignore
         except Exception as e:
             logger.error(f"Error converting data to {model_class.__name__}: {e}")
             return None
@@ -169,7 +169,7 @@ class JsonReader:
         result = []
         for item in data:
             try:
-                model = model_class.from_api_response(item)
+                model = model_class.from_api_response(item)  # type: ignore
                 result.append(model)
             except Exception as e:
                 logger.error(f"Error converting item to {model_class.__name__}: {e}")

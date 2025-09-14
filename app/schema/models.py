@@ -258,7 +258,7 @@ class ControllerConfigHostInterface:
         return self._raw_data.get(key, default)
 
 @dataclass
-class ControllerConfig:
+class ControllerConfig(BaseModel):
     """Configuration data for controllerconfig"""
     active: Optional[bool] = None
     cacheMemorySize: Optional[int] = None
@@ -376,7 +376,7 @@ class DriveConfigSsdWearLife:
          return self._raw_data.get(key, default)
 
 @dataclass
-class DriveConfig:
+class DriveConfig(BaseModel):
     """Configuration data for drives"""
     available: Optional[bool] = None
     blkSize: Optional[int] = None
@@ -633,7 +633,7 @@ class VolumeConfig(BaseModel):
         return self._raw_data.get(key, default)
 
 @dataclass
-class VolumeCGMembersConfig:
+class VolumeCGMembersConfig(BaseModel):
     """Configuration data for volume consistency group members"""
     autoDeleteLimit: Optional[int] = None
     autoDeleteSnapshots: Optional[bool] = None
@@ -679,7 +679,7 @@ class VolumeCGMembersConfig:
         return self._raw_data.get(key, default)
     
 @dataclass
-class InterfaceConfig:
+class InterfaceConfig(BaseModel):
     """Configuration data for interfaces"""
     # channelPortRef: Optional[str] = None
     # channelPortRefs: Optional[List[Any]] = None
@@ -710,10 +710,10 @@ class InterfaceConfig:
         return self._raw_data.get(key, default)
     
 @dataclass
-class TrayConfig:
-    id: str
+class TrayConfig(BaseModel):
     partNumber: Optional[str] = None
     serialNumber: Optional[str] = None
+    id: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
     # Add fields from schema.md that have high occurrence rates
 
@@ -814,7 +814,7 @@ class StoragePoolConfigVolumeGroupData:
         return self._raw_data.get(key, default)
 
 @dataclass
-class StoragePoolConfig:
+class StoragePoolConfig(BaseModel):
     """Configuration data for storagepoolconfig"""
     id: Optional[str] = None
     blkSizeRecommended: Optional[int] = None
@@ -902,14 +902,14 @@ class StoragePoolConfig:
 
 
 @dataclass
-class VolumeMappingsConfig:
+class VolumeMappingsConfig(BaseModel):
     """Configuration data for VolumeMappings Config"""
-    id: str
     lun: Optional[int] = None
     lunMappingRef: Optional[str] = None
     mapRef: Optional[str] = None
     type: Optional[str] = None
     volumeRef: Optional[str] = None
+    id: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1461,7 +1461,7 @@ class AnalyzedControllerStatistics(BaseModel):
         return self._raw_data.get(key, default)
 
 @dataclass
-class HostGroupsConfig:
+class HostGroupsConfig(BaseModel):
     """Configuration data for hostgroupsconfig"""
     clusterRef: Optional[str] = None
     confirmLUNMappingCreation: Optional[bool] = None
@@ -1561,7 +1561,7 @@ class HostConfigHostInitiators:
         return self._raw_data.get(key, default)
 
 @dataclass
-class HostConfig:
+class HostConfig(BaseModel):
     """Configuration data for hostconfig"""
     clusterRef: Optional[str] = None
     confirmLUNMappingCreation: Optional[bool] = None
