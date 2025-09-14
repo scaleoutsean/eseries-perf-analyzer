@@ -8,9 +8,12 @@ def safe_int(value, default=None):
     if value is None:
         return default
     
-    # Don't convert float values - they should be handled by models expecting floats
+    # Convert float values to int if they represent whole numbers
     if isinstance(value, float):
-        return default
+        if value == int(value):  # Check if it's a whole number
+            return int(value)
+        else:
+            return default  # Return default for non-whole floats
         
     try:
         return int(value)
@@ -562,6 +565,16 @@ class VolumeConfig(BaseModel):
     @staticmethod
     def from_api_response(data: Dict) -> 'VolumeConfig':
         """Create a VolumeConfig instance from API response data"""
+        # Explicit capacity conversion to ensure it's an integer
+        capacity_value = None
+        capacity_raw = data.get("capacity")
+        if capacity_raw is not None:
+            try:
+                capacity_value = int(capacity_raw)
+            except (ValueError, TypeError):
+                # Handle conversion errors - keep as None
+                capacity_value = None
+        
         return VolumeConfig(
             action=data.get("action"),
             allocGranularity=safe_int(data.get("allocGranularity")),
@@ -574,7 +587,7 @@ class VolumeConfig(BaseModel):
             cacheMirroringValidateProtectionInformation=data.get("cacheMirroringValidateProtectionInformation"),
             # cachePoolID=data.get("cachePoolID"),
             cacheSettings=data.get("cacheSettings"), # Nested object, keep as dict
-            capacity=safe_int(data.get("capacity")),
+            capacity=capacity_value,
             currentControllerId=data.get("currentControllerId"),
             # currentManager=data.get("currentManager"),
             dataAssurance=data.get("dataAssurance"),

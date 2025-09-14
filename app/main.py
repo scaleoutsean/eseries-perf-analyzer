@@ -266,6 +266,139 @@ class EnrichmentProcessor:
         
         return perf_data
 
+    def enrich_config_data(self, config_data_dict, sys_info=None):
+        """Enrich configuration data with system information for better InfluxDB tags."""
+        if not isinstance(config_data_dict, dict):
+            return config_data_dict
+            
+        # Load enrichment data if needed
+        self._load_enrichment_data()
+        
+        enriched_config = {}
+        
+        for config_type, config_items in config_data_dict.items():
+            if not isinstance(config_items, list) or not config_items:
+                enriched_config[config_type] = config_items
+                continue
+                
+            enriched_items = []
+            
+            for config_item in config_items:
+                # Start with original item
+                enriched_item = config_item.copy() if isinstance(config_item, dict) else config_item
+                
+                # Extract raw data if it's a BaseModel object
+                if hasattr(config_item, '_raw_data'):
+                    enriched_item = config_item._raw_data.copy()
+                elif hasattr(config_item, '__dict__'):
+                    enriched_item = config_item.__dict__.copy()
+                
+                # Add system information - prioritize cache (real data), fallback to sys_info
+                if self.system_enricher and self.system_enricher.system_config_cache:
+                    # Use system enricher cache (preferred - has real data from JSON/API)
+                    # Just take the first (and likely only) system in the cache
+                    for system_wwn, system_config in self.system_enricher.system_config_cache.items():
+                        if isinstance(system_config, dict):
+                            enriched_item['storage_system'] = system_config.get('name', system_config.get('id', system_wwn))
+                            enriched_item['storage_system_wwn'] = system_config.get('wwn', system_wwn)
+                            enriched_item['storage_system_model'] = system_config.get('model', 'unknown')
+                            break
+                elif sys_info and isinstance(sys_info, dict):
+                    # Fallback to sys_info parameter
+                    enriched_item['storage_system'] = sys_info.get('name', sys_info.get('id', 'unknown'))
+                    enriched_item['storage_system_wwn'] = sys_info.get('wwn', sys_info.get('world_wide_name', 'unknown'))
+                    enriched_item['storage_system_model'] = sys_info.get('model', 'unknown')
+                else:
+                    # No system info available
+                    enriched_item['storage_system'] = 'unknown'
+                    enriched_item['storage_system_wwn'] = 'unknown'
+                    enriched_item['storage_system_model'] = 'unknown'
+                
+                # Type-specific enrichment
+                if config_type == 'HostConfig':
+                    # Add valuable host fields that were getting dropped
+                    if hasattr(config_item, 'label') and config_item.label:
+                        enriched_item['host_name'] = config_item.label
+                    elif hasattr(config_item, 'name') and config_item.name:
+                        enriched_item['host_name'] = config_item.name
+                    else:
+                        enriched_item['host_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
+                
+                elif config_type == 'VolumeConfig':
+                    # Add valuable volume fields
+                    enriched_item['volume_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
+                    enriched_item['volume_capacity'] = enriched_item.get('capacity', enriched_item.get('totalSizeInBytes', 0))
+                
+                elif config_type == 'VolumeMappingsConfig':
+                    # Cross-reference volume information for mappings
+                    volume_ref = enriched_item.get('volumeRef', 'unknown')
+                    # Try to find volume info from volume enricher lookup
+                    if hasattr(self.volume_enricher, 'volume_lookup') and volume_ref in self.volume_enricher.volume_lookup:
+                        vol_data = self.volume_enricher.volume_lookup[volume_ref]
+                        enriched_item['volume_name'] = vol_data.get('label', vol_data.get('name', 'unknown'))
+                        enriched_item['pool_id'] = vol_data.get('volumeGroupRef', 'unknown')
+                    else:
+                        enriched_item['volume_name'] = 'unknown'
+                        enriched_item['pool_id'] = 'unknown'
+                
+                elif config_type == 'StoragePoolConfig':
+                    # Add valuable pool fields  
+                    enriched_item['pool_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
+                    enriched_item['pool_raid_level'] = enriched_item.get('raidLevel', 'unknown')
+                    enriched_item['pool_capacity'] = enriched_item.get('totalRaidedSpace', 0)
+                
+                enriched_items.append(enriched_item)
+            
+            enriched_config[config_type] = enriched_items
+            self.logger.info(f"Enriched {len(enriched_items)} {config_type} items with system information")
+        
+        return enriched_config
+
+    def enrich_event_data(self, event_data_list, sys_info=None):
+        """Enrich event data with system information for better InfluxDB tags."""
+        if not isinstance(event_data_list, list):
+            return event_data_list
+            
+        # Load enrichment data if needed
+        self._load_enrichment_data()
+        
+        enriched_events = []
+        
+        for event_item in event_data_list:
+            # Start with original item
+            enriched_item = event_item.copy() if isinstance(event_item, dict) else event_item
+            
+            # Extract raw data if it's a BaseModel object
+            if hasattr(event_item, '_raw_data'):
+                enriched_item = event_item._raw_data.copy()
+            elif hasattr(event_item, '__dict__'):
+                enriched_item = event_item.__dict__.copy()
+            
+            # Add system information - prioritize cache (real data), fallback to sys_info
+            if self.system_enricher and self.system_enricher.system_config_cache:
+                # Use system enricher cache (preferred - has real data from JSON/API)
+                for system_wwn, system_config in self.system_enricher.system_config_cache.items():
+                    if isinstance(system_config, dict):
+                        enriched_item['storage_system'] = system_config.get('name', system_config.get('id', system_wwn))
+                        enriched_item['storage_system_wwn'] = system_config.get('wwn', system_wwn) 
+                        enriched_item['storage_system_model'] = system_config.get('model', 'unknown')
+                        break
+            elif sys_info and isinstance(sys_info, dict):
+                # Fallback to sys_info parameter
+                enriched_item['storage_system'] = sys_info.get('name', sys_info.get('id', 'unknown'))
+                enriched_item['storage_system_wwn'] = sys_info.get('wwn', sys_info.get('world_wide_name', 'unknown'))
+                enriched_item['storage_system_model'] = sys_info.get('model', 'unknown')
+            else:
+                # No system info available
+                enriched_item['storage_system'] = 'unknown'
+                enriched_item['storage_system_wwn'] = 'unknown'
+                enriched_item['storage_system_model'] = 'unknown'
+            
+            enriched_events.append(enriched_item)
+        
+        self.logger.info(f"Enriched {len(enriched_events)} event items with system information")
+        return enriched_events
+
 class ConfigCache:
     """Temporary stub for ConfigCache."""
     def __init__(self):
@@ -696,8 +829,8 @@ def main():
         'enable_event_deduplication': True,
         'event_dedup_window_minutes': 5,
         'enable_grafana_annotations': False
-    })
-    LOG.info("EventEnrichment initialized with deduplication enabled")
+    }, enrichment_processor.system_enricher)
+    LOG.info("EventEnrichment initialized with deduplication enabled and system enricher cache")
     
     # Initialize thread pool
     executor = concurrent.futures.ThreadPoolExecutor(CMD.threads)
@@ -814,7 +947,7 @@ def main():
                         # Collect configuration data in JSON mode
                         try:
                             config_data = config_collector.collect_config(sys_info)
-                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON: config_data = {config_data}")
+                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON: config_data collected, type={type(config_data)}, keys={list(config_data.keys()) if isinstance(config_data, dict) else 'Not a dict'}")
                             # Add JSON mode metadata
                             if isinstance(config_data, dict):
                                 config_data["json_mode"] = True
@@ -852,7 +985,7 @@ def main():
                         # Try to collect config data even when exhausted
                         try:
                             config_data = config_collector.collect_config(sys_info)
-                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON-EXHAUSTED: config_data = {config_data}")
+                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON-EXHAUSTED: config_data collected, type={type(config_data)}, keys={list(config_data.keys()) if isinstance(config_data, dict) else 'Not a dict'}")
                         except Exception as e:
                             LOG.error(f"Failed to collect config data when exhausted: {e}")
                             config_data = {}
@@ -916,8 +1049,8 @@ def main():
                 if isinstance(perf_data, dict):
                     LOG.info(f"🔍 DEBUG - perf_data keys: {list(perf_data.keys())}")
                     for key, value in perf_data.items():
-                        if isinstance(value, list) and len(value) > 0:
-                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items, first item keys: {list(value[0].keys()) if isinstance(value[0], dict) else 'Not a dict'}")
+                        if isinstance(value, list):
+                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items")
                 
                 # Process and enrich data - handle multiple performance types
                 enriched_data = {}
@@ -998,8 +1131,12 @@ def main():
                         collected_config = config_data.get("collected_data", {})
                         if isinstance(collected_config, dict) and collected_config:
                             LOG.info(f"Adding config data to write: {list(collected_config.keys())}")
+                            
+                            # Enrich config data with storage_system and valuable fields
+                            enriched_config_data = enrichment_processor.enrich_config_data(collected_config, sys_info)
+                            
                             # Add each config type as a separate measurement
-                            for config_type, config_items in collected_config.items():
+                            for config_type, config_items in enriched_config_data.items():
                                 if config_items:  # Only add non-empty config data
                                     writer_data[f"config_{config_type.lower()}"] = config_items
                     
@@ -1065,6 +1202,12 @@ def main():
                                     )
                                     LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
                                     print(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
+                                    
+                                    # Add storage_system enrichment to deduplicated events
+                                    if enriched_events:
+                                        enriched_events = enrichment_processor.enrich_event_data(enriched_events, sys_info)
+                                        LOG.info(f"Events enriched with storage_system tags for {endpoint_name}")
+                                    
                                     if enriched_events:
                                         processed_events.extend(enriched_events)
                                         total_events_after += len(enriched_events)

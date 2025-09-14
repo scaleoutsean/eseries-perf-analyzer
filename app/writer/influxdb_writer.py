@@ -6,7 +6,7 @@ Writes enriched performance data to InfluxDB 3.x with proper field type handling
 import logging
 import os
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 
 from influxdb_client_3 import InfluxDBClient3
@@ -14,8 +14,13 @@ from app.writer.base import Writer
 from app.schema.base_model import BaseModel
 from app.schema.models import (
     AnalysedDriveStatistics, AnalysedSystemStatistics, 
-    AnalysedInterfaceStatistics, AnalyzedControllerStatistics
+    AnalysedInterfaceStatistics, AnalyzedControllerStatistics,
+    VolumeConfig, DriveConfig, ControllerConfig, StoragePoolConfig,
+    VolumeMappingsConfig, SystemConfig, TrayConfig, InterfaceConfig
 )
+from app.validator.schema_validator import validate_measurements_for_influxdb
+import inspect
+from dataclasses import fields
 
 LOG = logging.getLogger(__name__)
 
@@ -138,6 +143,18 @@ class InfluxDBWriter(Writer):
         Returns:
             bool: True if all writes succeeded, False otherwise
         """
+        # Apply schema-based validation before writing to InfluxDB
+        LOG.error("SCHEMA_VALIDATION_START - About to apply schema validation")
+        try:
+            from app.validator.schema_validator import validate_measurements_for_influxdb
+            LOG.error("SCHEMA_VALIDATION_IMPORT - Successfully imported schema validator")
+            measurements = validate_measurements_for_influxdb(measurements)
+            LOG.error("SCHEMA_VALIDATION_COMPLETE - Schema validation completed")
+        except Exception as e:
+            LOG.error(f"🔥 Schema validation failed: {e}")
+            import traceback
+            LOG.error(traceback.format_exc())
+        
         # DEBUG: Dump what InfluxDB writer receives
         try:
             import json
@@ -370,6 +387,7 @@ class InfluxDBWriter(Writer):
         Returns:
             List of InfluxDB record dictionaries
         """
+        LOG.error(f"🔥 _convert_to_line_protocol called with measurement_name={measurement_name}, data_len={len(data) if hasattr(data, '__len__') else 1}")
         records = []
         
         # Ensure data is a list
@@ -389,6 +407,7 @@ class InfluxDBWriter(Writer):
                 
                 # Determine measurement type and convert accordingly
                 if measurement_name.startswith('config_'):
+                    LOG.error(f"🔥 About to call _convert_config_record for {measurement_name}")
                     record = self._convert_config_record(measurement_name, item_dict)
                 elif measurement_name == 'system_events':
                     record = self._convert_event_record(measurement_name, item_dict)
@@ -446,10 +465,8 @@ class InfluxDBWriter(Writer):
         for field_name in performance_fields:
             value = self._get_field_value(data, field_name)
             if value is not None:
-                try:
-                    fields[field_name] = float(value)
-                except (ValueError, TypeError):
-                    LOG.debug(f"Could not convert {field_name} to float: {value}")
+                # Use value as-is from model - AnalysedVolumeStatistics defines these as Optional[float]
+                fields[field_name] = value
         
         # Get timestamp - convert observedTimeInMS to seconds
         timestamp = self._extract_timestamp(data)
@@ -549,8 +566,103 @@ class InfluxDBWriter(Writer):
             'combined_hit_response_time', 'max_possible_bps_under_current_load', 'max_possible_iops_under_current_load'
         ])
 
+    def _get_model_class_for_measurement(self, measurement_name: str):
+        """Map measurement names to their corresponding model classes."""
+        model_mapping = {
+            'config_volumeconfig': VolumeConfig,
+            'config_driveconfig': DriveConfig, 
+            'config_controllerconfig': ControllerConfig,
+            'config_storagepoolconfig': StoragePoolConfig,
+            'config_volumemappingsconfig': VolumeMappingsConfig,
+            'config_systemconfig': SystemConfig,
+            'config_trayconfig': TrayConfig,
+            'config_interfaceconfig': InterfaceConfig,
+            # Add statistics models too
+            'analyzed_drive_statistics': AnalysedDriveStatistics,
+            'analyzed_system_statistics': AnalysedSystemStatistics,
+            'analyzed_interface_statistics': AnalysedInterfaceStatistics,
+            'analyzed_controller_statistics': AnalyzedControllerStatistics,
+        }
+        return model_mapping.get(measurement_name)
+
+    def _validate_and_extract_fields_from_model(self, model_class, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Use the model class to validate and extract properly typed fields from data.
+        
+        This leverages your existing model type definitions and safe_int() conversions
+        to ensure data types are correct before writing to InfluxDB.
+        """
+        if not model_class or not hasattr(model_class, '__dataclass_fields__'):
+            return {}
+            
+        fields = {}
+        model_fields = model_class.__dataclass_fields__
+        
+        for field_name, field_info in model_fields.items():
+            # Skip internal fields and complex objects
+            if field_name.startswith('_') or field_name in ['listOfMappings', 'metadata', 'perms', 'cache', 'cacheSettings', 'mediaScan']:
+                continue
+                
+            value = self._get_field_value(data, field_name)
+            if value is None:
+                continue
+                
+            # Get the type annotation
+            field_type = field_info.type
+            
+            # Handle Optional types (extract the inner type)
+            if hasattr(field_type, '__origin__') and field_type.__origin__ is Union:
+                # Optional[T] is Union[T, None]
+                non_none_types = [t for t in field_type.__args__ if t is not type(None)]
+                if non_none_types:
+                    field_type = non_none_types[0]
+            
+            try:
+                # Convert based on the expected type
+                if field_type == int:
+                    if isinstance(value, int):
+                        fields[field_name] = value
+                    elif isinstance(value, str) and (value.isdigit() or (value.startswith('-') and value[1:].isdigit())):
+                        fields[field_name] = int(value)
+                    elif isinstance(value, float) and value == int(value):
+                        fields[field_name] = int(value)
+                    else:
+                        LOG.debug(f"Skipping field {field_name}: cannot convert {type(value).__name__} {value} to int")
+                        
+                elif field_type == float:
+                    if isinstance(value, (int, float)):
+                        fields[field_name] = float(value)
+                    elif isinstance(value, str):
+                        try:
+                            fields[field_name] = float(value)
+                        except ValueError:
+                            LOG.debug(f"Skipping field {field_name}: cannot convert string '{value}' to float")
+                    else:
+                        LOG.debug(f"Skipping field {field_name}: cannot convert {type(value).__name__} to float")
+                        
+                elif field_type == bool:
+                    if isinstance(value, bool):
+                        fields[field_name] = int(value)  # InfluxDB stores booleans as 0/1
+                    else:
+                        LOG.debug(f"Skipping field {field_name}: expected bool, got {type(value).__name__}")
+                        
+                elif field_type == str:
+                    # For string fields, we typically don't store them as InfluxDB fields
+                    # They're usually tags or skipped
+                    continue
+                    
+                else:
+                    # For complex types, skip or handle specially
+                    LOG.debug(f"Skipping field {field_name}: complex type {field_type}")
+                    
+            except (ValueError, TypeError) as e:
+                LOG.debug(f"Error converting field {field_name}: {e}")
+                
+        return fields
+
     def _convert_config_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Convert configuration data to InfluxDB record format."""
+        LOG.info(f"🔥 _convert_config_record called with measurement_name={measurement_name}")
         try:
             # Extract config type from measurement name (e.g., config_storage_pools -> storage_pools)
             config_type = measurement_name.replace('config_', '')
@@ -558,7 +670,10 @@ class InfluxDBWriter(Writer):
             # Create basic tags for configuration records
             tags = {
                 'config_type': self._sanitize_tag_value(config_type),
-                'storage_system': self._sanitize_tag_value(str(data.get('storageSystemWWN', data.get('wwn', 'unknown'))))
+                'storage_system': self._sanitize_tag_value(str(
+                    data.get('storage_system',  # Use enriched storage_system first
+                    data.get('storageSystemWWN', 
+                    data.get('wwn', 'unknown')))))
             }
             
             # Add specific tags based on config type
@@ -571,8 +686,13 @@ class InfluxDBWriter(Writer):
             elif 'volume' in config_type:
                 tags.update({
                     'volume_id': self._sanitize_tag_value(str(data.get('volumeRef', data.get('id', 'unknown')))),
-                    'volume_name': self._sanitize_tag_value(str(data.get('label', data.get('name', 'unknown')))),
-                    'pool_id': self._sanitize_tag_value(str(data.get('volumeGroupRef', 'unknown')))
+                    'volume_name': self._sanitize_tag_value(str(
+                        data.get('volume_name',  # Use enriched volume_name first
+                        data.get('label', 
+                        data.get('name', 'unknown'))))),
+                    'pool_id': self._sanitize_tag_value(str(
+                        data.get('pool_id',  # Use enriched pool_id first  
+                        data.get('volumeGroupRef', 'unknown'))))
                 })
             elif 'controller' in config_type:
                 tags.update({
@@ -592,31 +712,39 @@ class InfluxDBWriter(Writer):
                         tags['config_id'] = self._sanitize_tag_value(str(data[id_field]))
                         break
             
-            # Extract numeric fields for configuration (capacity, counts, etc.)
-            fields = {}
-            numeric_config_fields = [
-                'capacity', 'totalSizeInBytes', 'usableCapacity', 'freeSpace', 'usedSpace',
-                'driveCount', 'volumeCount', 'sequenceNum', 'trayId', 'slot'
-            ]
+            # Use schema-based validation to extract properly typed fields
+            LOG.info(f"🔍 SCHEMA DEBUG - Processing measurement: {measurement_name}")
+            model_class = self._get_model_class_for_measurement(measurement_name)
+            LOG.info(f"🔍 SCHEMA DEBUG - Found model class: {model_class}")
             
-            for field_name in numeric_config_fields:
-                value = self._get_field_value(data, field_name)
-                if value is not None:
-                    try:
-                        fields[field_name] = float(value)
-                    except (ValueError, TypeError):
-                        # Store as string if not numeric
-                        fields[f"{field_name}_str"] = str(value)
-            
-            # Add boolean fields as integers (0/1)
-            boolean_config_fields = [
-                'active', 'offline', 'optimal', 'enabled', 'online', 'present'
-            ]
-            
-            for field_name in boolean_config_fields:
-                value = data.get(field_name)
-                if isinstance(value, bool):
-                    fields[field_name] = int(value)
+            if model_class:
+                LOG.info(f"Using schema validation for {measurement_name} with model {model_class.__name__}")
+                fields = self._validate_and_extract_fields_from_model(model_class, data)
+                LOG.info(f"🔍 SCHEMA DEBUG - Extracted fields: {list(fields.keys())}")
+                
+                # Debug logging for capacity field
+                if 'capacity' in fields:
+                    LOG.info(f"🔍 SCHEMA-BASED CAPACITY - value={fields['capacity']}, type={type(fields['capacity'])}")
+            else:
+                LOG.debug(f"No model class found for {measurement_name}, using fallback field extraction")
+                # Fallback to basic field extraction for unknown measurements
+                fields = {}
+                numeric_config_fields = [
+                    'capacity', 'totalSizeInBytes', 'usableCapacity', 'freeSpace', 'usedSpace',
+                    'driveCount', 'volumeCount', 'sequenceNum', 'trayId', 'slot'
+                ]
+                
+                for field_name in numeric_config_fields:
+                    value = self._get_field_value(data, field_name)
+                    if value is not None and isinstance(value, (int, float)):
+                        fields[field_name] = value
+                        
+                # Add boolean fields as integers (0/1)
+                boolean_config_fields = ['active', 'offline', 'optimal', 'enabled', 'online', 'present']
+                for field_name in boolean_config_fields:
+                    value = data.get(field_name)
+                    if isinstance(value, bool):
+                        fields[field_name] = int(value)
             
             # Use current timestamp for config records (they don't have observedTime)
             import time
@@ -643,7 +771,10 @@ class InfluxDBWriter(Writer):
             # Create tags for event records
             tags = {
                 'event_type': self._sanitize_tag_value(str(data.get('eventType', data.get('type', 'unknown')))),
-                'storage_system': self._sanitize_tag_value(str(data.get('storageSystemId', data.get('systemId', 'unknown')))),
+                'storage_system': self._sanitize_tag_value(str(
+                    data.get('storage_system',  # Use enriched storage_system first
+                    data.get('storageSystemId', 
+                    data.get('systemId', 'unknown'))))),
                 'severity': self._sanitize_tag_value(str(data.get('severity', data.get('priority', 'info'))))
             }
             
@@ -666,13 +797,21 @@ class InfluxDBWriter(Writer):
             # Extract numeric fields from events
             fields = {}
             
-            # Event counts and durations
-            numeric_event_fields = [
-                'count', 'duration', 'progress', 'percentage', 'collectionTime',
-                'lastCollectionTime', 'currentCollectionTime'
-            ]
+            # Event counts and durations - preserve appropriate types
+            integer_event_fields = ['count', 'collectionTime', 'lastCollectionTime', 'currentCollectionTime']
+            float_event_fields = ['duration', 'progress', 'percentage']
             
-            for field_name in numeric_event_fields:
+            # Handle integer fields
+            for field_name in integer_event_fields:
+                value = self._get_field_value(data, field_name)
+                if value is not None:
+                    try:
+                        fields[field_name] = int(value)
+                    except (ValueError, TypeError):
+                        pass  # Skip non-integer values
+            
+            # Handle float fields  
+            for field_name in float_event_fields:
                 value = self._get_field_value(data, field_name)
                 if value is not None:
                     try:
@@ -743,10 +882,8 @@ class InfluxDBWriter(Writer):
                     value = schema_instance.get_raw(camel_field, None)
                 
                 if value is not None:
-                    try:
-                        fields[field_name] = float(value)
-                    except (ValueError, TypeError):
-                        LOG.debug(f"Could not convert {field_name} to float: {value}")
+                    # Use value as-is from model - schema defines appropriate types
+                    fields[field_name] = value
             
             # Extract timestamp
             timestamp = self._extract_timestamp(data)

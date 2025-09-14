@@ -42,14 +42,16 @@ class EventEnrichment:
         'volume_expansion_progress': 'low',
     }
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], system_enricher=None):
         """
         Initialize event enrichment
         
         Args:
             config: Configuration dictionary
+            system_enricher: SystemEnricher instance for cache-first enrichment
         """
         self.config = config
+        self.system_enricher = system_enricher
         self.enable_deduplication = config.get('enable_event_deduplication', True)
         self.dedup_window_minutes = config.get('event_dedup_window_minutes', 5)
         self.enable_grafana_annotations = config.get('enable_grafana_annotations', False)
@@ -121,6 +123,23 @@ class EventEnrichment:
         current_time = int(time.time())
         
         for event_item in serializable_data:
+            # Get system information using cache-first approach
+            system_wwn = system_info.get('wwn', 'unknown')
+            if self.system_enricher and hasattr(self.system_enricher, 'system_config_cache'):
+                system_config = self.system_enricher.system_config_cache
+                if system_config:
+                    system_name = system_config.get('name', system_config.get('id', system_wwn))
+                    system_id = system_config.get('id', 'unknown')
+                    system_wwn = system_config.get('wwn', system_wwn)
+                else:
+                    # Fallback to sys_info
+                    system_name = system_info.get('name', 'unknown')
+                    system_id = system_info.get('id', 'unknown')
+            else:
+                # Fallback to sys_info
+                system_name = system_info.get('name', 'unknown') 
+                system_id = system_info.get('id', 'unknown')
+            
             # Create enriched record with alert metadata
             enriched_record = {
                 # Original event data
@@ -130,9 +149,9 @@ class EventEnrichment:
                 'alert_type': endpoint_name,
                 'alert_severity': self.ALERT_SEVERITY.get(endpoint_name, 'medium'),
                 'alert_timestamp': current_time,
-                'system_id': system_info.get('id', 'unknown'),
-                'system_wwn': system_info.get('wwn', 'unknown'),
-                'system_name': system_info.get('name', 'unknown'),
+                'system_id': system_id,
+                'system_wwn': system_wwn,
+                'system_name': system_name,
                 
                 # Event categorization
                 'event_category': 'system_event',
