@@ -47,7 +47,8 @@ services:
       INFLUXDB3_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
       TOKEN_FILE: /home/influx/tokens/epa.token
       # Disable anonymous usage analytics (InfluxDB3 specific)
-      INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}    
+      INFLUXDB3_TELEMETRY_DISABLE_UPLOAD: ${INFLUXDB3_TELEMETRY_DISABLE_UPLOAD}
+      WAL_FLUSH_INTERVAL: ${WAL_FLUSH_INTERVAL}  
     volumes:
       - ./data/influxdb:/var/lib/influxdb3
       - ./certs/influxdb/influxdb.crt:/home/influx/certs/influxdb.crt:ro

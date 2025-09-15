@@ -93,7 +93,7 @@ class BatchedJsonReader:
             # Events endpoints
             'events_*.json',
             
-            # Legacy patterns (for backward compatibility)
+            # Other patterns (for backward compatibility)
             'system_*.json',
             'system_failures_*.json',
             'drive_*.json',
@@ -143,6 +143,11 @@ class BatchedJsonReader:
             readable_time = datetime.fromtimestamp(minute * 60).strftime('%Y-%m-%d %H:%M:%S')
             filenames = [os.path.basename(f) for f in batch[:3]]
             logger.info(f"  Batch {i+1}: minute {minute} ({readable_time}) - {len(batch)} files: {filenames}...")
+            # DEBUG-log files starting with configuration_ for deeper insight
+            if logger.isEnabledFor(logging.DEBUG):
+                for f in batch:
+                    if os.path.basename(f).startswith('configuration_'):
+                        logger.debug(f"    Configuration file in batch: {os.path.basename(f)}")
     
     def get_current_batch(self) -> List[str]:
         """

@@ -16,9 +16,10 @@ from app.schema.models import (
     AnalysedDriveStatistics, AnalysedSystemStatistics, 
     AnalysedInterfaceStatistics, AnalyzedControllerStatistics,
     VolumeConfig, DriveConfig, ControllerConfig, StoragePoolConfig,
-    VolumeMappingsConfig, SystemConfig, TrayConfig, InterfaceConfig
+    VolumeMappingsConfig, SystemConfig, TrayConfig, InterfaceConfig,
+    HostConfig
 )
-from app.validator.schema_validator import validate_measurements_for_influxdb
+from app.validator.schema_validator import validate_measurements_for_influxdb, SchemaValidator
 import inspect
 from dataclasses import fields
 
@@ -52,6 +53,9 @@ class InfluxDBWriter(Writer):
         # Initialize client
         self.client = None
         self._initialize_client()
+        
+        # Initialize schema validator for model-based type conversion
+        self.schema_validator = SchemaValidator()
         
         LOG.info(f"InfluxDBWriter initialized: {self.url} -> {self.database}")
     
@@ -566,24 +570,6 @@ class InfluxDBWriter(Writer):
             'combined_hit_response_time', 'max_possible_bps_under_current_load', 'max_possible_iops_under_current_load'
         ])
 
-    def _get_model_class_for_measurement(self, measurement_name: str):
-        """Map measurement names to their corresponding model classes."""
-        model_mapping = {
-            'config_volumeconfig': VolumeConfig,
-            'config_driveconfig': DriveConfig, 
-            'config_controllerconfig': ControllerConfig,
-            'config_storagepoolconfig': StoragePoolConfig,
-            'config_volumemappingsconfig': VolumeMappingsConfig,
-            'config_systemconfig': SystemConfig,
-            'config_trayconfig': TrayConfig,
-            'config_interfaceconfig': InterfaceConfig,
-            # Add statistics models too
-            'analyzed_drive_statistics': AnalysedDriveStatistics,
-            'analyzed_system_statistics': AnalysedSystemStatistics,
-            'analyzed_interface_statistics': AnalysedInterfaceStatistics,
-            'analyzed_controller_statistics': AnalyzedControllerStatistics,
-        }
-        return model_mapping.get(measurement_name)
 
     def _validate_and_extract_fields_from_model(self, model_class, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -598,12 +584,19 @@ class InfluxDBWriter(Writer):
         fields = {}
         model_fields = model_class.__dataclass_fields__
         
+        # DEBUG: Log the actual data keys for HostConfig
+        if 'hostconfig' in str(model_class).lower():
+            LOG.debug(f"🔍 HOST DATA DEBUG - data keys: {list(data.keys())}")
+        
         for field_name, field_info in model_fields.items():
             # Skip internal fields and complex objects
             if field_name.startswith('_') or field_name in ['listOfMappings', 'metadata', 'perms', 'cache', 'cacheSettings', 'mediaScan']:
                 continue
                 
             value = self._get_field_value(data, field_name)
+            # DEBUG: Log field processing for HostConfig
+            if 'hostconfig' in str(model_class).lower():
+                LOG.debug(f"🔍 HOST FIELD DEBUG - {field_name}: value={value}, type={type(value)}, is_none={value is None}")
             if value is None:
                 continue
                 
@@ -647,9 +640,9 @@ class InfluxDBWriter(Writer):
                         LOG.debug(f"Skipping field {field_name}: expected bool, got {type(value).__name__}")
                         
                 elif field_type == str:
-                    # For string fields, we typically don't store them as InfluxDB fields
-                    # They're usually tags or skipped
-                    continue
+                    # Store string fields as InfluxDB fields (valuable data like host names, labels, etc.)
+                    if isinstance(value, str) and value:  # Only store non-empty strings
+                        fields[field_name] = value
                     
                 else:
                     # For complex types, skip or handle specially
@@ -714,7 +707,7 @@ class InfluxDBWriter(Writer):
             
             # Use schema-based validation to extract properly typed fields
             LOG.info(f"🔍 SCHEMA DEBUG - Processing measurement: {measurement_name}")
-            model_class = self._get_model_class_for_measurement(measurement_name)
+            model_class = self.schema_validator.get_model_class(measurement_name)
             LOG.info(f"🔍 SCHEMA DEBUG - Found model class: {model_class}")
             
             if model_class:
@@ -937,15 +930,21 @@ class InfluxDBWriter(Writer):
         return None
     
     def _get_field_value(self, data_dict: Dict[str, Any], field_name: str) -> Any:
-        """Get field value, trying both snake_case and camelCase variants using BaseModel conversion."""
+        """Get field value, trying both snake_case and camelCase variants using proper conversion."""
         
-        # Try snake_case first (enriched field names)
-        snake_case = field_name.lower().replace(' ', '_')
+        # Try direct match first (field_name as-is)
+        if field_name in data_dict:
+            return data_dict[field_name]
+        
+        # Try proper snake_case conversion (for camelCase field names)
+        from app.utils import camel_to_snake_case
+        snake_case = camel_to_snake_case(field_name)
         if snake_case in data_dict:
             return data_dict[snake_case]
         
-        # Try camelCase equivalent using BaseModel conversion
-        camel_case = BaseModel.snake_to_camel(snake_case)
+        # Try camelCase equivalent (for snake_case field names)
+        from app.utils import snake_to_camel_case
+        camel_case = snake_to_camel_case(field_name)
         if camel_case in data_dict:
             return data_dict[camel_case]
             

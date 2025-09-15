@@ -267,12 +267,20 @@ class EnrichmentProcessor:
         return perf_data
 
     def enrich_config_data(self, config_data_dict, sys_info=None):
-        """Enrich configuration data with system information for better InfluxDB tags."""
+        """
+        Enrich configuration data using dedicated config enrichment architecture.
+        
+        This method now uses the proper config enrichment framework instead of
+        hardcoded logic, enabling proper enrichment for all config types.
+        """
         if not isinstance(config_data_dict, dict):
             return config_data_dict
             
         # Load enrichment data if needed
         self._load_enrichment_data()
+        
+        # Import the config enrichment factory
+        from app.enrichment.config_enrichment import get_config_enricher
         
         enriched_config = {}
         
@@ -280,77 +288,19 @@ class EnrichmentProcessor:
             if not isinstance(config_items, list) or not config_items:
                 enriched_config[config_type] = config_items
                 continue
-                
-            enriched_items = []
             
-            for config_item in config_items:
-                # Start with original item
-                enriched_item = config_item.copy() if isinstance(config_item, dict) else config_item
-                
-                # Extract raw data if it's a BaseModel object
-                if hasattr(config_item, '_raw_data'):
-                    enriched_item = config_item._raw_data.copy()
-                elif hasattr(config_item, '__dict__'):
-                    enriched_item = config_item.__dict__.copy()
-                
-                # Add system information - prioritize cache (real data), fallback to sys_info
-                if self.system_enricher and self.system_enricher.system_config_cache:
-                    # Use system enricher cache (preferred - has real data from JSON/API)
-                    # Just take the first (and likely only) system in the cache
-                    for system_wwn, system_config in self.system_enricher.system_config_cache.items():
-                        if isinstance(system_config, dict):
-                            enriched_item['storage_system'] = system_config.get('name', system_config.get('id', system_wwn))
-                            enriched_item['storage_system_wwn'] = system_config.get('wwn', system_wwn)
-                            enriched_item['storage_system_model'] = system_config.get('model', 'unknown')
-                            break
-                elif sys_info and isinstance(sys_info, dict):
-                    # Fallback to sys_info parameter
-                    enriched_item['storage_system'] = sys_info.get('name', sys_info.get('id', 'unknown'))
-                    enriched_item['storage_system_wwn'] = sys_info.get('wwn', sys_info.get('world_wide_name', 'unknown'))
-                    enriched_item['storage_system_model'] = sys_info.get('model', 'unknown')
-                else:
-                    # No system info available
-                    enriched_item['storage_system'] = 'unknown'
-                    enriched_item['storage_system_wwn'] = 'unknown'
-                    enriched_item['storage_system_model'] = 'unknown'
-                
-                # Type-specific enrichment
-                if config_type == 'HostConfig':
-                    # Add valuable host fields that were getting dropped
-                    if hasattr(config_item, 'label') and config_item.label:
-                        enriched_item['host_name'] = config_item.label
-                    elif hasattr(config_item, 'name') and config_item.name:
-                        enriched_item['host_name'] = config_item.name
-                    else:
-                        enriched_item['host_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
-                
-                elif config_type == 'VolumeConfig':
-                    # Add valuable volume fields
-                    enriched_item['volume_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
-                    enriched_item['volume_capacity'] = enriched_item.get('capacity', enriched_item.get('totalSizeInBytes', 0))
-                
-                elif config_type == 'VolumeMappingsConfig':
-                    # Cross-reference volume information for mappings
-                    volume_ref = enriched_item.get('volumeRef', 'unknown')
-                    # Try to find volume info from volume enricher lookup
-                    if hasattr(self.volume_enricher, 'volume_lookup') and volume_ref in self.volume_enricher.volume_lookup:
-                        vol_data = self.volume_enricher.volume_lookup[volume_ref]
-                        enriched_item['volume_name'] = vol_data.get('label', vol_data.get('name', 'unknown'))
-                        enriched_item['pool_id'] = vol_data.get('volumeGroupRef', 'unknown')
-                    else:
-                        enriched_item['volume_name'] = 'unknown'
-                        enriched_item['pool_id'] = 'unknown'
-                
-                elif config_type == 'StoragePoolConfig':
-                    # Add valuable pool fields  
-                    enriched_item['pool_name'] = enriched_item.get('label', enriched_item.get('name', 'unknown'))
-                    enriched_item['pool_raid_level'] = enriched_item.get('raidLevel', 'unknown')
-                    enriched_item['pool_capacity'] = enriched_item.get('totalRaidedSpace', 0)
-                
-                enriched_items.append(enriched_item)
+            # Get the appropriate enricher for this config type
+            enricher = get_config_enricher(config_type, self.system_enricher)
+            
+            # Use the enricher to process all items of this type
+            enriched_items = enricher.enrich_config_data(config_items, config_type, sys_info)
             
             enriched_config[config_type] = enriched_items
-            self.logger.info(f"Enriched {len(enriched_items)} {config_type} items with system information")
+            
+            if enriched_items:
+                self.logger.info(f"Enriched {len(enriched_items)} {config_type} items using {enricher.__class__.__name__}")
+            else:
+                self.logger.warning(f"No enriched items returned for {config_type} (input: {len(config_items)} items)")
         
         return enriched_config
 
