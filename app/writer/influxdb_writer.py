@@ -9,21 +9,65 @@ import time
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 
-from influxdb_client_3 import InfluxDBClient3
+from influxdb_client_3 import InfluxDBClient3, WritePrecision, WriteOptions, write_client_options
+from influxdb_client_3.exceptions.exceptions import InfluxDBError
 from app.writer.base import Writer
 from app.schema.base_model import BaseModel
 from app.schema.models import (
     AnalysedDriveStatistics, AnalysedSystemStatistics, 
-    AnalysedInterfaceStatistics, AnalyzedControllerStatistics,
-    VolumeConfig, DriveConfig, ControllerConfig, StoragePoolConfig,
-    VolumeMappingsConfig, SystemConfig, TrayConfig, InterfaceConfig,
-    HostConfig
+    AnalysedInterfaceStatistics, AnalyzedControllerStatistics
 )
 from app.validator.schema_validator import validate_measurements_for_influxdb, SchemaValidator
 import inspect
 from dataclasses import fields
 
 LOG = logging.getLogger(__name__)
+
+class BatchingCallback(object):
+    """
+    Callback handler for batched InfluxDB writes.
+    
+    Tracks write success/failure statistics and provides timing information
+    for performance monitoring and debugging.
+    """
+
+    def __init__(self):
+        self.write_status_msg = None
+        self.write_count = 0
+        self.error_count = 0
+        self.retry_count = 0
+        self.start = time.time_ns()
+
+    def success(self, conf, data: str):
+        """Called when a batch write succeeds."""
+        self.write_count += 1
+        self.write_status_msg = f"SUCCESS: {self.write_count} batches written"
+        LOG.debug(f"Batch write successful: {len(data)} bytes")
+
+    def error(self, conf, data: str, exception: InfluxDBError):
+        """Called when a batch write fails permanently."""
+        self.error_count += 1
+        self.write_status_msg = f"FAILURE: {exception}"
+        LOG.error(f"Batch write failed: {len(data)} bytes, error: {exception}")
+
+    def retry(self, conf, data: str, exception: InfluxDBError):
+        """Called when a batch write fails but will be retried."""
+        self.retry_count += 1
+        LOG.warning(f"Batch write retry {self.retry_count}: {len(data)} bytes, error: {exception}")
+
+    def elapsed_ms(self) -> int:
+        """Get elapsed time in milliseconds."""
+        return (time.time_ns() - self.start) // 1_000_000
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get write statistics."""
+        return {
+            'writes': self.write_count,
+            'errors': self.error_count, 
+            'retries': self.retry_count,
+            'elapsed_ms': self.elapsed_ms(),
+            'status': self.write_status_msg
+        }
 
 class InfluxDBWriter(Writer):
     """
@@ -50,6 +94,10 @@ class InfluxDBWriter(Writer):
         # Get TLS validation setting from config (passed from main.py)
         self.tls_validation = config.get('tls_validation', 'strict')
         
+        # Initialize batching configuration for performance optimization (before client init)
+        self.batch_size = 1000  # Target batch size (1K points as recommended)
+        self.batch_callback = BatchingCallback()  # Initialize callback for batching statistics
+        
         # Initialize client
         self.client = None
         self._initialize_client()
@@ -66,11 +114,33 @@ class InfluxDBWriter(Writer):
             if self.tls_validation == 'disable' or self.tls_validation == 'none':
                 LOG.warning("TLS validation 'disable'/'none' not supported for InfluxDB - InfluxDB requires strict TLS validation")
             
+            # Configure write options for efficient batching (following official example)
+            write_options = WriteOptions(
+                batch_size=self.batch_size,  # 1K points as recommended 
+                flush_interval=60_000,       # 60 seconds - matches collection interval
+                jitter_interval=2_000,       # 2 seconds
+                retry_interval=5_000,        # 5 seconds
+                max_retries=5,
+                max_retry_delay=30_000,      # 30 seconds
+                max_close_wait=120_000,      # 2 minutes - enough time for cleanup
+                exponential_base=2
+            )
+            
+            # Configure write client options with callbacks (following official example)
+            wco = write_client_options(
+                success_callback=self.batch_callback.success,
+                error_callback=self.batch_callback.error,
+                retry_callback=self.batch_callback.retry,
+                write_options=write_options
+            )
+            
             # Always use strict TLS validation for InfluxDB
             client_kwargs = {
                 'host': self.url,
                 'database': self.database, 
                 'token': self.token,
+                'enable_gzip': True,  # Enable gzip compression for better performance
+                'write_client_options': wco,  # Batching configuration
                 'verify_ssl': True,  # InfluxDB always uses strict TLS validation
                 'timeout': 60000  # 60 second timeout (in milliseconds)
             }
@@ -113,7 +183,18 @@ class InfluxDBWriter(Writer):
             
             if response.status_code == 200:
                 databases_data = response.json()
-                databases = databases_data.get('databases', [])
+                LOG.debug(f"Database list response type: {type(databases_data)}, content: {databases_data}")
+                
+                # Handle both response formats: list of databases or dict with 'databases' key
+                if isinstance(databases_data, list):
+                    databases = databases_data
+                    LOG.debug(f"API returned database list directly: {databases}")
+                elif isinstance(databases_data, dict):
+                    databases = databases_data.get('databases', [])
+                    LOG.debug(f"API returned database dict, extracted list: {databases}")
+                else:
+                    LOG.warning(f"Unexpected database list response format: {type(databases_data)}")
+                    databases = []
                 
                 if self.database not in databases:
                     LOG.info(f"Database '{self.database}' does not exist, creating it")
@@ -139,7 +220,7 @@ class InfluxDBWriter(Writer):
     
     def write(self, measurements: Dict[str, Any]) -> bool:
         """
-        Write measurement data to InfluxDB.
+        Write measurement data to InfluxDB using automatic client-side batching.
         
         Args:
             measurements: Dictionary of measurement name -> measurement data
@@ -148,93 +229,15 @@ class InfluxDBWriter(Writer):
             bool: True if all writes succeeded, False otherwise
         """
         # Apply schema-based validation before writing to InfluxDB
-        LOG.error("SCHEMA_VALIDATION_START - About to apply schema validation")
+        LOG.debug("Applying schema validation to measurements")
         try:
             from app.validator.schema_validator import validate_measurements_for_influxdb
-            LOG.error("SCHEMA_VALIDATION_IMPORT - Successfully imported schema validator")
             measurements = validate_measurements_for_influxdb(measurements)
-            LOG.error("SCHEMA_VALIDATION_COMPLETE - Schema validation completed")
+            LOG.debug("Schema validation completed successfully")
         except Exception as e:
-            LOG.error(f"🔥 Schema validation failed: {e}")
+            LOG.error(f"Schema validation failed: {e}")
             import traceback
             LOG.error(traceback.format_exc())
-        
-        # DEBUG: Dump what InfluxDB writer receives
-        try:
-            import json
-            import pickle
-            import os
-            debug_dir = "/home/app/samples/out"
-            os.makedirs(debug_dir, exist_ok=True)
-            
-            LOG.info(f"DEBUG: About to dump measurements with keys: {list(measurements.keys()) if measurements else 'None'}")
-            
-            # Comprehensive BaseModel detection
-            def find_basemodels_in_measurements(obj, path="root"):
-                """Recursively find BaseModel objects in measurement data"""
-                findings = []
-                
-                try:
-                    # Check if this object itself is a BaseModel
-                    if hasattr(obj, '__class__'):
-                        obj_mro = str(type(obj).__mro__)
-                        if 'BaseModel' in obj_mro:
-                            findings.append(f"BaseModel at {path}: {type(obj)} (MRO: {obj_mro})")
-                    
-                    # Recursively check containers
-                    if isinstance(obj, dict):
-                        for key, value in obj.items():
-                            findings.extend(find_basemodels_in_measurements(value, f"{path}.{key}"))
-                    elif isinstance(obj, (list, tuple)):
-                        for i, item in enumerate(obj):
-                            findings.extend(find_basemodels_in_measurements(item, f"{path}[{i}]"))
-                except Exception as e:
-                    findings.append(f"Error checking {path}: {e}")
-                
-                return findings
-            
-            # Check for BaseModel objects
-            basemodel_findings = find_basemodels_in_measurements(measurements, "measurements")
-            if basemodel_findings:
-                LOG.error(f"DEBUG: BaseModel objects found in writer input:")
-                for finding in basemodel_findings:
-                    LOG.error(f"  {finding}")
-                
-                # Save findings to file
-                with open(f"{debug_dir}/writer_input_basemodel_findings.txt", "w") as f:
-                    f.write("BaseModel objects found in InfluxDB writer input:\n")
-                    for finding in basemodel_findings:
-                        f.write(f"{finding}\n")
-            else:
-                LOG.info(f"DEBUG: No BaseModel objects found in writer input")
-            
-            # Try JSON dump
-            try:
-                with open(f"{debug_dir}/influxdb_writer_input.json", "w") as f:
-                    json.dump(measurements, f, indent=2, default=str)
-                LOG.info(f"DEBUG: Successfully dumped InfluxDB writer input to JSON")
-            except Exception as json_e:
-                LOG.error(f"DEBUG: JSON dump failed: {json_e}")
-                # Try pickle as fallback
-                try:
-                    with open(f"{debug_dir}/influxdb_writer_input.pkl", "wb") as f:
-                        pickle.dump(measurements, f)
-                    LOG.info(f"DEBUG: Successfully pickled InfluxDB writer input")
-                except Exception as pickle_e:
-                    LOG.error(f"DEBUG: Pickle dump also failed: {pickle_e}")
-            
-        except Exception as dump_e:
-            LOG.error(f"DEBUG: Failed to dump writer input: {dump_e}")
-            # Try to dump structure info at least
-            try:
-                with open(f"{debug_dir}/influxdb_writer_structure.txt", "w") as f:
-                    for key, value in measurements.items():
-                        f.write(f"{key}: {type(value)}\n")
-                        if isinstance(value, list) and value:
-                            f.write(f"  List item type: {type(value[0])}\n")
-                LOG.info(f"DEBUG: Dumped structure info to {debug_dir}/influxdb_writer_structure.txt")
-            except Exception as struct_e:
-                LOG.error(f"DEBUG: Failed to dump structure info: {struct_e}")
         
         if not self.client:
             LOG.error("InfluxDB client not available")
@@ -251,134 +254,81 @@ class InfluxDBWriter(Writer):
                 
                 LOG.info(f"Processing InfluxDB measurement: {measurement_name} ({len(measurement_data) if hasattr(measurement_data, '__len__') else 1} records)")
                 
-                # Convert to InfluxDB line protocol format
-                records = self._convert_to_line_protocol(measurement_name, measurement_data)
+                # Convert to InfluxDB Point objects
+                points = self._convert_to_points(measurement_name, measurement_data)
                 
-                if records:
-                    # Debug: Log a sample record structure
-                    if len(records) > 0:
-                        sample_record = records[0]
-                        LOG.debug(f"Sample record for {measurement_name}: tags={sample_record.get('tags', {})}, fields={list(sample_record.get('fields', {}).keys())}")
-                    
-                    # Debug: Log first few records as line protocol to see what's being sent
-                    try:
-                        from influxdb_client_3.write_client.client.write.point import Point
-                        if len(records) > 0:
-                            # Convert first record to line protocol for debugging
-                            if isinstance(records[0], Point):
-                                line_protocol_sample = records[0].to_line_protocol()
-                            else:
-                                # If it's a dict, manually create line protocol format for debugging
-                                rec = records[0]
-                                tags = rec.get('tags', {})
-                                fields = rec.get('fields', {})
-                                timestamp = rec.get('time', '')
-                                
-                                tag_str = ','.join([f'{k}={v}' for k, v in tags.items()]) if tags else ''
-                                field_str = ','.join([f'{k}={v}' for k, v in fields.items()]) if fields else ''
-                                line_protocol_sample = f"{measurement_name},{tag_str} {field_str} {timestamp}"
-                            
-                            LOG.debug(f"Sample line protocol for {measurement_name}: {line_protocol_sample}")
-                    except Exception as debug_e:
-                        LOG.debug(f"Could not generate debug line protocol: {debug_e}")
-                    
-                    # Write to InfluxDB in batches to avoid timeouts
-                    batch_size = 50  # Write 50 records at a time - with no_sync=True should be fast
-                    total_records = len(records)
-                    
-                    for i in range(0, total_records, batch_size):
-                        batch = records[i:i + batch_size]
-                        batch_num = (i // batch_size) + 1
-                        total_batches = (total_records + batch_size - 1) // batch_size
-                        
+                if points:
+                    # Write points using client's automatic batching (following official example)
+                    # The client automatically batches writes based on write_options configuration
+                    for point in points:
                         try:
-                            LOG.debug(f"Writing batch {batch_num}/{total_batches} ({len(batch)} records)")
-                            
-                            # DEBUG: Dump what we're about to send to InfluxDB client
-                            try:
-                                import json
-                                import pickle
-                                debug_dir = "/home/app/samples/out"
-                                
-                                # Try JSON dump first
-                                try:
-                                    with open(f"{debug_dir}/influxdb_client_batch_{measurement_name}_{batch_num}.json", "w") as f:
-                                        json.dump(batch, f, indent=2, default=str)
-                                    LOG.info(f"DEBUG: Successfully dumped JSON batch {batch_num} for {measurement_name}")
-                                except Exception as json_e:
-                                    LOG.error(f"DEBUG: JSON dump failed for batch {batch_num}: {json_e}")
-                                    # If JSON fails, it might be a BaseModel issue - let's pickle it
-                                    try:
-                                        with open(f"{debug_dir}/influxdb_client_batch_{measurement_name}_{batch_num}.pkl", "wb") as f:
-                                            pickle.dump(batch, f)
-                                        LOG.info(f"DEBUG: Successfully pickled batch {batch_num} for {measurement_name}")
-                                    except Exception as pickle_e:
-                                        LOG.error(f"DEBUG: Pickle dump also failed: {pickle_e}")
-                                
-                                # Detailed BaseModel detection on the batch data
-                                def find_basemodels_recursive(obj, path="root"):
-                                    """Recursively find BaseModel objects in data structure"""
-                                    findings = []
-                                    
-                                    if hasattr(obj, '__class__') and 'BaseModel' in str(type(obj).__mro__):
-                                        findings.append(f"BaseModel at {path}: {type(obj)}")
-                                    elif isinstance(obj, dict):
-                                        for key, value in obj.items():
-                                            findings.extend(find_basemodels_recursive(value, f"{path}.{key}"))
-                                    elif isinstance(obj, (list, tuple)):
-                                        for i, item in enumerate(obj):
-                                            findings.extend(find_basemodels_recursive(item, f"{path}[{i}]"))
-                                    
-                                    return findings
-                                
-                                basemodel_findings = find_basemodels_recursive(batch, f"batch_{batch_num}")
-                                if basemodel_findings:
-                                    LOG.error(f"DEBUG: BaseModel objects found in batch {batch_num}:")
-                                    for finding in basemodel_findings:
-                                        LOG.error(f"  {finding}")
-                                    
-                                    # Save findings to file
-                                    with open(f"{debug_dir}/basemodel_findings_batch_{batch_num}.txt", "w") as f:
-                                        f.write(f"BaseModel objects found in {measurement_name} batch {batch_num}:\n")
-                                        for finding in basemodel_findings:
-                                            f.write(f"{finding}\n")
-                                else:
-                                    LOG.info(f"DEBUG: No BaseModel objects found in batch {batch_num}")
-                                    
-                            except Exception as batch_dump_e:
-                                LOG.error(f"DEBUG: Failed to dump batch {batch_num}: {batch_dump_e}")
-                            
-                            # NOTE: no_sync=True provides significant write performance improvement (19s vs 30+ seconds)
-                            # but comes with durability risk - data may be lost on unexpected shutdown before WAL flush.
-                            # This is acceptable for performance metrics collection where some data loss is tolerable
-                            # vs. the alternative of write timeouts causing complete collection failures.
-                            # InfluxDB WAL flush interval is configurable (default 10s in our entrypoint.sh).
-                            self.client.write(
-                                batch,
-                                database=self.database,
-                                time_precision='s',  # Second-level precision to avoid nanosecond bloat
-                                no_sync=True  # Reduce write latency at cost of durability risk (see comment above)
-                            )
-                            written_count += len(batch)
-                            LOG.debug(f"Successfully wrote batch {batch_num}/{total_batches}")
-                                
-                        except Exception as batch_e:
-                            LOG.error(f"Failed to write batch {batch_num}/{total_batches}: {batch_e}")
+                            self.client.write(record=point)
+                            written_count += 1
+                        except Exception as point_e:
+                            LOG.error(f"Failed to write point: {point_e}")
                             success = False
-                            break
                     
-                    LOG.info(f"Successfully wrote {written_count} records to InfluxDB measurement: {measurement_name} (in {total_batches} batches)")
+                    LOG.info(f"Successfully submitted {len(points)} points for {measurement_name} (automatic batching enabled)")
                 else:
-                    LOG.warning(f"No valid records converted for measurement: {measurement_name}")
+                    LOG.warning(f"No valid points converted for measurement: {measurement_name}")
                     
             except Exception as e:
-                LOG.error(f"Failed to write InfluxDB measurement {measurement_name}: {e}", exc_info=True)
+                LOG.error(f"Failed to process InfluxDB measurement {measurement_name}: {e}", exc_info=True)
                 success = False
         
         if written_count > 0:
-            LOG.info(f"InfluxDB write completed: {written_count} total records")
+            LOG.info(f"InfluxDB write submitted: {written_count} total points (batched by client)")
         
         return success
+    
+    def _convert_to_points(self, measurement_name: str, data: Any) -> List:
+        """
+        Convert measurement data to InfluxDB Point objects for automatic batching.
+        
+        Args:
+            measurement_name: Name of the measurement
+            data: Raw measurement data (list of dicts or dataclasses)
+            
+        Returns:
+            List of InfluxDB Point objects
+        """
+        # First convert to line protocol format (existing logic)
+        records = self._convert_to_line_protocol(measurement_name, data)
+        
+        # Then convert dictionaries to Point objects
+        from influxdb_client_3 import Point
+        points = []
+        
+        for record in records:
+            try:
+                # Create Point object
+                point = Point(measurement_name)
+                
+                # Add tags
+                tags = record.get('tags', {})
+                for tag_key, tag_value in tags.items():
+                    if tag_value is not None:
+                        point = point.tag(tag_key, str(tag_value))
+                
+                # Add fields  
+                fields = record.get('fields', {})
+                for field_key, field_value in fields.items():
+                    if field_value is not None:
+                        point = point.field(field_key, field_value)
+                
+                # Add timestamp
+                timestamp = record.get('time')
+                if timestamp:
+                    point = point.time(timestamp, WritePrecision.S)
+                
+                points.append(point)
+                
+            except Exception as e:
+                LOG.error(f"Failed to convert record to Point: {e}")
+                continue
+        
+        LOG.debug(f"Converted {len(records)} records to {len(points)} Point objects for {measurement_name}")
+        return points
     
     def _convert_to_line_protocol(self, measurement_name: str, data: Any) -> List[Dict[str, Any]]:
         """
@@ -1007,9 +957,28 @@ class InfluxDBWriter(Writer):
             
         return sanitized
 
+    def get_batch_stats(self) -> Dict[str, Any]:
+        """
+        Get batching statistics from the client's automatic batching.
+        
+        Returns:
+            Dictionary with batching statistics
+        """
+        if self.batch_callback:
+            return self.batch_callback.get_stats()
+        else:
+            return {
+                'writes': 0,
+                'errors': 0, 
+                'retries': 0,
+                'elapsed_ms': 0,
+                'status': 'No callback available'
+            }
+
     def close(self):
         """Close the InfluxDB client connection."""
         if self.client:
+            # The client's automatic batching will flush any remaining data
             # InfluxDBClient3 doesn't require explicit close
             self.client = None
-            LOG.info("InfluxDB client closed")
+            LOG.info("InfluxDB client closed (automatic batching handles any remaining data)")

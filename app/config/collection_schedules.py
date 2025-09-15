@@ -10,7 +10,10 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Set, Optional
 import time
+import logging
 from datetime import datetime, timedelta
+
+LOG = logging.getLogger(__name__)
 
 class ScheduleFrequency(Enum):
     """User-configurable collection frequencies with multipliers"""
@@ -108,6 +111,10 @@ CONFIG_COLLECTION_MAPPING = {
         "SystemConfig",           # System-level settings change infrequently
         "DriveConfig",            # Drive configuration changes slowly
         "InterfaceConfig",        # Interface config changes infrequently
+        "SnapshotConfig",         # Snapshot configurations change infrequently
+        "EthernetConfig",         # Ethernet interface configs change infrequently
+        "HardwareConfig",         # Hardware component configs are static
+        "AsyncMirrorsConfig",     # Async mirror configurations change infrequently
     ],
     
     # Daily - very static configuration
@@ -181,11 +188,25 @@ class ConfigCollectionScheduler:
         """
         Get all config types that should be collected on this iteration, grouped by frequency
         
+        Special behavior for iteration 1: Collect ALL config types to establish initial
+        baseline in InfluxDB for downstream users (dashboards, alerts, etc.)
+        
         Returns:
             Dictionary mapping frequencies to lists of config types to collect
         """
         collections_needed = {}
         
+        # FIRST ITERATION CHECKPOINT: Collect ALL config types to establish baseline
+        if self.iteration_count == 1:
+            LOG.info("First iteration checkpoint: collecting ALL config types for InfluxDB baseline")
+            for frequency, config_types in CONFIG_COLLECTION_MAPPING.items():
+                collections_needed[frequency] = config_types.copy()
+                # Update tracking for all types
+                for config_type in config_types:
+                    self.last_collection_iterations[config_type] = self.iteration_count
+            return collections_needed
+        
+        # NORMAL SCHEDULING: Follow regular frequency-based collection
         for frequency, config_types in CONFIG_COLLECTION_MAPPING.items():
             schedule = self.schedules[frequency]
             types_to_collect = []

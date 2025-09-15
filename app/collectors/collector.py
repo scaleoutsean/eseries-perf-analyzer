@@ -192,7 +192,7 @@ class APICollector:
         
         results = []
         for file_path in files:
-            logger.info(f"Processing file: {file_path}")
+            logger.debug(f"Processing file: {file_path}")
             try:
                 data = self.read_json_file(file_path)
                 if isinstance(data, list):
@@ -205,7 +205,7 @@ class APICollector:
                 logger.error(f"Error processing file {file_path}: {str(e)}")
                 continue
                 
-        logger.info(f"Collected {len(results)} items from {len(files)} files")
+        logger.debug(f"Collected {len(results)} items from {len(files)} files")
         return results
     
     def collect_latest_from_json(self, directory: str, pattern: str, model_class: Type[T]) -> Optional[T]:

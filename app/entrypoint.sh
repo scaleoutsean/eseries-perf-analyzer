@@ -92,6 +92,9 @@ fi
 if [ -n "$MAX_ITERATIONS" ]; then
     ARGS="$ARGS --maxIterations $MAX_ITERATIONS"
 fi
+if [ -n "$COLLECTOR_LOG_LEVEL" ]; then
+    ARGS="$ARGS --loglevel $COLLECTOR_LOG_LEVEL"
+fi
 
 # Change to the app directory and run the collector
 cd /home/app
