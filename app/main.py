@@ -489,7 +489,7 @@ def main():
     parser.add_argument('--tlsCa', type=str, default=None,
         help='Path to CA certificate for verifying API/InfluxDB TLS connections (if not in system trust store).')
     parser.add_argument('--threads', type=int, default=4,
-        help='Number of concurrent threads for metric collection. Default: 4. 4 or 8 is typical.')
+        help='Number of concurrent threads for metric collection. Default: 4. 2-8 typical, higher for I/O-bound JSON processing.')
     parser.add_argument('--tlsValidation', type=str, choices=['strict', 'normal', 'none'], default='strict',
         help='TLS validation mode for SANtricity API: strict (require valid CA and SKI/AKI), normal (default Python validation), none (disable all TLS validation, INSECURE, for testing only). Default: strict.')
     parser.add_argument('--logfile', type=str, default=None,
@@ -525,6 +525,15 @@ def main():
     
     # Initialize main logger after configuration
     LOG = logging.getLogger(__name__)
+    
+    # Override with environment variables if they exist (for docker-compose support)
+    if 'MAX_ITERATIONS' in os.environ and os.environ['MAX_ITERATIONS']:
+        try:
+            original_value = CMD.maxIterations
+            CMD.maxIterations = int(os.environ['MAX_ITERATIONS'])
+            LOG.info(f"Override: Using MAX_ITERATIONS={CMD.maxIterations} from environment variable (was {original_value})")
+        except ValueError:
+            LOG.warning(f"Invalid MAX_ITERATIONS environment variable: {os.environ['MAX_ITERATIONS']}")
     
     # Validate arguments
     if CMD.intervalTime < 60:
@@ -571,7 +580,6 @@ def main():
     
     # InfluxDB configuration precedence: CLI > config > env
     # Resolve InfluxDB configuration from CLI args -> env vars -> config file
-    import os
     influxdb_url = CMD.influxdbUrl if CMD.influxdbUrl else (
         os.environ.get('INFLUXDB_URL') or (settings.influxdb_url if settings else None)
     )
@@ -784,6 +792,7 @@ def main():
     
     # Initialize thread pool
     executor = concurrent.futures.ThreadPoolExecutor(CMD.threads)
+    LOG.info(f"🚀 Starting main collection loop with {CMD.threads} threads for parallel JSON processing")
     
     # Initialize writer based on configuration
     from app.writer.factory import WriterFactory
@@ -842,53 +851,97 @@ def main():
                         else:
                             LOG.info("Processing current batch...")
                         
-                        # Collect system configuration from current batch
-                        from app.schema.models import SystemConfig
-                        system_config = eseries_collector.collect_system_config_from_current_batch(SystemConfig)
+                        # Collect configuration data from current batch - PARALLELIZED when needed
+                        from app.schema.models import SystemConfig, VolumeConfig
+                        
+                        LOG.info("Starting parallel config data collection...")
+                        config_start_time = time.time()
+                        
+                        # Submit config collection tasks to thread pool
+                        config_futures = {
+                            'system': executor.submit(
+                                eseries_collector.collect_system_config_from_current_batch, SystemConfig
+                            ),
+                            'volumes': executor.submit(
+                                eseries_collector.collect_volumes_from_current_batch, VolumeConfig
+                            )
+                            # TODO: Add more config types as needed:
+                            # 'hosts': executor.submit(eseries_collector.collect_hosts_from_current_batch, HostConfig),
+                            # 'drives': executor.submit(eseries_collector.collect_drives_from_current_batch, DriveConfig),
+                            # 'controllers': executor.submit(eseries_collector.collect_controllers_from_current_batch, ControllerConfig),
+                            # 'storage_pools': executor.submit(eseries_collector.collect_storage_pools_from_current_batch, StoragePoolConfig),
+                            # 'host_groups': executor.submit(eseries_collector.collect_host_groups_from_current_batch, HostGroupsConfig),
+                            # 'volume_mappings': executor.submit(eseries_collector.collect_volume_mappings_from_current_batch, VolumeMappingsConfig),
+                        }
+                        
+                        # Collect results
+                        system_config = config_futures['system'].result()
                         if system_config:
                             LOG.info(f"System config collected - WWN: {system_config.wwn}, Name: {system_config.name}")
                             LOG.info(f"Drive count: {system_config.driveCount}, Model: {system_config.model}")
                         else:
                             LOG.info("No system config data in current batch")
                         
-                        # Collect volume configuration from current batch
-                        from app.schema.models import VolumeConfig
-                        volumes = eseries_collector.collect_volumes_from_current_batch(VolumeConfig)
+                        volumes = config_futures['volumes'].result()
                         LOG.info(f"Collected {len(volumes)} volumes from current batch")
                         if volumes:
                             vol = volumes[0]
                             LOG.info(f"First volume - ID: {vol.id}, Label: {vol.label}, Capacity: {vol.capacity}")
                         
-                        # Collect all performance data types from current batch
+                        config_time = time.time() - config_start_time
+                        LOG.info(f"Parallel config collection completed in {config_time:.2f}s")
+                        
+                        # Collect all performance data types from current batch - PARALLELIZED
                         from app.schema.models import AnalysedVolumeStatistics, AnalysedDriveStatistics, AnalysedSystemStatistics, AnalysedInterfaceStatistics, AnalyzedControllerStatistics
                         
-                        # Volume performance
-                        volume_perf = eseries_collector.collect_performance_data_from_current_batch(
-                            AnalysedVolumeStatistics, 'analysed-volume-statistics')
+                        LOG.info("Starting parallel performance data collection...")
+                        start_time = time.time()
+                        
+                        # Submit all performance collection tasks to thread pool
+                        perf_futures = {
+                            'volume': executor.submit(
+                                eseries_collector.collect_performance_data_from_current_batch,
+                                AnalysedVolumeStatistics, 'analysed-volume-statistics'
+                            ),
+                            'drive': executor.submit(
+                                eseries_collector.collect_performance_data_from_current_batch,
+                                AnalysedDriveStatistics, 'analysed-drive-statistics'
+                            ),
+                            'system': executor.submit(
+                                eseries_collector.collect_performance_data_from_current_batch,
+                                AnalysedSystemStatistics, 'analysed-system-statistics'
+                            ),
+                            'interface': executor.submit(
+                                eseries_collector.collect_performance_data_from_current_batch,
+                                AnalysedInterfaceStatistics, 'analysed-interface-statistics'
+                            ),
+                            'controller': executor.submit(
+                                eseries_collector.collect_performance_data_from_current_batch,
+                                AnalyzedControllerStatistics, 'analyzed-controller-statistics'
+                            )
+                        }
+                        
+                        # Collect results as they complete
+                        volume_perf = perf_futures['volume'].result()
                         LOG.info(f"Collected {len(volume_perf)} volume performance records from current batch")
                         if volume_perf:
                             perf = volume_perf[0]
                             LOG.info(f"First perf record - Volume: {perf.volumeId}, IOPs: {perf.combinedIOps}, Observed: {perf.observedTime}")
                         
-                        # Drive performance
-                        drive_perf = eseries_collector.collect_performance_data_from_current_batch(
-                            AnalysedDriveStatistics, 'analysed-drive-statistics')
+                        drive_perf = perf_futures['drive'].result()
                         LOG.info(f"Collected {len(drive_perf)} drive performance records from current batch")
                         
-                        # System performance  
-                        system_perf = eseries_collector.collect_performance_data_from_current_batch(
-                            AnalysedSystemStatistics, 'analysed-system-statistics')
+                        system_perf = perf_futures['system'].result()
                         LOG.info(f"Collected {len(system_perf)} system performance records from current batch")
                         
-                        # Interface performance
-                        interface_perf = eseries_collector.collect_performance_data_from_current_batch(
-                            AnalysedInterfaceStatistics, 'analysed-interface-statistics')
+                        interface_perf = perf_futures['interface'].result()
                         LOG.info(f"Collected {len(interface_perf)} interface performance records from current batch")
                         
-                        # Controller performance (note: 'analyzed' with 'z')
-                        controller_perf = eseries_collector.collect_performance_data_from_current_batch(
-                            AnalyzedControllerStatistics, 'analyzed-controller-statistics')
+                        controller_perf = perf_futures['controller'].result()
                         LOG.info(f"Collected {len(controller_perf)} controller performance records from current batch")
+                        
+                        perf_time = time.time() - start_time
+                        LOG.info(f"Parallel performance collection completed in {perf_time:.2f}s")
                         
                         # Advance to next batch after processing all data types
                         batch_advanced = eseries_collector.advance_batch()
@@ -1159,27 +1212,19 @@ def main():
                                         LOG.info(f"Events enriched with storage_system tags for {endpoint_name}")
                                     
                                     if enriched_events:
+                                        # Store events by their specific endpoint name for proper InfluxDB writer routing
+                                        writer_data[endpoint_name] = enriched_events
                                         processed_events.extend(enriched_events)
                                         total_events_after += len(enriched_events)
-                                        LOG.info(f"Event {endpoint_name}: {len(event_list)} → {len(enriched_events)} (after dedup)")
+                                        LOG.info(f"Event {endpoint_name}: {len(event_list)} → {len(enriched_events)} (after dedup), stored under '{endpoint_name}'")
                                     else:
                                         LOG.info(f"Event {endpoint_name}: {len(event_list)} → 0 (duplicate/filtered)")
                             
-                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - About to check processed_events")
-                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - About to check processed_events")
+                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - Event processing completed, stored by endpoint names")
+                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - Event processing completed, stored by endpoint names")
                             
                             if processed_events:
-                                LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2B-1 - Adding {len(processed_events)} events to writer_data")
-                                print(f"🔥🔥🔥 DEBUG CHECKPOINT 2B-1 - Adding {len(processed_events)} events to writer_data")
-                                try:
-                                    writer_data["system_events"] = processed_events
-                                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-2 - Successfully assigned events to writer_data")
-                                    print("🔥🔥🔥 DEBUG CHECKPOINT 2B-2 - Successfully assigned events to writer_data")
-                                except Exception as events_e:
-                                    LOG.error(f"🚨 EXCEPTION assigning events to writer_data: {events_e}")
-                                    print(f"🚨 EXCEPTION assigning events to writer_data: {events_e}")
-                                    raise
-                                LOG.info(f"Adding {len(processed_events)} events to write (filtered from {total_events_before} total)")
+                                LOG.info(f"Processed {len(processed_events)} total events (filtered from {total_events_before} total), stored by endpoint names in writer_data")
                             else:
                                 LOG.info(f"No events to write after deduplication (filtered {total_events_before} duplicates)")
                                 
@@ -1419,7 +1464,6 @@ def main():
                     print("🔥 FINAL CHECKPOINT - Just before writer.write() call")
                     try:
                         import pickle
-                        import os
                         
                         debug_dir = "/home/app/samples/out"
                         os.makedirs(debug_dir, exist_ok=True)
@@ -1514,8 +1558,15 @@ def main():
             time_end = time.time()
             elapsed = time_end - time_start
             
+            # Check if collection took longer than interval and warn user
+            if elapsed >= CMD.intervalTime:
+                LOG.warning(f"⚠️  Collection took {elapsed:.2f}s but interval is {CMD.intervalTime}s - consider increasing --intervalTime or adding more --threads")
+                LOG.info(f"Collection completed in {elapsed:.2f}s (no sleep needed)")
+            else:
+                LOG.info(f"Collection completed in {elapsed:.2f}s")
+            
             # Check if this is the final iteration BEFORE sleeping
-            if CMD.maxIterations > 0 and loop_iteration == (CMD.maxIterations - 1):
+            if CMD.maxIterations > 0 and loop_iteration >= CMD.maxIterations:
                 LOG.info(f"Completed final iteration ({CMD.maxIterations}). Exiting gracefully.")
                 break
             LOG.info(f"Current iteration before increment: {loop_iteration}, Max iterations: {CMD.maxIterations}")
@@ -1530,7 +1581,17 @@ def main():
     
     except KeyboardInterrupt:
         LOG.info("Interrupted by user. Exiting gracefully.")
+        LOG.info("Attempting graceful shutdown (90s timeout) to preserve pending writes...")
     finally:
+        # Clean up writer and flush any remaining data
+        if 'writer' in locals() and writer:
+            if hasattr(writer, 'close') and callable(getattr(writer, 'close')):
+                LOG.info("Closing writer and flushing remaining data...")
+                try:
+                    writer.close(timeout_seconds=90, force_exit_on_timeout=True)
+                except Exception as e:
+                    LOG.warning(f"Error closing writer: {e}")
+        
         # Clean up session and logout
         if 'session' in locals() and session and 'active_endpoint' in locals() and active_endpoint:
             logout_session(session, active_endpoint)

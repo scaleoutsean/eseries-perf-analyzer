@@ -90,8 +90,9 @@ services:
       - ./certs/collector:/home/app/certs:ro
       - ./data/influxdb_tokens/epa.token:/home/app/tokens/epa.token:ro
       # - ./data/samples/in:/home/app/samples/in:rw
-      - ./tests/10.113.1.158/:/home/app/samples/in:rw
-      - ./data/samples/out:/home/app/samples/out:rw
+      # - ./tests/10.113.1.158/:/home/app/samples/in:rw
+      - ./tests/combined/:/home/app/samples/in:rw 
+      - ./data/samples/out:/home/app/samples/out:rw # required for DEBUG output by InfluxDB and Prometheus writers
     networks:
       epa:
         ipv4_address: ${EPA_COLLECTOR}

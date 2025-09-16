@@ -5,7 +5,8 @@ from app.collectors.collector import ESeriesCollector
 from app.config.collection_schedules import ConfigCollectionScheduler, ScheduleFrequency
 from app.schema.models import (
     DriveConfig, VolumeConfig, ControllerConfig, SystemConfig,
-    HostConfig, HostGroupsConfig, StoragePoolConfig, VolumeMappingsConfig
+    HostConfig, HostGroupsConfig, StoragePoolConfig, VolumeMappingsConfig,
+    InterfaceConfig, TrayConfig, VolumeCGMembersConfig
 )
 
 class ConfigCollector:
@@ -85,6 +86,17 @@ class ConfigCollector:
                 return [system_config] if system_config else []
             elif config_type == "DriveConfig":
                 return self.eseries_collector.collect_drives(DriveConfig)
+            elif config_type == "InterfaceConfig":
+                return self.eseries_collector.collect_hierarchical_data('interfaces_config', InterfaceConfig)
+            elif config_type == "TrayConfig":
+                return self.eseries_collector.collect_hierarchical_data('tray_config', TrayConfig)
+            elif config_type == "VolumeCGMembersConfig":
+                # Volume consistency group members - use the correct endpoint from your manual collector
+                return self.eseries_collector.collect_hierarchical_data('volume_consistency_group_members', VolumeCGMembersConfig)
+            elif config_type in ["SnapshotConfig", "EthernetConfig", "HardwareConfig", "AsyncMirrorsConfig"]:
+                # These config types don't have corresponding schema models yet
+                self.logger.debug(f"Config type {config_type} not implemented - no schema model available")
+                return None
             else:
                 self.logger.warning(f"Unknown config type: {config_type}")
                 return None

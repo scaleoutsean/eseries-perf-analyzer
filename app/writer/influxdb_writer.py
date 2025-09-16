@@ -1,6 +1,9 @@
 """
 InfluxDB writer for E-Series Performance Analyzer.
 Writes enriched performance data to InfluxDB 3.x with proper field type handling.
+
+Note: this file leverages batching_example.py from the https://github.com/InfluxCommunity/influxdb3-python project
+License: Apache License, Version 2.0, January 2004 (http://www.apache.org/licenses/)
 """
 
 import logging
@@ -95,7 +98,19 @@ class InfluxDBWriter(Writer):
         self.tls_validation = config.get('tls_validation', 'strict')
         
         # Initialize batching configuration for performance optimization (before client init)
-        self.batch_size = 1000  # Target batch size (1K points as recommended)
+        # Use smaller batch size and shorter flush interval for single-iteration runs
+        max_iterations = int(os.getenv('MAX_ITERATIONS', '0'))
+        if max_iterations == 1:
+            # Single iteration: optimize for immediate writes
+            self.batch_size = 100   # Smaller batch size for immediate flushing
+            self.flush_interval = 5_000  # 5 seconds - immediate flush for single runs
+            LOG.info("Single iteration mode: using immediate batching (batch_size=100, flush_interval=5s)")
+        else:
+            # Multi-iteration: optimize for throughput
+            self.batch_size = 1000  # Target batch size (1K points as recommended)
+            self.flush_interval = 60_000  # 60 seconds - matches collection interval
+            LOG.info("Multi-iteration mode: using throughput batching (batch_size=1000, flush_interval=60s)")
+        
         self.batch_callback = BatchingCallback()  # Initialize callback for batching statistics
         
         # Initialize client
@@ -104,6 +119,13 @@ class InfluxDBWriter(Writer):
         
         # Initialize schema validator for model-based type conversion
         self.schema_validator = SchemaValidator()
+        
+        # Enable debug file output only when COLLECTOR_LOG_LEVEL=DEBUG
+        self.enable_debug_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
+        self.debug_output_dir = "/home/app/samples/out"
+        
+        if self.enable_debug_output:
+            LOG.info(f"InfluxDB debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG)")
         
         LOG.info(f"InfluxDBWriter initialized: {self.url} -> {self.database}")
     
@@ -116,8 +138,8 @@ class InfluxDBWriter(Writer):
             
             # Configure write options for efficient batching (following official example)
             write_options = WriteOptions(
-                batch_size=self.batch_size,  # 1K points as recommended 
-                flush_interval=60_000,       # 60 seconds - matches collection interval
+                batch_size=self.batch_size,         # Dynamic batch size based on MAX_ITERATIONS
+                flush_interval=self.flush_interval, # Dynamic flush interval for immediate vs throughput mode
                 jitter_interval=2_000,       # 2 seconds
                 retry_interval=5_000,        # 5 seconds
                 max_retries=5,
@@ -252,7 +274,7 @@ class InfluxDBWriter(Writer):
                     LOG.debug(f"No data for measurement: {measurement_name}")
                     continue
                 
-                LOG.info(f"Processing InfluxDB measurement: {measurement_name} ({len(measurement_data) if hasattr(measurement_data, '__len__') else 1} records)")
+                LOG.info(f"Processing InfluxDB measurement: {measurement_name} (Batch size: {len(measurement_data) if hasattr(measurement_data, '__len__') else 1} records)")
                 
                 # Convert to InfluxDB Point objects
                 points = self._convert_to_points(measurement_name, measurement_data)
@@ -278,6 +300,28 @@ class InfluxDBWriter(Writer):
         
         if written_count > 0:
             LOG.info(f"InfluxDB write submitted: {written_count} total points (batched by client)")
+            
+            # For single iteration mode, flush immediately to avoid delays during close()
+            if os.getenv('MAX_ITERATIONS', '5') == '1':
+                try:
+                    LOG.info("Single iteration detected - flushing InfluxDB client immediately")
+                    if (self.client and hasattr(self.client, '_client') and 
+                        hasattr(self.client._client, 'write_api')):
+                        write_api = self.client._client.write_api()
+                        if hasattr(write_api, 'flush'):
+                            write_api.flush()
+                            LOG.info("InfluxDB write_api flushed successfully")
+                        else:
+                            LOG.debug("No flush method available on write_api")
+                    else:
+                        LOG.debug("No write_api available for flushing")
+                except Exception as e:
+                    LOG.warning(f"Failed to flush InfluxDB client: {e}")
+        
+        # Write debug output files if enabled
+        if self.enable_debug_output:
+            self._write_debug_input_json(measurements)
+            self._write_debug_line_protocol(measurements)
         
         return success
     
@@ -341,7 +385,7 @@ class InfluxDBWriter(Writer):
         Returns:
             List of InfluxDB record dictionaries
         """
-        LOG.error(f"🔥 _convert_to_line_protocol called with measurement_name={measurement_name}, data_len={len(data) if hasattr(data, '__len__') else 1}")
+        LOG.debug(f"Converting {measurement_name} to line protocol (data_len={len(data) if hasattr(data, '__len__') else 1})")
         records = []
         
         # Ensure data is a list
@@ -361,10 +405,12 @@ class InfluxDBWriter(Writer):
                 
                 # Determine measurement type and convert accordingly
                 if measurement_name.startswith('config_'):
-                    LOG.error(f"🔥 About to call _convert_config_record for {measurement_name}")
+                    LOG.debug(f"Converting config record for {measurement_name}")
                     record = self._convert_config_record(measurement_name, item_dict)
                 elif measurement_name == 'system_events':
                     record = self._convert_event_record(measurement_name, item_dict)
+                elif measurement_name == 'system_failures':
+                    record = self._convert_system_failures_record(measurement_name, item_dict)
                 elif 'volume' in measurement_name.lower():
                     record = self._convert_volume_record(measurement_name, item_dict)
                 elif 'drive' in measurement_name.lower():
@@ -605,7 +651,7 @@ class InfluxDBWriter(Writer):
 
     def _convert_config_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Convert configuration data to InfluxDB record format."""
-        LOG.info(f"🔥 _convert_config_record called with measurement_name={measurement_name}")
+        LOG.debug(f"Converting config record for {measurement_name}")
         try:
             # Extract config type from measurement name (e.g., config_storage_pools -> storage_pools)
             config_type = measurement_name.replace('config_', '')
@@ -656,18 +702,18 @@ class InfluxDBWriter(Writer):
                         break
             
             # Use schema-based validation to extract properly typed fields
-            LOG.info(f"🔍 SCHEMA DEBUG - Processing measurement: {measurement_name}")
+            LOG.debug(f"Processing schema validation for {measurement_name}")
             model_class = self.schema_validator.get_model_class(measurement_name)
-            LOG.info(f"🔍 SCHEMA DEBUG - Found model class: {model_class}")
+            LOG.debug(f"Found model class: {model_class}")
             
             if model_class:
-                LOG.info(f"Using schema validation for {measurement_name} with model {model_class.__name__}")
+                LOG.debug(f"Using schema validation for {measurement_name} with model {model_class.__name__}")
                 fields = self._validate_and_extract_fields_from_model(model_class, data)
-                LOG.info(f"🔍 SCHEMA DEBUG - Extracted fields: {list(fields.keys())}")
+                LOG.debug(f"Extracted fields: {list(fields.keys())}")
                 
                 # Debug logging for capacity field
                 if 'capacity' in fields:
-                    LOG.info(f"🔍 SCHEMA-BASED CAPACITY - value={fields['capacity']}, type={type(fields['capacity'])}")
+                    LOG.debug(f"Schema-based capacity: value={fields['capacity']}, type={type(fields['capacity'])}")
             else:
                 LOG.debug(f"No model class found for {measurement_name}, using fallback field extraction")
                 # Fallback to basic field extraction for unknown measurements
@@ -792,6 +838,49 @@ class InfluxDBWriter(Writer):
             LOG.warning(f"Failed to convert event record: {e}")
             return None
     
+    def _convert_system_failures_record(self, measurement_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert system failures data to InfluxDB record format."""
+        try:
+            # Create tags for system failure records based on SystemFailures model
+            tags = {
+                'failure_type': self._sanitize_tag_value(str(data.get('failureType', 'unknown'))),
+                'object_type': self._sanitize_tag_value(str(data.get('objectType', 'unknown'))),
+                'storage_system': self._sanitize_tag_value(str(
+                    data.get('storage_system',  # Use enriched storage_system first
+                    data.get('storageSystemId', 
+                    data.get('systemId', 'unknown')))))
+            }
+            
+            # Fields for system failures - we need at least one numeric field for InfluxDB
+            fields = {
+                'failure_occurred': 1  # Simple indicator that failure occurred
+            }
+            
+            # Add optional string fields as tags if they exist
+            if 'objectRef' in data and data['objectRef']:
+                tags['object_ref'] = self._sanitize_tag_value(str(data['objectRef']))
+                
+            if 'objectData' in data and data['objectData']:
+                tags['object_data'] = self._sanitize_tag_value(str(data['objectData']))
+                
+            if 'extraData' in data and data['extraData']:
+                tags['extra_data'] = self._sanitize_tag_value(str(data['extraData']))
+            
+            # Use current time as timestamp since system failures don't have observedTime
+            import time
+            timestamp = int(time.time())
+            
+            return {
+                'measurement': 'system_failures',
+                'tags': tags,
+                'fields': fields,
+                'time': timestamp
+            }
+            
+        except Exception as e:
+            LOG.warning(f"Failed to convert system failures record: {e}")
+            return None
+    
     def _convert_schema_record(self, measurement_name: str, data: Dict[str, Any], 
                              schema_class, tag_fields: Dict[str, tuple], 
                              numeric_fields: List[str]) -> Optional[Dict[str, Any]]:
@@ -802,7 +891,7 @@ class InfluxDBWriter(Writer):
             
             # DEBUG: Log when BaseModel objects are created in writer
             if hasattr(schema_instance, '__class__') and 'BaseModel' in str(type(schema_instance)):
-                LOG.info(f"🔍 WRITER DEBUG: Created BaseModel instance in _convert_schema_record: {type(schema_instance)} for {measurement_name}")
+                LOG.debug(f"Created BaseModel instance in _convert_schema_record: {type(schema_instance)} for {measurement_name}")
             
             # Extract tags using provided mapping
             tags = {}
@@ -975,10 +1064,247 @@ class InfluxDBWriter(Writer):
                 'status': 'No callback available'
             }
 
-    def close(self):
-        """Close the InfluxDB client connection."""
-        if self.client:
-            # The client's automatic batching will flush any remaining data
-            # InfluxDBClient3 doesn't require explicit close
-            self.client = None
-            LOG.info("InfluxDB client closed (automatic batching handles any remaining data)")
+    def close(self, timeout_seconds=90, force_exit_on_timeout=False):
+        """Close the InfluxDB client connection with timeout.
+        
+        Args:
+            timeout_seconds: Maximum time to wait for graceful close
+            force_exit_on_timeout: If True, force process exit after timeout to avoid zombie threads
+        """
+        if not self.client:
+            return
+        
+        import threading
+        import time
+        import os
+        
+        # For single iteration mode, use shorter timeout since data should already be flushed
+        if os.getenv('MAX_ITERATIONS', '5') == '1':
+            timeout_seconds = 10  # Much shorter timeout for single iteration
+            LOG.info(f"Single iteration mode: using reduced close timeout ({timeout_seconds}s)")
+        
+        LOG.info(f"Closing InfluxDB client with {timeout_seconds}s timeout...")        # Use a flag to track if close completed
+        close_completed = threading.Event()
+        close_error = []
+        
+        def close_thread():
+            try:
+                if self.client and hasattr(self.client, 'close') and callable(getattr(self.client, 'close')):
+                    LOG.info("Calling InfluxDB client close() method")
+                    start_close = time.time()
+                    self.client.close()
+                    close_elapsed = time.time() - start_close
+                    LOG.info(f"InfluxDB client closed gracefully in {close_elapsed:.2f}s")
+                close_completed.set()
+            except Exception as e:
+                close_error.append(e)
+                LOG.warning(f"Error during graceful close: {e}")
+                close_completed.set()
+        
+        # Start close in background thread
+        closer = threading.Thread(target=close_thread, daemon=True)
+        closer.start()
+        
+        # Wait for completion or timeout
+        if close_completed.wait(timeout_seconds):
+            if close_error:
+                LOG.warning(f"Close completed with errors: {close_error[0]}")
+            else:
+                LOG.info("InfluxDB client closed successfully within timeout")
+                # Even successful close may leave zombie threads - give them 5s to cleanup
+                LOG.info("Waiting 5s for background threads to cleanup...")
+                import time
+                time.sleep(5)
+        else:
+            LOG.warning(f"InfluxDB client close timed out after {timeout_seconds}s - forcing shutdown")
+            LOG.info("Pending writes may be lost, but avoiding indefinite hang")
+        
+        # Clear reference regardless
+        self.client = None
+        
+        # Force process exit if requested to avoid zombie InfluxDB3 threads
+        if force_exit_on_timeout:
+            import os
+            LOG.warning("Force exiting process to avoid zombie InfluxDB3 threads")
+            LOG.info("All data has been preserved - terminating cleanly")
+            os._exit(0)  # Hard exit - bypasses Python cleanup that can hang
+
+    def _write_debug_input_json(self, measurements: Dict[str, Any]):
+        """
+        Write input measurements to JSON file for debugging/validation.
+        Only enabled when COLLECTOR_LOG_LEVEL=DEBUG.
+        """
+        if not self.enable_debug_output:
+            return
+            
+        try:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Ensure output directory exists
+            os.makedirs(self.debug_output_dir, exist_ok=True)
+            
+            # Create timestamped filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"influxdb_writer_input_{timestamp}.json"
+            filepath = os.path.join(self.debug_output_dir, filename)
+            
+            # Convert data to JSON-serializable format
+            serializable_data = {}
+            for measurement_name, measurement_data in measurements.items():
+                if measurement_data:  # Only include non-empty measurements
+                    serializable_data[measurement_name] = []
+                    if isinstance(measurement_data, list):
+                        for item in measurement_data:
+                            # Normalize to dict format
+                            if hasattr(item, '__dict__'):
+                                item_dict = item.__dict__
+                            elif isinstance(item, dict):
+                                item_dict = item
+                            else:
+                                item_dict = {"value": str(item)}
+                            serializable_data[measurement_name].append(item_dict)
+                    else:
+                        # Single item
+                        if hasattr(measurement_data, '__dict__'):
+                            item_dict = measurement_data.__dict__
+                        elif isinstance(measurement_data, dict):
+                            item_dict = measurement_data
+                        else:
+                            item_dict = {"value": str(measurement_data)}
+                        serializable_data[measurement_name] = [item_dict]
+            
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(serializable_data, f, indent=2, default=str)
+                
+            LOG.info(f"InfluxDB writer input JSON saved to: {filepath}")
+            
+        except Exception as e:
+            LOG.error(f"Failed to write InfluxDB debug input JSON: {e}")
+
+    def _write_debug_line_protocol(self, measurements: Dict[str, Any]):
+        """
+        Write generated line protocol to text file for debugging/validation.
+        Only enabled when COLLECTOR_LOG_LEVEL=DEBUG.
+        """
+        if not self.enable_debug_output:
+            return
+            
+        try:
+            import os
+            from datetime import datetime
+            
+            # Ensure output directory exists
+            os.makedirs(self.debug_output_dir, exist_ok=True)
+            
+            # Create timestamped filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"influxdb_line_protocol_{timestamp}.txt"
+            filepath = os.path.join(self.debug_output_dir, filename)
+            
+            # Generate line protocol for all measurements
+            line_protocol_lines = []
+            
+            for measurement_name, measurement_data in measurements.items():
+                if not measurement_data:
+                    continue
+                    
+                # Convert to line protocol format (reuse existing logic)
+                records = self._convert_to_line_protocol(measurement_name, measurement_data)
+                
+                for record in records:
+                    try:
+                        # Convert record dict to InfluxDB line protocol format
+                        line = self._record_to_line_protocol(record)
+                        if line:
+                            line_protocol_lines.append(line)
+                    except Exception as e:
+                        LOG.debug(f"Failed to convert record to line protocol: {e}")
+                        continue
+            
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                for line in line_protocol_lines:
+                    f.write(line + '\n')
+                
+            LOG.info(f"InfluxDB line protocol debug output saved to: {filepath} ({len(line_protocol_lines)} lines)")
+            
+        except Exception as e:
+            LOG.error(f"Failed to write InfluxDB debug line protocol: {e}")
+
+    def _record_to_line_protocol(self, record: Dict[str, Any]) -> str:
+        """
+        Convert a record dictionary to InfluxDB line protocol string format.
+        
+        Format: measurement,tag1=value1,tag2=value2 field1=value1,field2=value2 timestamp
+        """
+        try:
+            measurement = record.get('measurement', 'unknown')
+            tags = record.get('tags', {})
+            fields = record.get('fields', {})
+            timestamp = record.get('time', int(time.time()))
+            
+            # Build measurement name
+            line_parts = [measurement]
+            
+            # Add tags
+            if tags:
+                tag_parts = []
+                for tag_key, tag_value in sorted(tags.items()):
+                    if tag_value is not None:
+                        # Escape special characters in tag keys and values
+                        escaped_key = str(tag_key).replace(',', r'\,').replace(' ', r'\ ').replace('=', r'\=')
+                        escaped_value = str(tag_value).replace(',', r'\,').replace(' ', r'\ ').replace('=', r'\=')
+                        tag_parts.append(f"{escaped_key}={escaped_value}")
+                
+                if tag_parts:
+                    line_parts[0] += ',' + ','.join(tag_parts)
+            
+            # Add fields
+            if fields:
+                field_parts = []
+                for field_key, field_value in sorted(fields.items()):
+                    if field_value is not None:
+                        # Escape field key
+                        escaped_key = str(field_key).replace(',', r'\,').replace(' ', r'\ ').replace('=', r'\=')
+                        
+                        # Format field value based on type
+                        if isinstance(field_value, str):
+                            # String field - quote and escape
+                            escaped_value = field_value.replace('"', r'\"').replace('\\', r'\\')
+                            formatted_value = f'"{escaped_value}"'
+                        elif isinstance(field_value, bool):
+                            # Boolean field
+                            formatted_value = 'true' if field_value else 'false'
+                        elif isinstance(field_value, int):
+                            # Integer field - add 'i' suffix
+                            formatted_value = f"{field_value}i"
+                        elif isinstance(field_value, float):
+                            # Float field
+                            formatted_value = str(field_value)
+                        else:
+                            # Default to string representation
+                            str_value = str(field_value).replace('"', r'\"').replace('\\', r'\\')
+                            formatted_value = f'"{str_value}"'
+                        
+                        field_parts.append(f"{escaped_key}={formatted_value}")
+                
+                if field_parts:
+                    line_parts.append(' ' + ','.join(field_parts))
+                else:
+                    # No valid fields - skip this record
+                    return ""
+            else:
+                # No fields - skip this record
+                return ""
+            
+            # Add timestamp (in seconds, converted to nanoseconds for line protocol)
+            line_parts.append(' ' + str(int(timestamp) * 1_000_000_000))
+            
+            return ''.join(line_parts)
+            
+        except Exception as e:
+            LOG.debug(f"Failed to convert record to line protocol: {e}")
+            return ""

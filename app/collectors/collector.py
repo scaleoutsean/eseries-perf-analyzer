@@ -336,6 +336,10 @@ class ESeriesCollector(APICollector):
         'snapshot_groups': 'devmgr/v2/storage-systems/{system_id}/snapshot-groups',
         'snapshot_volumes': 'devmgr/v2/storage-systems/{system_id}/snapshot-volumes',
         'snapshot_images': 'devmgr/v2/storage-systems/{system_id}/snapshot-images',
+        
+        # Volume consistency groups (from manual collector endpoints)
+        'volume_consistency_group_config': 'devmgr/v2/storage-systems/{system_id}/consistency_groups',
+        'volume_consistency_group_members': 'devmgr/v2/storage-systems/{system_id}/consistency-groups/member-volumes',
         'mirrors': 'devmgr/v2/storage-systems/{system_id}/mirror-pairs',
         'async_mirrors': 'devmgr/v2/storage-systems/{system_id}/async-mirrors',
         
@@ -687,12 +691,16 @@ class ESeriesCollector(APICollector):
             List of volume model instances
         """
         if self.from_json:
-            return self.collect_from_json_directory(
-                directory=self.json_directory,
-                pattern='*volumes_config*',
-                model_class=model_class,
-                sort_by='timestamp'
-            )
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_volumes_from_current_batch(model_class)
+            else:
+                return self.collect_from_json_directory(
+                    directory=self.json_directory,
+                    pattern='*volumes_config*',
+                    model_class=model_class,
+                    sort_by='timestamp'
+                )
         else:
             return self._collect_from_api('volumes_config', model_class)
     
@@ -707,11 +715,15 @@ class ESeriesCollector(APICollector):
             System config model instance or None
         """
         if self.from_json:
-            return self.collect_latest_from_json(
-                directory=self.json_directory,
-                pattern='*system_config*',
-                model_class=model_class
-            )
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_system_config_from_current_batch(model_class)
+            else:
+                return self.collect_latest_from_json(
+                    directory=self.json_directory,
+                    pattern='*system_config*',
+                    model_class=model_class
+                )
         else:
             results = self._collect_from_api('system_config', model_class)
             return results[0] if results else None
@@ -830,8 +842,12 @@ class ESeriesCollector(APICollector):
         """Collect host configuration data"""
         
         if self.from_json:
-            pattern = "*hosts*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_hosts_from_current_batch(model_class)
+            else:
+                pattern = "*hosts*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('hosts', model_class)
     
@@ -839,8 +855,12 @@ class ESeriesCollector(APICollector):
         """Collect host group configuration data"""
         
         if self.from_json:
-            pattern = "*host_group*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_host_groups_from_current_batch(model_class)
+            else:
+                pattern = "*host_group*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('host_groups', model_class)
     
@@ -848,8 +868,12 @@ class ESeriesCollector(APICollector):
         """Collect storage pool configuration data"""
         
         if self.from_json:
-            pattern = "*storage_pool*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_storage_pools_from_current_batch(model_class)
+            else:
+                pattern = "*storage_pool*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('storage_pools', model_class)
     
@@ -857,8 +881,12 @@ class ESeriesCollector(APICollector):
         """Collect volume mapping configuration data"""
         
         if self.from_json:
-            pattern = "*volume_mapping*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_volume_mappings_from_current_batch(model_class)
+            else:
+                pattern = "*volume_mapping*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('volume_mappings_config', model_class)
     
@@ -866,8 +894,12 @@ class ESeriesCollector(APICollector):
         """Collect drive configuration data"""
         
         if self.from_json:
-            pattern = "*drive_config*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_drives_from_current_batch(model_class)
+            else:
+                pattern = "*drive_config*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('drive_config', model_class)
     
@@ -875,8 +907,12 @@ class ESeriesCollector(APICollector):
         """Collect controller configuration data"""
         
         if self.from_json:
-            pattern = "*controller_config*"
-            return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
+            # Use batch-aware collection if BatchedJsonReader is available
+            if self.batched_reader:
+                return self.collect_controllers_from_current_batch(model_class)
+            else:
+                pattern = "*controller_config*"
+                return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('controller_config', model_class)
     
@@ -903,6 +939,30 @@ class ESeriesCollector(APICollector):
         """Collect performance data from current batch."""
         return self._collect_from_batch(endpoint, model_class)
     
+    def collect_hosts_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect host config from current batch."""
+        return self._collect_from_batch('hosts', model_class)
+    
+    def collect_host_groups_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect host groups config from current batch."""
+        return self._collect_from_batch('host_group', model_class)
+    
+    def collect_drives_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect drive config from current batch."""
+        return self._collect_from_batch('drive_config', model_class)
+    
+    def collect_controllers_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect controller config from current batch."""
+        return self._collect_from_batch('controller_config', model_class)
+    
+    def collect_storage_pools_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect storage pool config from current batch."""
+        return self._collect_from_batch('storage_pool', model_class)
+    
+    def collect_volume_mappings_from_current_batch(self, model_class: Type[T]) -> List[T]:
+        """Collect volume mappings config from current batch."""
+        return self._collect_from_batch('volume_mapping', model_class)
+
     def get_batch_info(self) -> Dict[str, Any]:
         """Get batch information from the batch reader."""
         if not self.batched_reader:

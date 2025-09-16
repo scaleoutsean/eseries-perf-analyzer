@@ -36,6 +36,18 @@ class PrometheusWriter(Writer):
         # Initialize all metric definitions
         self.prometheus_metrics = self._initialize_metrics()
         
+        # Add JSON output capability for debugging/validation (similar to InfluxDB writer)
+        # Only enable debug output when COLLECTOR_LOG_LEVEL=DEBUG
+        import os
+        self.enable_json_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
+        self.json_output_dir = "/home/app/samples/out"
+        
+        # Add HTML metrics output capability for direct comparison with InfluxDB
+        self.enable_html_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
+        
+        if self.enable_json_output:
+            LOG.info(f"Prometheus debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG)")
+        
         LOG.info(f"PrometheusWriter initialized, will serve metrics on port {port}")
     
     def _initialize_metrics(self) -> Dict[str, Dict[str, Gauge]]:
@@ -145,6 +157,16 @@ class PrometheusWriter(Writer):
             bool: True if successful, False otherwise
         """
         try:
+            # Apply schema-based validation before processing (following InfluxDB writer pattern)
+            LOG.debug("Applying schema validation to measurements for Prometheus")
+            try:
+                from app.validator.schema_validator import validate_measurements_for_influxdb
+                data = validate_measurements_for_influxdb(data)
+                LOG.debug("Schema validation completed successfully")
+            except Exception as e:
+                LOG.error(f"Schema validation failed: {e}")
+                # Continue processing even if validation fails
+            
             # Start the metrics server if not already started
             if not self.server_started:
                 self._start_prometheus_server()
@@ -157,7 +179,7 @@ class PrometheusWriter(Writer):
                 for key, value in data.items():
                     LOG.info(f"  {key}: type={type(value)}, length={len(value) if hasattr(value, '__len__') else 'N/A'}")
             
-            # Only process performance data (skip config data)
+            # Only process performance data (skip config data and events)
             measurements_processed = 0
             
             # Process each measurement type in the data
@@ -167,13 +189,19 @@ class PrometheusWriter(Writer):
                     self._process_measurement(measurement_name, measurement_data)
                     measurements_processed += 1
                 else:
-                    LOG.debug(f"Skipping config measurement: {measurement_name}")
+                    LOG.debug(f"Skipping non-performance measurement: {measurement_name}")
+            
+            # Write JSON output for debugging/validation (similar to InfluxDB writer)
+            self._write_json_output(data, "prometheus_writer_input")
+            
+            # Write HTML metrics output for direct comparison with InfluxDB
+            self._write_html_metrics_output("prometheus_metrics_export")
             
             LOG.info(f"Updated {measurements_processed} Prometheus measurement types")
             return True
             
         except Exception as e:
-            LOG.error(f"Error writing to Prometheus: {e}")
+            LOG.error(f"Error writing to Prometheus: {e}", exc_info=True)
             return False
     
     def _is_performance_measurement(self, measurement_name: str) -> bool:
@@ -221,19 +249,175 @@ class PrometheusWriter(Writer):
             LOG.error(f"Error processing measurement {measurement_name}: {e}", exc_info=True)
     
     def _get_field_value(self, data_dict: dict, field_name: str):
-        """Get field value, trying both snake_case and camelCase variants using BaseModel conversion."""
-        
+        """
+        Get field value, trying both snake_case and camelCase variants using BaseModel conversion.
+        Enhanced version following InfluxDB writer pattern.
+        """
+        if not isinstance(data_dict, dict):
+            return None
+            
         # Try snake_case first (enriched field names)
         snake_case = field_name.lower().replace(' ', '_')
         if snake_case in data_dict:
-            return data_dict[snake_case]
+            value = data_dict[snake_case]
+            # Convert to appropriate numeric type if possible
+            if isinstance(value, (int, float)):
+                return value
+            elif isinstance(value, str) and value.replace('.', '').replace('-', '').isdigit():
+                try:
+                    return float(value) if '.' in value else int(value)
+                except (ValueError, TypeError):
+                    pass
+            return value
         
         # Try camelCase equivalent using BaseModel conversion
-        camel_case = BaseModel.snake_to_camel(snake_case)
-        if camel_case in data_dict:
-            return data_dict[camel_case]
+        try:
+            camel_case = BaseModel.snake_to_camel(snake_case)
+            if camel_case in data_dict:
+                value = data_dict[camel_case]
+                # Same numeric conversion as above
+                if isinstance(value, (int, float)):
+                    return value
+                elif isinstance(value, str) and value.replace('.', '').replace('-', '').isdigit():
+                    try:
+                        return float(value) if '.' in value else int(value)
+                    except (ValueError, TypeError):
+                        pass
+                return value
+        except Exception as e:
+            LOG.debug(f"Error in camelCase conversion for {field_name}: {e}")
             
         return None
+
+    def _safe_numeric_operation(self, value1, value2, operation='subtract'):
+        """Safely perform numeric operations, handling type conversion."""
+        try:
+            if value1 is None or value2 is None:
+                return None
+            
+            # Convert to numbers
+            num1 = float(value1) if isinstance(value1, (str, int, float)) else None
+            num2 = float(value2) if isinstance(value2, (str, int, float)) else None
+            
+            if num1 is None or num2 is None:
+                return None
+                
+            if operation == 'subtract':
+                return num1 - num2
+            elif operation == 'add':
+                return num1 + num2
+            elif operation == 'divide' and num2 != 0:
+                return num1 / num2
+            else:
+                return None
+        except (ValueError, TypeError, ZeroDivisionError):
+            return None
+
+    def _safe_float_conversion(self, value):
+        """Safely convert value to float."""
+        try:
+            if value is None:
+                return None
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
+    def _write_json_output(self, data: Dict[str, Any], filename_prefix: str = "prometheus_writer"):
+        """
+        Write processed data to JSON file for debugging/validation.
+        Similar to InfluxDB writer's JSON output capability.
+        """
+        if not self.enable_json_output:
+            return
+            
+        try:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Ensure output directory exists
+            os.makedirs(self.json_output_dir, exist_ok=True)
+            
+            # Create timestamped filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{filename_prefix}_{timestamp}.json"
+            filepath = os.path.join(self.json_output_dir, filename)
+            
+            # Convert data to JSON-serializable format
+            serializable_data = {}
+            for measurement_name, measurement_data in data.items():
+                if self._is_performance_measurement(measurement_name):
+                    serializable_data[measurement_name] = []
+                    if isinstance(measurement_data, list):
+                        for item in measurement_data:
+                            # Normalize to dict format
+                            item_dict = self._normalize_data_item(item)
+                            if item_dict:
+                                serializable_data[measurement_name].append(item_dict)
+            
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(serializable_data, f, indent=2, default=str)
+                
+            LOG.info(f"Prometheus writer JSON output saved to: {filepath}")
+            
+        except Exception as e:
+            LOG.error(f"Failed to write JSON output: {e}")
+
+    def _write_html_metrics_output(self, filename_prefix: str = "prometheus_metrics"):
+        """
+        Export current Prometheus metrics to HTML file for direct comparison with InfluxDB output.
+        This captures the actual metrics that would be scraped by Prometheus.
+        """
+        if not self.enable_html_output:
+            return
+            
+        try:
+            import os
+            from datetime import datetime
+            from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+            
+            # Ensure output directory exists
+            os.makedirs(self.json_output_dir, exist_ok=True)
+            
+            # Create timestamped filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{filename_prefix}_{timestamp}.txt"
+            filepath = os.path.join(self.json_output_dir, filename)
+            
+            # Generate Prometheus metrics in text format (same as /metrics endpoint)
+            metrics_text = generate_latest(self.prometheus_registry).decode('utf-8')
+            
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write("# Prometheus Metrics Export\n")
+                f.write(f"# Generated: {datetime.now().isoformat()}\n")
+                f.write("# Format: Prometheus text exposition format\n")
+                f.write("# This shows the actual metrics that would be scraped by Prometheus\n")
+                f.write("\n")
+                f.write(metrics_text)
+                
+            LOG.info(f"Prometheus metrics HTML output saved to: {filepath}")
+            
+        except Exception as e:
+            LOG.error(f"Failed to write HTML metrics output: {e}")
+
+    def _normalize_data_item(self, item):
+        """
+        Normalize data item to dictionary format, following InfluxDB writer pattern.
+        """
+        try:
+            # Convert dataclass to dict if needed (same as InfluxDB writer)
+            if hasattr(item, '__dict__'):
+                return item.__dict__
+            elif isinstance(item, dict):
+                return item
+            else:
+                LOG.warning(f"Unexpected data type for Prometheus: {type(item)}")
+                return None
+        except Exception as e:
+            LOG.error(f"Error normalizing data item: {e}")
+            return None
 
     def _process_volume_metrics(self, volume_data: list):
         """Process volume performance data and update Prometheus metrics."""
@@ -243,16 +427,13 @@ class PrometheusWriter(Writer):
             try:
                 LOG.info(f"Processing volume {i+1}/{len(volume_data)}: type={type(volume)}")
                 
-                # Check if it's a dataclass or dict-like object
-                if hasattr(volume, '__dict__'):
-                    LOG.info(f"Volume attributes: {list(volume.__dict__.keys())}")
-                    vol_dict = volume.__dict__
-                elif isinstance(volume, dict):
-                    LOG.info(f"Volume dict keys: {list(volume.keys())}")
-                    vol_dict = volume
-                else:
-                    LOG.warning(f"Unexpected volume type: {type(volume)}")
+                # Normalize data to dict format (following InfluxDB writer pattern)
+                vol_dict = self._normalize_data_item(volume)
+                if vol_dict is None:
+                    LOG.warning(f"Could not normalize volume data item {i+1}")
                     continue
+                    
+                LOG.debug(f"Volume normalized keys: {list(vol_dict.keys())}")
                 
                 # Extract common labels from enriched volume data using snake_case
                 labels = {
@@ -286,7 +467,7 @@ class PrometheusWriter(Writer):
                     # Try alternate field names
                     other_iops = self._get_field_value(vol_dict, 'other_iops')
                     if combined_iops is not None and read_iops is not None:
-                        write_iops = combined_iops - read_iops
+                        write_iops = self._safe_numeric_operation(combined_iops, read_iops, 'subtract')
                     elif other_iops is not None:
                         write_iops = other_iops
                         
@@ -311,16 +492,14 @@ class PrometheusWriter(Writer):
                 # Update response time metrics using snake_case field names
                 combined_response_time = self._get_field_value(vol_dict, 'combined_response_time')
                 if combined_response_time is not None:
-                    # Convert ms to seconds if needed
-                    response_time_seconds = float(combined_response_time) / 1000.0 if combined_response_time > 1 else float(combined_response_time)
-                    self.prometheus_metrics['volumes']['response_time'].labels(
-                        operation='total', **labels
-                    ).set(response_time_seconds)
-                    LOG.info(f"Set combined response time: {combined_response_time}ms for volume {labels['volume_name']}")
-                
-                # Update response time metrics
-                combined_response_time = self._get_field_value(vol_dict, 'combined_response_time')
-                if combined_response_time is not None:
+                    # Convert ms to seconds if needed (safe conversion)
+                    combined_rt_float = self._safe_float_conversion(combined_response_time)
+                    if combined_rt_float is not None:
+                        response_time_seconds = combined_rt_float / 1000.0 if combined_rt_float > 1 else combined_rt_float
+                        self.prometheus_metrics['volumes']['response_time'].labels(
+                            operation='total', **labels
+                        ).set(response_time_seconds)
+                        LOG.info(f"Set combined response time: {combined_response_time}ms for volume {labels['volume_name']}")
                     self.prometheus_metrics['volumes']['response_time'].labels(
                         operation='total', **labels
                     ).set(float(combined_response_time) / 1000.0)  # Convert to seconds

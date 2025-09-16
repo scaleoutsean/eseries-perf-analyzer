@@ -62,6 +62,12 @@ class EventCollector:
         
         for endpoint_name in self.event_endpoints:
             try:
+                # Skip system_events - they're just audit noise, not actionable metrics
+                # Keep system_failures as those represent actual error conditions
+                if endpoint_name == 'system_events':
+                    self.logger.info(f"Skipping {endpoint_name} - audit noise, not suitable for TSDB")
+                    continue
+                
                 # Attempt to collect data for this event endpoint
                 data = self._collect_event_endpoint(endpoint_name)
                 

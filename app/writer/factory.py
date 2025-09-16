@@ -9,6 +9,7 @@ from app.writer.base import Writer
 from app.writer.influxdb_writer import InfluxDBWriter
 from app.writer.json_writer import JsonWriter
 from app.writer.prometheus_writer import PrometheusWriter
+from app.writer.multi_writer import MultiWriter
 
 # Initialize logger
 LOG = logging.getLogger(__name__)
@@ -63,8 +64,11 @@ class WriterFactory:
                 return _create_stub_writer()
                 
         elif output_choice == 'both':
-            # TODO: Implement multi-writer that supports both InfluxDB and Prometheus
-            LOG.warning("'both' output not yet implemented, defaulting to InfluxDB")
+            # Create multi-writer that supports both InfluxDB and Prometheus
+            LOG.info("Creating MultiWriter for both InfluxDB and Prometheus output")
+            writers = []
+            
+            # Add InfluxDB writer if configured
             if influxdb_url and influxdb_database and influxdb_token:
                 config = {
                     'influxdb_url': influxdb_url,
@@ -73,7 +77,23 @@ class WriterFactory:
                     'tls_ca': getattr(args, 'tlsCa', None),
                     'tls_validation': getattr(args, 'tls_validation', 'strict')
                 }
-                return InfluxDBWriter(config)
+                influxdb_writer = InfluxDBWriter(config)
+                writers.append(influxdb_writer)
+                LOG.info("✅ Added InfluxDB writer to MultiWriter")
+            else:
+                LOG.error("InfluxDB configuration missing for 'both' output")
+            
+            # Add Prometheus writer
+            prometheus_port = getattr(args, 'prometheus_port', 8000)
+            prometheus_writer = PrometheusWriter(port=prometheus_port)
+            writers.append(prometheus_writer)
+            LOG.info("✅ Added Prometheus writer to MultiWriter")
+            
+            if writers:
+                return MultiWriter(writers)
+            else:
+                LOG.error("No writers configured for 'both' output, falling back to stub")
+                return _create_stub_writer()
         
         # Fall back to stub writer for testing if nothing else works
         LOG.warning("No valid output destination configured, using stub writer")
