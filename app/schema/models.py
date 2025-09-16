@@ -692,6 +692,24 @@ class VolumeCGMembersConfig(BaseModel):
         return self._raw_data.get(key, default)
     
 @dataclass
+class InterfaceConfigInterfaceTypeData(BaseModel):
+    """Interface type data for InterfaceConfig"""
+    sas: Optional[Dict[str, Any]] = None
+    _raw_data: Dict[str, Any] = field(default_factory=dict)
+    
+    @staticmethod
+    def from_api_response(data: Dict) -> 'InterfaceConfigInterfaceTypeData':
+        """Create an InterfaceConfigInterfaceTypeData instance from API response data"""
+        return InterfaceConfigInterfaceTypeData(
+            sas=data.get("sas"),
+            _raw_data=data.copy()
+        )
+    
+    def get_raw(self, key, default=None):
+        """Access any field from the raw data"""
+        return self._raw_data.get(key, default)
+
+@dataclass
 class InterfaceConfig(BaseModel):
     """Configuration data for interfaces"""
     # channelPortRef: Optional[str] = None
@@ -700,7 +718,7 @@ class InterfaceConfig(BaseModel):
     # commandProtocolPropertiesList: Optional[Dict] = None
     controllerRef: Optional[str] = None
     interfaceRef: Optional[str] = None
-    # ioInterfaceTypeData: Optional[InterfaceConfigInterfaceTypeData] = None
+    ioInterfaceTypeData: Optional[InterfaceConfigInterfaceTypeData] = None
 
     # Add fields from schema.md that have high occurrence rates
     _raw_data: Dict[str, Any] = field(default_factory=dict)
@@ -709,6 +727,10 @@ class InterfaceConfig(BaseModel):
     @staticmethod
     def from_api_response(data: Dict) -> 'InterfaceConfig':
         """Create an InterfaceConfig instance from API response data"""
+        io_interface_data = None
+        if data.get("ioInterfaceTypeData"):
+            io_interface_data = InterfaceConfigInterfaceTypeData.from_api_response(data["ioInterfaceTypeData"])
+            
         return InterfaceConfig(
             # channelPortRef=data.get("channelPortRef"),
             # channelPortRefs=data.get("channelPortRefs"),
@@ -716,7 +738,8 @@ class InterfaceConfig(BaseModel):
             # commandProtocolPropertiesList=data.get("commandProtocolPropertiesList"),
             controllerRef=data.get("controllerRef"),
             interfaceRef=data.get("interfaceRef"),
-            # ioInterfaceTypeData=data.get("ioInterfaceTypeData")
+            ioInterfaceTypeData=io_interface_data,
+            _raw_data=data.copy()
         )
     def get_raw(self, key, default=None):
         """Access any field from the raw data"""
@@ -735,7 +758,29 @@ class TrayConfig(BaseModel):
         return TrayConfig(
             id=data.get('id', 'unknown'),
             partNumber=data.get('partNumber'),
-            serialNumber=data.get('serialNumber')
+            serialNumber=data.get('serialNumber'),
+            _raw_data=data.copy()
+        )
+
+    def get_raw(self, key, default=None):
+        """Access any field from the raw data"""
+        return self._raw_data.get(key, default)
+
+@dataclass
+class LockdownStatusConfig(BaseModel):
+    """Configuration data for lockdown status"""
+    id: Optional[str] = None
+    lockdownState: Optional[str] = None
+    unlockKeyId: Optional[str] = None
+    _raw_data: Dict[str, Any] = field(default_factory=dict)
+
+    @staticmethod
+    def from_api_response(data: Dict) -> 'LockdownStatusConfig':
+        return LockdownStatusConfig(
+            id=data.get('id', 'unknown'),
+            lockdownState=data.get('lockdownState'),
+            unlockKeyId=data.get('unlockKeyId'),
+            _raw_data=data.copy()
         )
 
     def get_raw(self, key, default=None):
@@ -1609,36 +1654,6 @@ class HostConfig(BaseModel):
             name=data.get('name'),
             ports=data.get('ports', []),
             protectionInformationCapableAccessMethod=data.get('protectionInformationCapableAccessMethod'),
-            _raw_data=data.copy()
-        )
-
-    def get_raw(self, key, default=None):
-        """Access any field from the raw data"""
-        return self._raw_data.get(key, default)
-
-
-@dataclass
-class IsLockdown:
-    """Configuration data for islockdown"""
-    hasDrives: Optional[bool] = None
-    isLockdown: Optional[bool] = None
-    limitedAccessState: Optional[str] = None
-    lockdownClearable: Optional[bool] = None
-    lockdownType: Optional[str] = None
-    sevenSegmentCodes: Optional[str] = None
-    storageSystemLabel: Optional[str] = None
-    _raw_data: Dict[str, Any] = field(default_factory=dict)
-
-    @staticmethod
-    def from_api_response(data: Dict) -> 'IsLockdown':
-        return IsLockdown(
-            isLockdown=data.get('isLockdown'),
-            hasDrives=data.get('hasDrives'),
-            limitedAccessState=data.get('limitedAccessState'),
-            lockdownClearable=data.get('lockdownClearable'),
-            lockdownType=data.get('lockdownType'),
-            sevenSegmentCodes=data.get('sevenSegmentCodes'),
-            storageSystemLabel=data.get('storageSystemLabel'),
             _raw_data=data.copy()
         )
 

@@ -526,6 +526,10 @@ def main():
     # Initialize main logger after configuration
     LOG = logging.getLogger(__name__)
     
+    # Debug environment variables
+    LOG.info(f"Environment MAX_ITERATIONS: '{os.environ.get('MAX_ITERATIONS', 'NOT SET')}'")
+    LOG.info(f"Current maxIterations before override: {CMD.maxIterations}")
+    
     # Override with environment variables if they exist (for docker-compose support)
     if 'MAX_ITERATIONS' in os.environ and os.environ['MAX_ITERATIONS']:
         try:
@@ -534,6 +538,8 @@ def main():
             LOG.info(f"Override: Using MAX_ITERATIONS={CMD.maxIterations} from environment variable (was {original_value})")
         except ValueError:
             LOG.warning(f"Invalid MAX_ITERATIONS environment variable: {os.environ['MAX_ITERATIONS']}")
+    else:
+        LOG.info("MAX_ITERATIONS environment variable not set or empty, using default")
     
     # Validate arguments
     if CMD.intervalTime < 60:

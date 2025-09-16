@@ -146,7 +146,39 @@ class APICollector:
             Instance of the model class
         """
         data = self.read_json_file(file_path)
+        
+        # Extract system ID from filename for config files
+        filename = os.path.basename(file_path)
+        if filename.startswith('configuration_'):
+            system_id = self._extract_system_id_from_filename(filename)
+            if system_id:
+                data['system_id'] = system_id
+        
         return self.parse_model_from_json(data, model_class)
+    
+    def _extract_system_id_from_filename(self, filename: str) -> Optional[str]:
+        """
+        Extract system ID from configuration filename.
+        
+        Args:
+            filename: Configuration filename (e.g., 'configuration_tray_config_6D039EA0004D00AA000000006652A086_...')
+            
+        Returns:
+            System ID string or None if not found
+        """
+        if not filename.startswith('configuration_'):
+            return None
+            
+        # Pattern: configuration_{endpoint}_{system_id}_{object_id}_{timestamp}.json
+        parts = filename.split('_')
+        if len(parts) >= 4:
+            # system_id is typically the 3rd part (index 2) after 'configuration' and endpoint
+            system_id = parts[2]
+            # Validate it's a reasonable system ID (hex characters, typical length)
+            if len(system_id) >= 16 and system_id.replace('0123456789ABCDEFabcdef', '') == '':
+                return system_id
+                
+        return None
     
     def collect_list_from_json(self, file_path: str, model_class: Type[T]) -> List[T]:
         """
@@ -189,6 +221,14 @@ class APICollector:
             elif sort_by == 'name':
                 files.sort()
             files = [str(f) for f in files]
+        
+        # For config endpoints, deduplicate files to avoid processing historical duplicates
+        if any(config_keyword in pattern.lower() for config_keyword in ['config', 'tray', 'controller', 'drive', 'system', 'host', 'storage_pool', 'volume_mapping']):
+            # Only call deduplication if the method exists (for ESeriesCollector)
+            deduplicate_method = getattr(self, '_deduplicate_config_files', None)
+            if deduplicate_method:
+                files = deduplicate_method(files, pattern)
+                logger.info(f"🔍 After deduplication: {len(files)} unique config files")
         
         results = []
         for file_path in files:
@@ -616,14 +656,30 @@ class ESeriesCollector(APICollector):
             List of model instances
         """
         if self.from_json:
-            # In JSON mode, use existing collection logic
-            pattern = f"*{endpoint_key.replace('_', '*')}*"
-            return self.collect_from_json_directory(
+            # In JSON mode, use specific patterns for known endpoints to avoid overly broad matching
+            pattern_mapping = {
+                'tray_config': 'configuration_tray_config_*',
+                'interfaces_config': 'configuration_interfaces_config_*',
+                'volume_consistency_group_members': 'configuration_volume_consistency_group_members_*',
+                # Add more specific mappings as needed
+            }
+            
+            # Use specific pattern if available, otherwise fall back to the original logic
+            if endpoint_key in pattern_mapping:
+                pattern = pattern_mapping[endpoint_key]
+                logger.info(f"Using specific pattern '{pattern}' for endpoint '{endpoint_key}'")
+            else:
+                pattern = f"*{endpoint_key.replace('_', '*')}*"
+                logger.info(f"Using fallback pattern '{pattern}' for endpoint '{endpoint_key}'")
+                
+            result = self.collect_from_json_directory(
                 directory=self.json_directory,
                 pattern=pattern,
                 model_class=model_class,
                 sort_by='timestamp'
             )
+            logger.info(f"Collected {len(result)} items for endpoint '{endpoint_key}' using pattern '{pattern}'")
+            return result
         else:
             # In API mode, check if this endpoint requires ID dependency
             if endpoint_key in self.ID_DEPENDENCIES:
@@ -898,7 +954,7 @@ class ESeriesCollector(APICollector):
             if self.batched_reader:
                 return self.collect_drives_from_current_batch(model_class)
             else:
-                pattern = "*drive_config*"
+                pattern = "configuration_drive_config_*"
                 return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('drive_config', model_class)
@@ -911,7 +967,7 @@ class ESeriesCollector(APICollector):
             if self.batched_reader:
                 return self.collect_controllers_from_current_batch(model_class)
             else:
-                pattern = "*controller_config*"
+                pattern = "configuration_controller_config_*"
                 return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('controller_config', model_class)
@@ -920,7 +976,7 @@ class ESeriesCollector(APICollector):
         """Collect system configuration data"""
         
         if self.from_json:
-            pattern = "*system_config*"
+            pattern = "configuration_system_config_*"
             return self.collect_from_json_directory(self.json_directory, pattern, model_class, sort_by='filename')
         else:
             return self._collect_from_api('system_config', model_class)
@@ -1006,6 +1062,23 @@ class ESeriesCollector(APICollector):
         
         logger.info(f"🔍 Found {len(endpoint_files)} files for endpoint '{endpoint}'")
         
+        # For config endpoints, deduplicate by taking only the most recent file for each unique config item
+        if any(config_keyword in endpoint.lower() for config_keyword in ['config', 'tray', 'controller', 'drive', 'system', 'host', 'storage_pool', 'volume_mapping']):
+            # Convert endpoint name to pattern for deduplication method
+            if 'tray' in endpoint.lower():
+                pattern = 'configuration_tray_config_*'
+            elif 'drive' in endpoint.lower() and 'config' in endpoint.lower():
+                pattern = 'configuration_drive_config_*'
+            elif 'controller' in endpoint.lower() and 'config' in endpoint.lower():
+                pattern = 'configuration_controller_config_*'
+            elif 'system' in endpoint.lower() and 'config' in endpoint.lower():
+                pattern = 'configuration_system_config_*'
+            else:
+                pattern = f"*{endpoint}*"
+            
+            endpoint_files = self._deduplicate_config_files(endpoint_files, pattern)
+            logger.info(f"🔍 After deduplication: {len(endpoint_files)} unique config files")
+        
         all_data = []
         
         for file_path in endpoint_files:
@@ -1023,6 +1096,90 @@ class ESeriesCollector(APICollector):
                 continue
         
         return all_data
+    
+    def _deduplicate_config_files(self, config_files: List[str], pattern: str) -> List[str]:
+        """
+        Deduplicate config files by keeping only the most recent file for each unique config item.
+        
+        For config data, we don't want to process historical duplicates since config is static.
+        This method groups files by their unique identifiers and keeps only the latest timestamp.
+        
+        Args:
+            config_files: List of config file paths
+            pattern: The glob pattern used to match files (e.g., 'configuration_tray_config_*')
+            
+        Returns:
+            List of deduplicated file paths (only most recent for each unique item)
+        """
+        from collections import defaultdict
+        import os
+        
+        # Group files by their unique identifier
+        file_groups = defaultdict(list)
+        
+        for file_path in config_files:
+            filename = os.path.basename(file_path)
+            
+            # Extract unique identifier based on pattern type
+            if 'tray' in pattern.lower():
+                # Pattern: configuration_tray_config_{system_id}_{tray_id}_{timestamp}.json
+                # Unique key: system_id + tray_id
+                parts = filename.split('_')
+                if len(parts) >= 6:
+                    system_id = parts[3]
+                    tray_id = parts[4]
+                    unique_key = f"{system_id}_{tray_id}"
+                    file_groups[unique_key].append(file_path)
+                    
+            elif 'drive_config' in pattern.lower():
+                # Pattern: configuration_drive_config_{system_id}_{drive_id}_{timestamp}.json
+                parts = filename.split('_')
+                if len(parts) >= 6:
+                    system_id = parts[3]
+                    drive_id = parts[4]
+                    unique_key = f"{system_id}_{drive_id}"
+                    file_groups[unique_key].append(file_path)
+                    
+            elif 'controller_config' in pattern.lower():
+                # Pattern: configuration_controller_config_{system_id}_{controller_id}_{timestamp}.json
+                parts = filename.split('_')
+                if len(parts) >= 6:
+                    system_id = parts[3]
+                    controller_id = parts[4]
+                    unique_key = f"{system_id}_{controller_id}"
+                    file_groups[unique_key].append(file_path)
+                    
+            elif 'system' in pattern.lower():
+                # Pattern: configuration_system_config_{system_id}_{timestamp}.json
+                parts = filename.split('_')
+                if len(parts) >= 5:
+                    system_id = parts[3]
+                    unique_key = system_id
+                    file_groups[unique_key].append(file_path)
+                    
+            else:
+                # For other config types, use the full filename as unique key
+                # This ensures we don't lose any data but prevents obvious duplicates
+                file_groups[filename].append(file_path)
+        
+        # For each group, keep only the most recent file (by timestamp in filename)
+        deduplicated_files = []
+        
+        for unique_key, files in file_groups.items():
+            if len(files) == 1:
+                # Only one file for this unique item
+                deduplicated_files.append(files[0])
+            else:
+                # Multiple files, keep the most recent by timestamp
+                # Sort by timestamp in filename (assuming format ends with YYYYMMDDHHMM.json)
+                files.sort(key=lambda f: os.path.basename(f), reverse=True)
+                most_recent = files[0]
+                deduplicated_files.append(most_recent)
+                
+                logger.debug(f"🔍 Deduplicated {len(files)} files for {unique_key}, kept: {os.path.basename(most_recent)}")
+        
+        logger.info(f"🔍 Config deduplication: {len(config_files)} → {len(deduplicated_files)} files")
+        return deduplicated_files
     
     def advance_batch(self) -> bool:
         """Advance to the next batch after processing current one."""

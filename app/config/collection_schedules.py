@@ -120,12 +120,11 @@ CONFIG_COLLECTION_MAPPING = {
     # Daily - very static configuration
     ScheduleFrequency.DAILY: [
         "TrayConfig",             # Tray configuration rarely changes
-        "VolumeCGMembersConfig",  # Consistency groups change rarely
     ],
     
     # Weekly - essentially static data (mainly for auditing)
     ScheduleFrequency.WEEKLY: [
-        # Reserved for future very static config types
+        "VolumeCGMembersConfig",  # Consistency groups rarely used, check weekly only
     ]
 }
 

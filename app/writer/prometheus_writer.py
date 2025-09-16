@@ -40,7 +40,7 @@ class PrometheusWriter(Writer):
         # Only enable debug output when COLLECTOR_LOG_LEVEL=DEBUG
         import os
         self.enable_json_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
-        self.json_output_dir = "/home/app/samples/out"
+        self.json_output_dir = "/data/samples/out"
         
         # Add HTML metrics output capability for direct comparison with InfluxDB
         self.enable_html_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
@@ -179,7 +179,7 @@ class PrometheusWriter(Writer):
                 for key, value in data.items():
                     LOG.info(f"  {key}: type={type(value)}, length={len(value) if hasattr(value, '__len__') else 'N/A'}")
             
-            # Only process performance data (skip config data and events)
+            # Process performance and config data (skip events)
             measurements_processed = 0
             
             # Process each measurement type in the data
@@ -205,7 +205,7 @@ class PrometheusWriter(Writer):
             return False
     
     def _is_performance_measurement(self, measurement_name: str) -> bool:
-        """Determine if a measurement contains performance data (not config)."""
+        """Determine if a measurement contains performance data or config data."""
         performance_indicators = [
             'volume_statistics', 'analysed_volume_statistics',
             'drive_statistics', 'analysed_drive_statistics', 
@@ -214,7 +214,17 @@ class PrometheusWriter(Writer):
             'system_statistics', 'analysed_system_statistics'
         ]
         
-        return any(indicator in measurement_name.lower() for indicator in performance_indicators)
+        config_indicators = [
+            'config_trayconfig', 'config_controllerconfig', 'config_driveconfig',
+            'config_interfaceconfig', 'config_systemconfig', 'config_volumeconfig',
+            'config_volumemappingsconfig', 'config_hostconfig', 'config_storagepoolconfig',
+            'config_hostgroupsconfig'
+        ]
+        
+        is_performance = any(indicator in measurement_name.lower() for indicator in performance_indicators)
+        is_config = any(indicator in measurement_name.lower() for indicator in config_indicators)
+        
+        return is_performance or is_config
     
     def _process_measurement(self, measurement_name: str, measurement_data: list):
         """Process a single measurement type and update corresponding Prometheus metrics."""
@@ -338,9 +348,8 @@ class PrometheusWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.json_output_dir, exist_ok=True)
             
-            # Create timestamped filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{filename_prefix}_{timestamp}.json"
+            # Use static filename that overwrites previous debug output
+            filename = f"{filename_prefix}_final.json"
             filepath = os.path.join(self.json_output_dir, filename)
             
             # Convert data to JSON-serializable format
@@ -380,9 +389,8 @@ class PrometheusWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.json_output_dir, exist_ok=True)
             
-            # Create timestamped filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{filename_prefix}_{timestamp}.txt"
+            # Use static filename that overwrites previous debug output
+            filename = f"{filename_prefix}_final.txt"
             filepath = os.path.join(self.json_output_dir, filename)
             
             # Generate Prometheus metrics in text format (same as /metrics endpoint)

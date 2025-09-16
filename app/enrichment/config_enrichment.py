@@ -101,7 +101,9 @@ class BaseConfigEnricher(ABC):
         
         # Try to get system info from cache first (most reliable)
         if self.system_enricher and hasattr(self.system_enricher, 'system_config_cache'):
-            system_config = self._get_system_from_cache()
+            # Try to get system info based on system_id from the data
+            system_id = raw_item.get('system_id')
+            system_config = self._get_system_from_cache(system_id)
             if system_config:
                 enriched_item['storage_system'] = system_config.get('name', system_config.get('id', 'unknown'))
                 enriched_item['storage_system_wwn'] = system_config.get('wwn', 'unknown') 
@@ -122,7 +124,7 @@ class BaseConfigEnricher(ABC):
         
         return enriched_item
     
-    def _get_system_from_cache(self) -> Optional[Dict[str, Any]]:
+    def _get_system_from_cache(self, system_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get system info from enricher cache."""
         if not self.system_enricher or not hasattr(self.system_enricher, 'system_config_cache'):
             return None
@@ -131,8 +133,14 @@ class BaseConfigEnricher(ABC):
         if not cache:
             return None
             
-        # Return the first (and typically only) system in cache
-        for system_wwn, system_config in cache.items():
+        # If system_id is provided, try to find the specific system
+        if system_id:
+            system_config = cache.get(system_id)
+            if system_config:
+                return system_config
+                
+        # Fallback: Return the first (and typically only) system in cache
+        for system_key, system_config in cache.items():
             if isinstance(system_config, dict):
                 return system_config
                 
@@ -152,15 +160,19 @@ class BaseConfigEnricher(ABC):
         # Ensure we have an ID field (critical for InfluxDB)
         if not enriched_item.get('id'):
             # Try common ID field variations
-            id_candidates = ['ref', 'volumeRef', 'driveRef', 'controllerRef', 'hostRef']
+            id_candidates = ['ref', 'volumeRef', 'driveRef', 'controllerRef', 'hostRef', 'trayRef', 'trayId']
             for candidate in id_candidates:
                 if enriched_item.get(candidate):
                     enriched_item['id'] = enriched_item[candidate]
                     break
             else:
-                # Still no ID - this might be problematic
-                LOG.warning(f"No ID field found for {config_type} item")
-                enriched_item['id'] = 'unknown'
+                # For tray configs, create a composite ID from partNumber and serialNumber
+                if config_type == 'TrayConfig' and enriched_item.get('partNumber') and enriched_item.get('serialNumber'):
+                    enriched_item['id'] = f"{enriched_item['partNumber']}_{enriched_item['serialNumber']}"
+                else:
+                    # Still no ID - this might be problematic
+                    LOG.warning(f"No ID field found for {config_type} item")
+                    enriched_item['id'] = 'unknown'
         
         # Remove private fields and None values
         cleaned_item = {}
@@ -201,14 +213,34 @@ class DefaultConfigEnricher(BaseConfigEnricher):
         """
         Apply basic enrichment for simple config types.
         
-        - Add name/label standardization
+        - Add name/label standardization  
+        - Preserve all original fields (don't discard valuable data)
         - Basic field promotion to tags
         """
         enriched_item = raw_item.copy()
         
+        # Debug logging for tray configs
+        if config_type == 'TrayConfig':
+            LOG.debug(f"DefaultConfigEnricher.enrich_item - TrayConfig raw_item keys: {list(raw_item.keys())}")
+            LOG.debug(f"DefaultConfigEnricher.enrich_item - TrayConfig raw_item: {raw_item}")
+        
         # Standardize name field (common pattern across many config types)
         name_value = enriched_item.get('label') or enriched_item.get('name') or 'unknown'
         enriched_item[f'{config_type}_name'] = name_value
+        
+        # Special handling for TrayConfig: trim trailing spaces from partNumber and serialNumber
+        if config_type == 'TrayConfig':
+            if enriched_item.get('partNumber') and isinstance(enriched_item['partNumber'], str):
+                enriched_item['partNumber'] = enriched_item['partNumber'].rstrip()
+            if enriched_item.get('serialNumber') and isinstance(enriched_item['serialNumber'], str):
+                enriched_item['serialNumber'] = enriched_item['serialNumber'].rstrip()
+        
+        # Keep all original fields - don't discard valuable data like partNumber, serialNumber, etc.
+        # The _validate_and_cleanup method will handle ID field generation and cleanup
+        
+        if config_type == 'TrayConfig':
+            LOG.debug(f"DefaultConfigEnricher.enrich_item - TrayConfig enriched_item keys: {list(enriched_item.keys())}")
+            LOG.debug(f"DefaultConfigEnricher.enrich_item - TrayConfig enriched_item: {enriched_item}")
         
         return enriched_item
 

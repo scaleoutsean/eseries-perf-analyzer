@@ -88,29 +88,29 @@ class InfluxDBWriter(Writer):
         
         # Extract InfluxDB connection parameters from environment variables or config
         import os
-        self.url = config.get('influxdb_url') or os.getenv('INFLUXDB_URL', 'https://influxdb:8086')
+        self.url = config.get('influxdb_url') or os.getenv('INFLUXDB_URL', 'https://influxdb:8181')
         self.token = config.get('influxdb_token') or os.getenv('INFLUXDB_TOKEN', '')
-        self.database = config.get('influxdb_database') or os.getenv('INFLUXDB_DATABASE', 'eseries_perf')
+        self.database = config.get('influxdb_database') or os.getenv('INFLUXDB_DATABASE', 'epa')
         self.org = config.get('influxdb_org') or os.getenv('INFLUXDB_ORG', 'netapp')
-        self.bucket = config.get('influxdb_bucket') or os.getenv('INFLUXDB_BUCKET', 'eseries_perf')
+        self.bucket = config.get('influxdb_bucket') or os.getenv('INFLUXDB_BUCKET', 'epa')
         self.tls_ca = config.get('tls_ca', None)
         # Get TLS validation setting from config (passed from main.py)
         self.tls_validation = config.get('tls_validation', 'strict')
         
         # Initialize batching configuration for performance optimization (before client init)
         # Use smaller batch size and shorter flush interval for single-iteration runs
-        max_iterations = int(os.getenv('MAX_ITERATIONS', '0'))
-        if max_iterations == 1:
-            # Single iteration: optimize for immediate writes
-            self.batch_size = 100   # Smaller batch size for immediate flushing
-            self.flush_interval = 5_000  # 5 seconds - immediate flush for single runs
-            LOG.info("Single iteration mode: using immediate batching (batch_size=100, flush_interval=5s)")
-        else:
-            # Multi-iteration: optimize for throughput
-            self.batch_size = 1000  # Target batch size (1K points as recommended)
-            self.flush_interval = 60_000  # 60 seconds - matches collection interval
-            LOG.info("Multi-iteration mode: using throughput batching (batch_size=1000, flush_interval=60s)")
-        
+        # max_iterations = int(os.getenv('MAX_ITERATIONS', '0'))
+        # if max_iterations == 1:
+        #     # Single iteration: optimize for immediate writes
+        #     self.batch_size = 100   # Smaller batch size for immediate flushing
+        #     self.flush_interval = 5_000  # 5 seconds - immediate flush for single runs
+        #     LOG.info("Single iteration mode: using immediate batching (batch_size=100, flush_interval=5s)")
+        # else:
+        # Multi-iteration: optimize for throughput
+        self.batch_size = 500  # Target batch size
+        self.flush_interval = 60_000  # 60 seconds - matches collection interval
+        LOG.info("Multi-iteration mode: using throughput batching (batch_size=500, flush_interval=60s)")
+
         self.batch_callback = BatchingCallback()  # Initialize callback for batching statistics
         
         # Initialize client
@@ -122,7 +122,7 @@ class InfluxDBWriter(Writer):
         
         # Enable debug file output only when COLLECTOR_LOG_LEVEL=DEBUG
         self.enable_debug_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
-        self.debug_output_dir = "/home/app/samples/out"
+        self.debug_output_dir = "/data/samples/out"
         
         if self.enable_debug_output:
             LOG.info(f"InfluxDB debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG)")
@@ -207,10 +207,17 @@ class InfluxDBWriter(Writer):
                 databases_data = response.json()
                 LOG.debug(f"Database list response type: {type(databases_data)}, content: {databases_data}")
                 
-                # Handle both response formats: list of databases or dict with 'databases' key
+                # Handle multiple response formats from InfluxDB database API
+                databases = []
                 if isinstance(databases_data, list):
-                    databases = databases_data
-                    LOG.debug(f"API returned database list directly: {databases}")
+                    # Check if it's a list of database name objects: [{"iox::database": "name"}]
+                    if databases_data and isinstance(databases_data[0], dict) and "iox::database" in databases_data[0]:
+                        databases = [db_obj["iox::database"] for db_obj in databases_data]
+                        LOG.debug(f"API returned database object list: {databases}")
+                    else:
+                        # Simple list of database names: ["_internal", "epa"]
+                        databases = databases_data
+                        LOG.debug(f"API returned database name list: {databases}")
                 elif isinstance(databases_data, dict):
                     databases = databases_data.get('databases', [])
                     LOG.debug(f"API returned database dict, extracted list: {databases}")
@@ -276,8 +283,16 @@ class InfluxDBWriter(Writer):
                 
                 LOG.info(f"Processing InfluxDB measurement: {measurement_name} (Batch size: {len(measurement_data) if hasattr(measurement_data, '__len__') else 1} records)")
                 
+                # Debug tray config specifically
+                if 'trayconfig' in measurement_name:
+                    LOG.info(f"🔍 TRAY DEBUG: Processing {measurement_name} with {len(measurement_data) if hasattr(measurement_data, '__len__') else 1} records")
+                
                 # Convert to InfluxDB Point objects
                 points = self._convert_to_points(measurement_name, measurement_data)
+                
+                # Debug tray config point conversion
+                if 'trayconfig' in measurement_name:
+                    LOG.info(f"🔍 TRAY DEBUG: Converted to {len(points)} points for {measurement_name}")
                 
                 if points:
                     # Write points using client's automatic batching (following official example)
@@ -372,6 +387,16 @@ class InfluxDBWriter(Writer):
                 continue
         
         LOG.debug(f"Converted {len(records)} records to {len(points)} Point objects for {measurement_name}")
+        
+        # Debug tray config point creation
+        if 'trayconfig' in measurement_name:
+            LOG.info(f"🔍 TRAY POINT DEBUG: {measurement_name} - {len(records)} records → {len(points)} points")
+            if points and len(points) > 0:
+                sample_point = points[0]
+                LOG.info(f"🔍 TRAY POINT DEBUG: Sample point: {sample_point}")
+            else:
+                LOG.warning(f"🔍 TRAY POINT DEBUG: No points created for {measurement_name}!")
+        
         return points
     
     def _convert_to_line_protocol(self, measurement_name: str, data: Any) -> List[Dict[str, Any]]:
@@ -685,14 +710,24 @@ class InfluxDBWriter(Writer):
                 })
             elif 'controller' in config_type:
                 tags.update({
-                    'controller_id': self._sanitize_tag_value(str(data.get('controllerRef', data.get('id', 'unknown')))),
+                    'controller_id': self._sanitize_tag_value(str(data.get('id', 'unknown'))),
                     'controller_status': self._sanitize_tag_value(str(data.get('status', 'unknown')))
+                    # Don't put controllerRef in tags - it should only be a field
+                    # 'controller_id': self._sanitize_tag_value(str(data.get('controllerRef', data.get('id', 'unknown')))),
                 })
             elif 'drive' in config_type:
                 tags.update({
-                    'drive_id': self._sanitize_tag_value(str(data.get('driveRef', data.get('id', 'unknown')))),
+                    'drive_id': self._sanitize_tag_value(str(data.get('id', 'unknown'))),
                     'drive_type': self._sanitize_tag_value(str(data.get('driveMediaType', 'unknown'))),
                     'drive_status': self._sanitize_tag_value(str(data.get('status', 'unknown')))
+                    # Don't put driveRef in tags - it should only be a field
+                    # 'drive_id': self._sanitize_tag_value(str(data.get('driveRef', data.get('id', 'unknown')))),
+                })
+            elif 'tray' in config_type:
+                tags.update({
+                    'serial_number': self._sanitize_tag_value(str(data.get('serialNumber', 'unknown'))),
+                    # Don't put partNumber in tags - it may not be unique across multiple trays of same model
+                    # 'part_number': self._sanitize_tag_value(str(data.get('partNumber', 'unknown'))),
                 })
             else:
                 # Generic config record - try to find common ID fields
@@ -739,9 +774,29 @@ class InfluxDBWriter(Writer):
             import time
             timestamp = int(time.time())
             
+            # Ensure we have at least one numeric field for InfluxDB
             if not fields:
                 # If no numeric fields, add at least one field to make it a valid InfluxDB record
                 fields['config_present'] = 1
+            
+            # For specific config types, try to extract additional numeric fields from raw data
+            if 'interface' in config_type:
+                # Extract basic numeric fields from nested InterfaceConfig data
+                io_data = data.get('ioInterfaceTypeData', {})
+                sas_data = io_data.get('sas', {}) if io_data else {}
+                if sas_data:
+                    # Extract numeric fields like channel, revision, isDegraded flag
+                    if 'channel' in sas_data:
+                        fields['channel'] = int(sas_data['channel'])
+                    if 'revision' in sas_data:
+                        fields['revision'] = int(sas_data['revision'])
+                    if 'isDegraded' in sas_data:
+                        fields['is_degraded'] = int(bool(sas_data['isDegraded']))
+            
+            elif 'tray' in config_type:
+                # TrayConfig string fields (partNumber, serialNumber) are extracted by schema validation above
+                # No additional numeric fields needed for tray config
+                pass
             
             return {
                 'measurement': measurement_name,
@@ -965,8 +1020,47 @@ class InfluxDBWriter(Writer):
             LOG.debug(f"Converting performance_data as volume performance record")
             return self._convert_volume_record('analysed_volume_statistics', data)
         
+        # Special handling for lockdown_status 
+        if measurement_name == 'lockdown_status':
+            return self._convert_lockdown_status_record(data)
+        
         LOG.debug(f"Generic record conversion not implemented yet for {measurement_name}")
         return None
+    
+    def _convert_lockdown_status_record(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Convert lockdown status data to InfluxDB record format."""
+        try:
+            # Extract tags (indexed fields)
+            tags = {
+                'system_id': self._sanitize_tag_value(str(self._get_field_value(data, 'id') or 'unknown')),
+                'lockdown_state': self._sanitize_tag_value(str(self._get_field_value(data, 'lockdownState') or 'unknown'))
+            }
+            
+            # Extract fields (non-indexed data) 
+            fields = {
+                'is_lockdown': bool(self._get_field_value(data, 'isLockdown') or False),
+                'lockdown_type': str(self._get_field_value(data, 'lockdownType') or 'unknown'),
+                'storage_system_label': str(self._get_field_value(data, 'storageSystemLabel') or 'unknown')
+            }
+            
+            # Add unlock key if present
+            unlock_key_id = self._get_field_value(data, 'unlockKeyId')
+            if unlock_key_id:
+                fields['unlock_key_id'] = str(unlock_key_id)
+            
+            # Use current timestamp for lockdown status events
+            timestamp = int(time.time())
+            
+            return {
+                'measurement': 'lockdown_status',
+                'tags': tags,
+                'fields': fields,
+                'time': timestamp
+            }
+            
+        except Exception as e:
+            LOG.warning(f"Failed to convert lockdown status record: {e}")
+            return None
     
     def _get_field_value(self, data_dict: Dict[str, Any], field_name: str) -> Any:
         """Get field value, trying both snake_case and camelCase variants using proper conversion."""
@@ -1076,13 +1170,8 @@ class InfluxDBWriter(Writer):
         
         import threading
         import time
-        import os
         
-        # For single iteration mode, use shorter timeout since data should already be flushed
-        if os.getenv('MAX_ITERATIONS', '5') == '1':
-            timeout_seconds = 10  # Much shorter timeout for single iteration
-            LOG.info(f"Single iteration mode: using reduced close timeout ({timeout_seconds}s)")
-        
+        timeout_seconds = 10  # Standard timeout for all modes
         LOG.info(f"Closing InfluxDB client with {timeout_seconds}s timeout...")        # Use a flag to track if close completed
         close_completed = threading.Event()
         close_error = []
@@ -1145,9 +1234,8 @@ class InfluxDBWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.debug_output_dir, exist_ok=True)
             
-            # Create timestamped filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"influxdb_writer_input_{timestamp}.json"
+            # Use static filename to prevent disk space explosion during long debug runs
+            filename = "influxdb_writer_input_final.json"
             filepath = os.path.join(self.debug_output_dir, filename)
             
             # Convert data to JSON-serializable format
@@ -1199,9 +1287,8 @@ class InfluxDBWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.debug_output_dir, exist_ok=True)
             
-            # Create timestamped filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"influxdb_line_protocol_{timestamp}.txt"
+            # Use static filename to prevent disk space explosion during long debug runs
+            filename = "influxdb_line_protocol_final.txt"
             filepath = os.path.join(self.debug_output_dir, filename)
             
             # Generate line protocol for all measurements

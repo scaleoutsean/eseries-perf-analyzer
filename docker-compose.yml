@@ -71,8 +71,8 @@ services:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
-    restart: unless-stopped    
-    command: ["--fromJson", "/home/app/samples/in", "--output", "influxdb", "--tlsCa", "/home/app/certs/ca.crt"]
+    restart: no
+    command: ["--fromJson", "/data/samples/in", "--output", "both", "--tlsCa", "/home/app/certs/ca.crt", "--logfile", "/data/samples/out/collector.log"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
       INFLUX_PORT: ${INFLUXDB_PORT:-8181}
@@ -83,16 +83,15 @@ services:
       API: ${API}
       USERNAME: ${SANTRICITY_USERNAME}
       PASSWORD: ${SANTRICITY_PASSWORD}
-      COLLECTOR_LOG_LEVEL: ${COLLECTOR_LOG_LEVEL:-INFO}
+      COLLECTOR_LOG_LEVEL: DEBUG
+      MAX_ITERATIONS: 2
     depends_on:
       - influxdb
     volumes:
       - ./certs/collector:/home/app/certs:ro
       - ./data/influxdb_tokens/epa.token:/home/app/tokens/epa.token:ro
-      # - ./data/samples/in:/home/app/samples/in:rw
-      # - ./tests/10.113.1.158/:/home/app/samples/in:rw
-      - ./tests/combined/:/home/app/samples/in:rw 
-      - ./data/samples/out:/home/app/samples/out:rw # required for DEBUG output by InfluxDB and Prometheus writers
+      - ./tests/combined/:/data/samples/in:rw 
+      - ./data/samples/out:/data/samples/out:rw # <- in container path required for DEBUG output by InfluxDB and Prometheus writers!!!
     networks:
       epa:
         ipv4_address: ${EPA_COLLECTOR}
