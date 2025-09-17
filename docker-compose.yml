@@ -3,7 +3,12 @@ services:
   proxy:
     image: docker.io/nginx:${NGINX_IMAGE}
     container_name: proxy
-    restart: unless-stopped
+    restart: "unless-stopped"
+    # build:
+    #   context: proxy
+    #   dockerfile: Dockerfile
+    #   args:
+    #     INFLUXDB3_BUILD_VERSION: ${INFLUXDB3_BUILD_VERSION}
     ports:
       - "${PROXY_HTTP_PORT}:80"
       - "${PROXY_HTTPS_PORT}:443"
@@ -12,13 +17,14 @@ services:
       - "${PROXY_INFLUXDB_PORT}:8181"
       # Optional for Versity S3 Gateway access
       # - "${S3_PORT}:7070"
+    environment:
+      - NGINX_IMAGE=${NGINX_IMAGE}
     volumes:
-      - ./certs/proxy/ca.crt:/etc/nginx/ssl/ca.crt:ro
-      - ./certs/proxy/external/pub_ca.crt:/etc/nginx/ssl/pub_ca.crt:ro
-      - ./certs/proxy/external/server.crt:/etc/nginx/ssl/server.crt:ro
-      - ./certs/proxy/external/private.key:/etc/nginx/ssl/private.key:ro
+      - ./data/nginx/ssl:/etc/nginx/ssl:ro
       - ./data/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # ssl_ecdh_curve X25519MLKEM768; use PQC - https://github.com/nginx/nginx/issues/288      
+      - ./data/nginx/index.html:/usr/share/nginx/html/index.html:ro
+      - ./data/nginx/logs/:/nginx-logs/:rw
+      # ssl_ecdh_curve X25519MLKEM768; use PQC - https://github.com/nginx/nginx/issues/288
     networks:
       epa:
         ipv4_address: ${PROXY_IP}
@@ -26,7 +32,7 @@ services:
   influxdb:
     container_name: epa4-influxdb
     image: epa/influxdb:${INFLUXDB3_VERSION}
-    restart: unless-stopped
+    restart: "unless-stopped"
     build:
       context: .
       dockerfile: influxdb/Dockerfile
@@ -71,7 +77,7 @@ services:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
-    restart: "no"
+    restart: "unless-stopped"
     command: ["--fromJson", "/data/samples/in", "--output", "both", "--tlsCa", "/home/app/certs/ca.crt", "--logfile", "/data/samples/out/collector.log"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
@@ -101,7 +107,7 @@ services:
     build:
       context: ./utils
     container_name: utils
-    restart: "no"
+    restart: "unless-stopped"
     tty: true
     stdin_open: true
     environment:
@@ -128,10 +134,10 @@ services:
   influx-mcp:
     image: epa/influxdb-mcp:${INFLUXDB_MCP_VERSION:-latest}
     build:
-      context: .
-      dockerfile: influx-mcp/Dockerfile
+      context: influx-mcp
+      dockerfile: Dockerfile
     container_name: influx-mcp
-    restart: "no"
+    restart: "unless-stopped"
     environment:
       # InfluxDB3 Environment Variables
       # INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
@@ -144,6 +150,8 @@ services:
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca.crt
       SSL_CERT_FILE:       /etc/ssl/certs/server.crt
       SSL_KEY_FILE:        /etc/ssl/private/server.key
+    stdin_open: true
+    tty: true
     volumes:
       - ./certs/_master/ca.crt:/etc/ssl/certs/ca.crt:ro
       - ./certs/mcp/server.crt:/etc/ssl/certs/server.crt:ro
@@ -162,7 +170,7 @@ services:
       args:
         GRAFANA_BUILD_VERSION: ${GRAFANA_VERSION}
     container_name: grafana
-    restart: unless-stopped
+    restart: "unless-stopped"
     ports:
       - "${GRAFANA_PORT}:3000" # HTTPS only
     environment:
@@ -196,7 +204,7 @@ services:
       args:
         INFLUXDB3_EXPLORER_VERSION: ${INFLUXDB3_EXPLORER_VERSION}
     container_name: influxdb3-explorer
-    restart: unless-stopped
+    restart: "unless-stopped"
     ports:
       - "${EXPLORER_PORT}:443"
       # - "8080:80" # For non-TLS access (not recommended)
