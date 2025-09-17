@@ -145,7 +145,7 @@ services:
       INFLUX_DB: ${INFLUXDB_DB}
       INFLUX_DB_INSTANCE_URL: https://${INFLUXDB_HOST}:${INFLUXDB_PORT}
       INFLUXDB3_TLS_CA: /etc/ssl/certs/ca.crt
-      INFLUXDB3_AUTH_TOKEN_FILE: /home/influxd/epa.token
+      INFLUXDB_TOKEN: /home/influxd/epa.token
       INFLUX_DB_PRODUCT_TYPE: core
       NODE_EXTRA_CA_CERTS: /etc/ssl/certs/ca.crt
       SSL_CERT_FILE:       /etc/ssl/certs/server.crt
@@ -156,6 +156,7 @@ services:
       - ./certs/_master/ca.crt:/etc/ssl/certs/ca.crt:ro
       - ./certs/mcp/server.crt:/etc/ssl/certs/server.crt:ro
       - ./certs/mcp/server.key:/etc/ssl/private/server.key:ro
+      - ./data/influxdb_tokens/epa.token:/home/influx/epa.token:ro
     networks:
       epa:
         ipv4_address: ${INFLUX_MCP_IP}
