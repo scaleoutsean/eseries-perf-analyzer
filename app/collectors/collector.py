@@ -171,13 +171,48 @@ class APICollector:
             
         # Pattern: configuration_{endpoint}_{system_id}_{object_id}_{timestamp}.json
         parts = filename.split('_')
+        logger.debug(f"🔍 Extracting system_id from filename: {filename}")
+        logger.debug(f"🔍 Filename parts: {parts}")
         if len(parts) >= 4:
-            # system_id is typically the 3rd part (index 2) after 'configuration' and endpoint
-            system_id = parts[2]
-            # Validate it's a reasonable system ID (hex characters, typical length)
-            if len(system_id) >= 16 and system_id.replace('0123456789ABCDEFabcdef', '') == '':
-                return system_id
+            # Find the system_id based on the endpoint type
+            endpoint = parts[1] if len(parts) > 1 else ""
+            logger.debug(f"🔍 Endpoint detected: {endpoint}")
+            
+            # Different endpoints have system_id at different positions
+            if endpoint == 'volumes' and len(parts) > 2 and parts[2] == 'config':
+                # configuration_volumes_config_{system_id}_{volume_id}_{timestamp}.json
+                system_id = parts[3] if len(parts) > 3 else None
+            elif endpoint == 'snapshot' and len(parts) > 2:
+                # configuration_snapshot_{subendpoint}_{system_id}_{object_id}_{timestamp}.json
+                system_id = parts[3] if len(parts) > 3 else None
+            elif len(parts) > 2 and parts[2] in ['config', 'system', 'controller', 'drive', 'host', 'storage_pool', 'volume_mapping']:
+                # configuration_{endpoint}_config_{system_id}_{object_id}_{timestamp}.json
+                system_id = parts[3] if len(parts) > 3 else None
+            else:
+                # Default: system_id is at position 2 (for tray_config, etc.)
+                system_id = parts[2]
                 
+            logger.debug(f"🔍 Extracted system_id candidate: {system_id}")
+            # Validate it's a reasonable system ID (hex characters, typical length)
+            if system_id:
+                length_valid = len(system_id) >= 16
+                # Use regex to check for valid hex characters (both uppercase and lowercase)
+                import re
+                hex_only = bool(re.match(r'^[0-9A-Fa-f]+$', system_id))
+                logger.debug(f"🔍 Validation - length_valid: {length_valid}, hex_only: {hex_only}")
+                if not hex_only:
+                    # Find invalid characters
+                    invalid_chars = re.sub(r'[0-9A-Fa-f]', '', system_id)
+                    logger.debug(f"🔍 Invalid characters found: '{invalid_chars}' in '{system_id}'")
+                if length_valid and hex_only:
+                    logger.debug(f"✅ Valid system_id extracted: {system_id}")
+                    return system_id
+                else:
+                    logger.debug(f"❌ Invalid system_id format: {system_id} (length: {len(system_id)}, valid_length: {length_valid}, valid_hex: {hex_only})")
+            else:
+                logger.debug(f"❌ No system_id extracted")
+                
+        logger.debug(f"❌ Could not extract system_id from filename: {filename}")
         return None
     
     def collect_list_from_json(self, file_path: str, model_class: Type[T]) -> List[T]:
@@ -235,6 +270,26 @@ class APICollector:
             logger.debug(f"Processing file: {file_path}")
             try:
                 data = self.read_json_file(file_path)
+                
+                # Extract system ID from filename for config files
+                filename = os.path.basename(file_path)
+                if filename.startswith('configuration_'):
+                    system_id = self._extract_system_id_from_filename(filename)
+                    if system_id:
+                        logger.debug(f"📁 Adding system_id {system_id} to data from file: {filename}")
+                        if isinstance(data, list):
+                            # Add system_id to each item in the list
+                            for item in data:
+                                if isinstance(item, dict):
+                                    item['system_id'] = system_id
+                                    logger.debug(f"📁 Added system_id {system_id} to list item")
+                        elif isinstance(data, dict):
+                            # Add system_id to the single object
+                            data['system_id'] = system_id
+                            logger.debug(f"📁 Added system_id {system_id} to single object")
+                    else:
+                        logger.debug(f"📁 No system_id extracted from file: {filename}")
+                
                 if isinstance(data, list):
                     # If the file contains a list, extend results with all items
                     results.extend([self.parse_model_from_json(item, model_class) for item in data])

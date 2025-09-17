@@ -97,6 +97,7 @@ CONFIG_COLLECTION_MAPPING = {
         "VolumeConfig",           # Volume mappings change frequently
         "VolumeMappingsConfig",   # Critical for volume enrichment
         "HostConfig",             # Host connectivity can change
+        "TrayConfig",             # DEBUG: Tray configuration rarely changes
     ],
     
     # Medium frequency - moderately changing configuration
@@ -110,16 +111,15 @@ CONFIG_COLLECTION_MAPPING = {
     ScheduleFrequency.LOW_FREQUENCY: [
         "SystemConfig",           # System-level settings change infrequently
         "DriveConfig",            # Drive configuration changes slowly
-        "InterfaceConfig",        # Interface config changes infrequently
         "SnapshotConfig",         # Snapshot configurations change infrequently
         "EthernetConfig",         # Ethernet interface configs change infrequently
-        "HardwareConfig",         # Hardware component configs are static
         "AsyncMirrorsConfig",     # Async mirror configurations change infrequently
     ],
     
     # Daily - very static configuration
     ScheduleFrequency.DAILY: [
-        "TrayConfig",             # Tray configuration rarely changes
+        "InterfaceConfig",        # Interface config changes infrequently
+        "HardwareConfig",         # Hardware component configs are static
     ],
     
     # Weekly - essentially static data (mainly for auditing)

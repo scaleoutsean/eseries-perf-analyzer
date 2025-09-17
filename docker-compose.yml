@@ -71,7 +71,7 @@ services:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
-    restart: no
+    restart: "no"
     command: ["--fromJson", "/data/samples/in", "--output", "both", "--tlsCa", "/home/app/certs/ca.crt", "--logfile", "/data/samples/out/collector.log"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
@@ -84,7 +84,7 @@ services:
       USERNAME: ${SANTRICITY_USERNAME}
       PASSWORD: ${SANTRICITY_PASSWORD}
       COLLECTOR_LOG_LEVEL: DEBUG
-      MAX_ITERATIONS: 2
+      MAX_ITERATIONS: 17
     depends_on:
       - influxdb
     volumes:

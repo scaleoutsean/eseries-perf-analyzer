@@ -82,8 +82,7 @@ class ConfigCollector:
             elif config_type == "ControllerConfig":
                 return self.eseries_collector.collect_controllers(ControllerConfig)
             elif config_type == "SystemConfig":
-                system_config = self.eseries_collector.collect_system_config(SystemConfig)
-                return [system_config] if system_config else []
+                return self.eseries_collector.collect_system_configs(SystemConfig)
             elif config_type == "DriveConfig":
                 return self.eseries_collector.collect_drives(DriveConfig)
             elif config_type == "InterfaceConfig":
