@@ -90,7 +90,7 @@ services:
       USERNAME: ${SANTRICITY_USERNAME}
       PASSWORD: ${SANTRICITY_PASSWORD}
       COLLECTOR_LOG_LEVEL: DEBUG
-      COLLECTOR_LOG_FILE: ${COLLECTOR_LOG_FILE:-None}
+      COLLECTOR_LOG_FILE: ${COLLECTOR_LOG_FILE:-/data/samples/out/collector.log}
       MAX_ITERATIONS: 2
     depends_on:
       - influxdb

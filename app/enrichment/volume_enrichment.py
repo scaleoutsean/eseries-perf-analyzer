@@ -27,7 +27,8 @@ class VolumeEnrichmentProcessor:
                               host_groups: List[Dict],
                               storage_pools: List[Dict],
                               volumes: List[Dict],
-                              volume_mappings: List[Dict]):
+                              volume_mappings: List[Dict],
+                              system_configs: List[Dict]):
         """Load all configuration data needed for enrichment"""
         
         # Build lookup tables
@@ -35,6 +36,7 @@ class VolumeEnrichmentProcessor:
         self.hostgroup_lookup = {hg['id']: hg for hg in host_groups}
         self.pool_lookup = {p['id']: p for p in storage_pools}
         self.volume_lookup = {v['id']: v for v in volumes}
+        self.system_lookup = {s.get('wwn', s.get('storageSystemWwn', s.get('id'))): s for s in system_configs}
         
         # Group mappings by volume
         self.volume_mappings = {}
@@ -45,7 +47,8 @@ class VolumeEnrichmentProcessor:
             self.volume_mappings[vol_ref].append(mapping)
             
         logger.info(f"Loaded enrichment data: {len(hosts)} hosts, {len(host_groups)} host groups, "
-                   f"{len(storage_pools)} pools, {len(volumes)} volumes, {len(volume_mappings)} mappings")
+                   f"{len(storage_pools)} pools, {len(volumes)} volumes, {len(volume_mappings)} mappings, "
+                   f"{len(system_configs)} systems")
     
     def enrich_volume_performance(self, volume_performance: Dict) -> Dict:
         """Enrich a single volume performance measurement with host/pool tags"""
@@ -65,6 +68,12 @@ class VolumeEnrichmentProcessor:
         pool_ref = volume.get('volumeGroupRef')
         pool = self.pool_lookup.get(pool_ref)
         pool_name = pool.get('name') if pool else 'unknown'
+        
+        # Get system information
+        system_wwn = volume.get('storage_system_wwn') or volume.get('storageSystemWwn') or volume.get('systemWwn')
+        system = self.system_lookup.get(system_wwn) if system_wwn else None
+        system_name = system.get('name') if system else 'unknown'
+        system_wwn_tag = system.get('wwn', system_wwn) if system else 'unknown'
         
         # Get mappings for this volume
         vol_mappings = self.volume_mappings.get(volume_id, [])
@@ -106,6 +115,8 @@ class VolumeEnrichmentProcessor:
         enriched['host'] = ','.join(sorted(set(host_names))) if host_names else ''
         enriched['host_group'] = ','.join(sorted(host_group_names)) if host_group_names else ''
         enriched['storage_pool'] = pool_name
+        enriched['storage_system_name'] = system_name
+        enriched['storage_system_wwn'] = system_wwn_tag
         
         return enriched
     

@@ -105,14 +105,14 @@ class EnrichmentProcessor:
             
             # Load into volume enricher
             self.volume_enricher.load_configuration_data(
-                hosts_data, host_groups_data, pools_data, volumes_data, mappings_data
+                hosts_data, host_groups_data, pools_data, volumes_data, mappings_data, system_configs_data
             )
             
             # Load into drive enricher
-            self.drive_enricher.load_configuration_data(drives_data, pools_data)
+            self.drive_enricher.load_configuration_data(drives_data, pools_data, system_configs_data)
             
             # Load into controller enricher
-            self.controller_enricher.load_configuration_data(controllers_data)
+            self.controller_enricher.load_configuration_data(controllers_data, system_configs_data)
             
             # Load into system enricher
             self.system_enricher.build_system_config_cache(system_configs_data)
@@ -192,12 +192,15 @@ class EnrichmentProcessor:
             if self.enrichment_data_loaded:
                 
                 # Try to detect measurement type from data structure
+                first_record = None
                 if not measurement_type and len(perf_data) > 0:
                     first_record = perf_data[0]
                     if 'volumeId' in first_record:
                         measurement_type = 'volume_performance'
                     elif 'diskId' in first_record:
                         measurement_type = 'drive_performance'
+                    elif 'interfaceId' in first_record:
+                        measurement_type = 'interface_performance'
                     elif 'controllerId' in first_record or 'sourceController' in first_record:
                         # Check if it's system stats vs controller stats
                         if 'storageSystemWWN' in first_record and 'maxCpuUtilization' in first_record:
@@ -212,6 +215,8 @@ class EnrichmentProcessor:
                         measurement_type = 'volume_performance'
                     elif 'drive' in measurement_type.lower():
                         measurement_type = 'drive_performance'
+                    elif 'interface' in measurement_type.lower():
+                        measurement_type = 'interface_performance'
                     elif 'controller' in measurement_type.lower():
                         if len(perf_data) > 0 and 'storageSystemWWN' in perf_data[0] and 'maxCpuUtilization' in perf_data[0]:
                             measurement_type = 'system_performance'
@@ -232,6 +237,10 @@ class EnrichmentProcessor:
                 elif measurement_type == 'controller_performance':
                     enriched_data = self.controller_enricher.enrich_controller_performance_batch(perf_data)
                     self.logger.info(f"Enriched {len(enriched_data)} controller performance records with config data")
+                    return enriched_data
+                elif measurement_type == 'interface_performance':
+                    enriched_data = self.controller_enricher.enrich_interface_statistics_batch(perf_data)
+                    self.logger.info(f"Enriched {len(enriched_data)} interface performance records with config data")
                     return enriched_data
                 elif measurement_type == 'system_performance':
                     # Check if this is system statistics by looking for system-specific fields
@@ -363,7 +372,7 @@ class EnrichmentProcessor:
         return enriched_events
 
 class ConfigCache:
-    """Temporary stub for ConfigCache."""
+    """ConfigCache"""
     def __init__(self):
         self.data = {}
     
@@ -1000,10 +1009,10 @@ def main():
                         
                         # Combine all performance data types for processing
                         all_performance_data = {
-                            'analysed_volume_statistics': volume_perf,
-                            'analysed_drive_statistics': drive_perf, 
-                            'analysed_system_statistics': system_perf,
-                            'analysed_interface_statistics': interface_perf,
+                            'analyzed_volume_statistics': volume_perf,
+                            'analyzed_drive_statistics': drive_perf, 
+                            'analyzed_system_statistics': system_perf,
+                            'analyzed_interface_statistics': interface_perf,
                             'analyzed_controller_statistics': controller_perf
                         }
                         
@@ -1133,11 +1142,11 @@ def main():
                     
                     # Add performance data - map performance types to InfluxDB measurement names
                     performance_type_mapping = {
-                        'volume_performance': 'analysed_volume_statistics',
-                        'drive_performance': 'analysed_drive_statistics', 
-                        'controller_performance': 'analysed_controller_statistics',
-                        'system_performance': 'analysed_system_statistics',
-                        'interface_performance': 'analysed_interface_statistics'
+                        'volume_performance': 'analyzed_volume_statistics',
+                        'drive_performance': 'analyzed_drive_statistics', 
+                        'controller_performance': 'analyzed_controller_statistics',
+                        'system_performance': 'analyzed_system_statistics',
+                        'interface_performance': 'analyzed_interface_statistics'
                     }
                     
                     if isinstance(enriched_data, dict):
@@ -1150,7 +1159,7 @@ def main():
                                 LOG.info(f"Adding {len(perf_records)} {measurement_name} records to write")
                     elif isinstance(enriched_data, list):
                         # Legacy handling - assume volume performance
-                        writer_data["analysed_volume_statistics"] = enriched_data
+                        writer_data["analyzed_volume_statistics"] = enriched_data
                         LOG.info(f"Adding {len(enriched_data)} volume performance records to write (legacy mode)")
                     else:
                         # Fallback

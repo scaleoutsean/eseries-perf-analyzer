@@ -182,10 +182,16 @@ class APICollector:
             if endpoint == 'volumes' and len(parts) > 2 and parts[2] == 'config':
                 # configuration_volumes_config_{system_id}_{volume_id}_{timestamp}.json
                 system_id = parts[3] if len(parts) > 3 else None
+            elif endpoint == 'volume' and len(parts) > 3 and parts[2] == 'mappings' and parts[3] == 'config':
+                # configuration_volume_mappings_config_{system_id}_{object_id}_{timestamp}.json
+                system_id = parts[4] if len(parts) > 4 else None
+            elif endpoint == 'storage' and len(parts) > 2 and parts[2] == 'pools':
+                # configuration_storage_pools_{system_id}_{object_id}_{timestamp}.json
+                system_id = parts[3] if len(parts) > 3 else None
             elif endpoint == 'snapshot' and len(parts) > 2:
                 # configuration_snapshot_{subendpoint}_{system_id}_{object_id}_{timestamp}.json
                 system_id = parts[3] if len(parts) > 3 else None
-            elif len(parts) > 2 and parts[2] in ['config', 'system', 'controller', 'drive', 'host', 'storage_pool', 'volume_mapping']:
+            elif len(parts) > 2 and parts[2] in ['config', 'system', 'controller', 'drive', 'host', 'storage_pool', 'volume_mapping', 'groups']:
                 # configuration_{endpoint}_config_{system_id}_{object_id}_{timestamp}.json
                 system_id = parts[3] if len(parts) > 3 else None
             else:

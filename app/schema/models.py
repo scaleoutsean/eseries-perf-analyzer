@@ -1045,6 +1045,14 @@ class AnalysedVolumeStatistics(BaseModel):
     writeResponseTimeStdDev: Optional[float] = None
     writeThroughput: Optional[float] = None
     writeTimeMax: Optional[float] = None    
+    # Enriched fields added during processing
+    host: Optional[str] = None
+    host_group: Optional[str] = None
+    storage_pool: Optional[str] = None
+    storage_system_name: Optional[str] = None
+    storage_system_wwn: Optional[str] = None
+    storageSystemName: Optional[str] = None
+    storageSystemWWN: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1108,6 +1116,14 @@ class AnalysedVolumeStatistics(BaseModel):
             writeResponseTimeStdDev=data.get('writeResponseTimeStdDev'),
             writeThroughput=data.get('writeThroughput'),
             writeTimeMax=data.get('writeTimeMax'),
+            # Enriched fields
+            host=data.get('host'),
+            host_group=data.get('host_group'),
+            storage_pool=data.get('storage_pool'),
+            storage_system_name=data.get('storage_system_name'),
+            storage_system_wwn=data.get('storage_system_wwn'),
+            storageSystemName=data.get('storageSystemName') or data.get('storage_system_name'),
+            storageSystemWWN=data.get('storageSystemWWN') or data.get('storage_system_wwn'),
             _raw_data=data.copy()
         )
 
@@ -1152,6 +1168,19 @@ class AnalysedDriveStatistics(BaseModel):
     writeResponseTimeStdDev: Optional[float] = None
     writeThroughput: Optional[float] = None
     writeTimeMax: Optional[float] = None
+    # Enriched fields added during processing
+    tray_id: Optional[str] = None
+    vol_group_name: Optional[str] = None
+    has_degraded_channel: Optional[bool] = None
+    system_name: Optional[str] = None
+    system_wwn: Optional[str] = None
+    system_id: Optional[str] = None
+    system_model: Optional[str] = None
+    system_firmware_version: Optional[str] = None
+    drive_slot: Optional[str] = None
+    tray_ref: Optional[str] = None
+    storageSystemName: Optional[str] = None
+    storageSystemWWN: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1199,6 +1228,19 @@ class AnalysedDriveStatistics(BaseModel):
             writeResponseTimeStdDev=data.get('writeResponseTimeStdDev'),
             writeThroughput=data.get('writeThroughput'),
             writeTimeMax=data.get('writeTimeMax'),
+            # Enriched fields
+            tray_id=data.get('tray_id'),
+            vol_group_name=data.get('vol_group_name'),
+            has_degraded_channel=data.get('has_degraded_channel'),
+            system_name=data.get('system_name'),
+            system_wwn=data.get('system_wwn'),
+            system_id=data.get('system_id'),
+            system_model=data.get('system_model'),
+            system_firmware_version=data.get('system_firmware_version'),
+            drive_slot=data.get('drive_slot'),
+            tray_ref=data.get('tray_ref'),
+            storageSystemName=data.get('storageSystemName') or data.get('storage_system_name'),
+            storageSystemWWN=data.get('storageSystemWWN') or data.get('storage_system_wwn'),
             _raw_data=data.copy()
         )
 
@@ -1253,6 +1295,30 @@ class AnalysedSystemStatistics(BaseModel):
     writeResponseTime: Optional[float] = None
     writeResponseTimeStdDev: Optional[float] = None
     writeThroughput: Optional[float] = None
+    # Enriched fields added during processing
+    system_id: Optional[str] = None
+    system_name: Optional[str] = None
+    system_wwn: Optional[str] = None
+    system_model: Optional[str] = None
+    system_status: Optional[str] = None
+    system_sub_model: Optional[str] = None
+    firmware_version: Optional[str] = None
+    app_version: Optional[str] = None
+    boot_version: Optional[str] = None
+    nvsram_version: Optional[str] = None
+    chassis_serial_number: Optional[str] = None
+    drive_count: Optional[int] = None
+    tray_count: Optional[int] = None
+    hot_spare_count: Optional[int] = None
+    used_pool_space: Optional[str] = None
+    free_pool_space: Optional[str] = None
+    unconfigured_space: Optional[str] = None
+    auto_load_balancing_enabled: Optional[bool] = None
+    host_connectivity_reporting_enabled: Optional[bool] = None
+    remote_mirroring_enabled: Optional[bool] = None
+    security_key_enabled: Optional[bool] = None
+    simplex_mode_enabled: Optional[bool] = None
+    drive_types: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1309,7 +1375,31 @@ class AnalysedSystemStatistics(BaseModel):
             writePhysicalIOps=data.get('writePhysicalIOps'),
             writeResponseTime=data.get('writeResponseTime'),
             writeResponseTimeStdDev=data.get('writeResponseTimeStdDev'),
-            writeThroughput=data.get('writeThroughput'),            
+            writeThroughput=data.get('writeThroughput'),
+            # Enriched fields
+            system_id=data.get('system_id'),
+            system_name=data.get('system_name'),
+            system_wwn=data.get('system_wwn'),
+            system_model=data.get('system_model'),
+            system_status=data.get('system_status'),
+            system_sub_model=data.get('system_sub_model'),
+            firmware_version=data.get('firmware_version'),
+            app_version=data.get('app_version'),
+            boot_version=data.get('boot_version'),
+            nvsram_version=data.get('nvsram_version'),
+            chassis_serial_number=data.get('chassis_serial_number'),
+            drive_count=data.get('drive_count'),
+            tray_count=data.get('tray_count'),
+            hot_spare_count=data.get('hot_spare_count'),
+            used_pool_space=data.get('used_pool_space'),
+            free_pool_space=data.get('free_pool_space'),
+            unconfigured_space=data.get('unconfigured_space'),
+            auto_load_balancing_enabled=data.get('auto_load_balancing_enabled'),
+            host_connectivity_reporting_enabled=data.get('host_connectivity_reporting_enabled'),
+            remote_mirroring_enabled=data.get('remote_mirroring_enabled'),
+            security_key_enabled=data.get('security_key_enabled'),
+            simplex_mode_enabled=data.get('simplex_mode_enabled'),
+            drive_types=data.get('drive_types'),
             _raw_data=data.copy()
         )
 
@@ -1347,6 +1437,8 @@ class AnalysedInterfaceStatistics(BaseModel):
     writeResponseTime: Optional[float] = None
     writeResponseTimeStdDev: Optional[float] = None
     writeThroughput: Optional[float] = None
+    storageSystemName: Optional[str] = None
+    storageSystemWWN: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1381,6 +1473,8 @@ class AnalysedInterfaceStatistics(BaseModel):
             writeResponseTime=data.get('writeResponseTime'),
             writeResponseTimeStdDev=data.get('writeResponseTimeStdDev'),
             writeThroughput=data.get('writeThroughput'),
+            storageSystemName=data.get('storageSystemName') or data.get('storage_system_name'),
+            storageSystemWWN=data.get('storageSystemWWN') or data.get('storage_system_wwn'),
             _raw_data=data.copy()
         )
 
@@ -1437,6 +1531,25 @@ class AnalyzedControllerStatisticsValues:
     writeResponseTime: Optional[float] = None
     writeResponseTimeStdDev: Optional[float] = None
     writeThroughput: Optional[float] = None
+    # Enriched fields added during processing
+    controller_id: Optional[str] = None
+    controller_label: Optional[str] = None
+    controller_active: Optional[bool] = None
+    controller_model: Optional[str] = None
+    interface_type: Optional[str] = None
+    is_management_interface: Optional[bool] = None
+    system_name: Optional[str] = None
+    system_wwn: Optional[str] = None
+    system_id: Optional[str] = None
+    system_model: Optional[str] = None
+    system_firmware_version: Optional[str] = None
+    link_state: Optional[str] = None
+    current_speed: Optional[str] = None
+    link_width: Optional[str] = None
+    port_state: Optional[str] = None
+    channel: Optional[str] = None
+    storageSystemName: Optional[str] = None
+    storageSystemWWN: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
@@ -1495,6 +1608,25 @@ class AnalyzedControllerStatisticsValues:
             writeResponseTime=data.get('writeResponseTime'),
             writeResponseTimeStdDev=data.get('writeResponseTimeStdDev'),
             writeThroughput=data.get('writeThroughput'),
+            # Enriched fields
+            controller_id=data.get('controller_id'),
+            controller_label=data.get('controller_label'),
+            controller_active=data.get('controller_active'),
+            controller_model=data.get('controller_model'),
+            interface_type=data.get('interface_type'),
+            is_management_interface=data.get('is_management_interface'),
+            system_name=data.get('system_name'),
+            system_wwn=data.get('system_wwn'),
+            system_id=data.get('system_id'),
+            system_model=data.get('system_model'),
+            system_firmware_version=data.get('system_firmware_version'),
+            link_state=data.get('link_state'),
+            current_speed=data.get('current_speed'),
+            link_width=data.get('link_width'),
+            port_state=data.get('port_state'),
+            channel=data.get('channel'),
+            storageSystemName=data.get('storageSystemName') or data.get('storage_system_name'),
+            storageSystemWWN=data.get('storageSystemWWN') or data.get('storage_system_wwn'),
             _raw_data=data.copy()
         )
 

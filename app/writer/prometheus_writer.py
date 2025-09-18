@@ -61,6 +61,27 @@ class PrometheusWriter(Writer):
 
         LOG.info(f"PrometheusWriter initialized, will serve metrics on port {port}")
     
+    def _sanitize_label_value(self, value: str) -> str:
+        """Sanitize label values to avoid Prometheus metric issues."""
+        if not value:
+            return 'unknown'
+        
+        # Strip leading/trailing whitespace and collapse multiple spaces
+        sanitized = ' '.join(value.split())
+        
+        # Replace spaces with underscores (Prometheus label convention)
+        sanitized = sanitized.replace(' ', '_')
+        
+        # Remove or escape problematic characters for Prometheus labels
+        # Prometheus doesn't like characters that could break metric formatting
+        sanitized = sanitized.replace(',', '_').replace('=', '_').replace('\n', '_').replace('\r', '_')
+        
+        # If empty after sanitization, return unknown
+        if not sanitized.strip():
+            return 'unknown'
+            
+        return sanitized
+    
     def _initialize_metrics(self) -> Dict[str, Dict[str, Gauge]]:
         """Initialize all Prometheus metric definitions."""
         metrics = {}
@@ -463,12 +484,12 @@ class PrometheusWriter(Writer):
                 
                 # Extract common labels from enriched volume data using snake_case
                 labels = {
-                    'volume_id': str(vol_dict.get('volume_id', vol_dict.get('volumeId', 'unknown'))),
-                    'volume_name': str(vol_dict.get('volume_name', vol_dict.get('volumeName', 'unknown'))),
-                    'host': str(vol_dict.get('host', 'unknown')),
-                    'host_group': str(vol_dict.get('host_group', 'unknown')),
-                    'storage_pool': str(vol_dict.get('storage_pool', 'unknown')),
-                    'controller_id': str(vol_dict.get('controller_id', vol_dict.get('controllerId', 'unknown')))
+                    'volume_id': self._sanitize_label_value(str(vol_dict.get('volume_id', vol_dict.get('volumeId', 'unknown')))),
+                    'volume_name': self._sanitize_label_value(str(vol_dict.get('volume_name', vol_dict.get('volumeName', 'unknown')))),
+                    'host': self._sanitize_label_value(str(vol_dict.get('host', 'unknown'))),
+                    'host_group': self._sanitize_label_value(str(vol_dict.get('host_group', 'unknown'))),
+                    'storage_pool': self._sanitize_label_value(str(vol_dict.get('storage_pool', 'unknown'))),
+                    'controller_id': self._sanitize_label_value(str(vol_dict.get('controller_id', vol_dict.get('controllerId', 'unknown'))))
                 }
                 
                 LOG.info(f"Volume labels: {labels}")

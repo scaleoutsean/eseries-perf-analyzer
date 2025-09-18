@@ -21,69 +21,107 @@ class ControllerEnrichmentProcessor:
     def __init__(self):
         self.controller_lookup = {}     # controller_id -> controller_config
         self.interface_lookup = {}      # interface_ref -> interface enrichment data
+        self.system_lookup = {}         # system_id/system_wwn -> system_config
         
-    def load_configuration_data(self, controllers: List[Dict]):
-        """Load controller configuration data needed for enrichment"""
-        
-        # Build lookup tables
-        self.controller_lookup = {c['id']: c for c in controllers}
-        # Also index by controllerRef in case they differ
-        for controller in controllers:
-            if controller.get('controllerRef') and controller['controllerRef'] != controller['id']:
-                self.controller_lookup[controller['controllerRef']] = controller
-        
-        # Build interface reference mapping for interface statistics enrichment
+    def load_configuration_data(self, controllers_data, system_configs_data=None):
+        """Load controller and interface configuration data for enrichment"""
+        self.controller_lookup = {}
         self.interface_lookup = {}
-        for controller in controllers:
-            controller_id = controller.get('id')
+        self.system_lookup = {}
+        
+        # Load system configurations if provided
+        if system_configs_data:
+            # Handle both single system config dict and list of system configs
+            if isinstance(system_configs_data, dict):
+                system_configs_data = [system_configs_data]
             
-            # Process host interfaces (IB, iSCSI, FC, SAS, etc.)
-            for host_interface in controller.get('hostInterfaces', []):
-                interface_type = host_interface.get('interfaceType')
-                interface_ref = None
+            for system_config in system_configs_data:
+                system_id = system_config.get('id')
+                system_wwn = system_config.get('wwn')
+                if system_id:
+                    self.system_lookup[system_id] = system_config
+                if system_wwn:
+                    self.system_lookup[system_wwn] = system_config
+        
+        # Load controller configurations
+        for controller_config in controllers_data:
+            controller_id = controller_config.get('id')
+            if controller_id:
+                self.controller_lookup[controller_id] = controller_config
                 
-                # Extract interface reference based on type
-                if interface_type and interface_type in host_interface:
-                    interface_data = host_interface[interface_type]
-                    interface_ref = interface_data.get('interfaceRef')
+                # Extract system information from controller config
+                system_id = controller_config.get('storage_system_id') or controller_config.get('system_id')
+                if system_id and system_id in self.system_lookup:
+                    # Link controller to its system
+                    controller_config['_system_config'] = self.system_lookup[system_id]
+                
+                # Process interfaces for this controller
+                # Handle both hostInterfaces and netInterfaces arrays
+                all_interfaces = []
+                
+                # Add host interfaces (interfaceId is nested in type-specific objects)
+                host_interfaces = controller_config.get('hostInterfaces', [])
+                for interface in host_interfaces:
+                    interface_copy = interface.copy()
                     
-                if interface_ref:
-                    # Determine controller label (A/B logic - customize as needed)
-                    # This is a simplified example - you may need different logic
-                    controller_label = self._get_controller_label(controller)
+                    # Extract interface ID from nested structure based on interface type
+                    interface_type = interface.get('interfaceType')
+                    interface_id = None
                     
-                    self.interface_lookup[interface_ref] = {
-                        'controller_id': controller_id,
-                        'controller_ref': controller.get('controllerRef', controller_id),
-                        'controller_label': controller_label,
-                        'controller_active': controller.get('active'),
-                        'controller_model': controller.get('modelName'),
-                        'interface_type': interface_type,
-                        'interface_data': interface_data  # Full interface config for detailed enrichment
-                    }
-            
-            # Process network interfaces (management - typically Ethernet)
-            for net_interface in controller.get('netInterfaces', []):
-                interface_type = net_interface.get('interfaceType')
-                if interface_type and interface_type in net_interface:
-                    interface_data = net_interface[interface_type]
-                    interface_ref = interface_data.get('interfaceRef')
+                    if interface_type == 'ib':
+                        interface_id = interface.get('ib', {}).get('interfaceId')
+                    elif interface_type == 'iscsi':
+                        interface_id = interface.get('iscsi', {}).get('interfaceId')
+                    elif interface_type == 'fibre':
+                        interface_id = interface.get('fibre', {}).get('interfaceId')
+                    elif interface_type == 'sas':
+                        interface_id = interface.get('sas', {}).get('interfaceId')
+                    elif interface_type == 'sata':
+                        interface_id = interface.get('sata', {}).get('interfaceId')
+                    elif interface_type == 'scsi':
+                        interface_id = interface.get('scsi', {}).get('interfaceId')
+                    elif interface_type == 'ethernet':
+                        interface_id = interface.get('ethernet', {}).get('interfaceId')
+                    elif interface_type == 'pcie':
+                        interface_id = interface.get('pcie', {}).get('interfaceId')
                     
-                    if interface_ref:
-                        controller_label = self._get_controller_label(controller)
+                    interface_copy['_interface_id'] = interface_id
+                    interface_copy['_interface_type'] = interface_type
+                    all_interfaces.append(interface_copy)
+                
+                # Add network interfaces (id is in ethernet object)
+                net_interfaces = controller_config.get('netInterfaces', [])
+                for interface in net_interfaces:
+                    interface_copy = interface.copy()
+                    
+                    # Extract interface ID from ethernet object
+                    ethernet_data = interface.get('ethernet', {})
+                    interface_id = ethernet_data.get('id') or ethernet_data.get('interfaceRef')
+                    
+                    interface_copy['_interface_id'] = interface_id
+                    interface_copy['_interface_type'] = interface.get('interfaceType', 'network')
+                    all_interfaces.append(interface_copy)
+                
+                # Populate interface lookup using normalized interface ID
+                for interface in all_interfaces:
+                    interface_id = interface.get('_interface_id')
+                    if interface_id:
+                        # Get controller label
+                        controller_label = self._get_controller_label(controller_config)
                         
-                        self.interface_lookup[interface_ref] = {
+                        self.interface_lookup[interface_id] = {
                             'controller_id': controller_id,
-                            'controller_ref': controller.get('controllerRef', controller_id),
+                            'controller_name': controller_config.get('name', 'unknown'),
                             'controller_label': controller_label,
-                            'controller_active': controller.get('active'),
-                            'controller_model': controller.get('modelName'),
-                            'interface_type': interface_type,
-                            'interface_data': interface_data,
-                            'is_management': True  # Flag for management vs host interfaces
+                            'controller_active': controller_config.get('active', False),
+                            'controller_model': controller_config.get('modelName', 'unknown'),
+                            'controller_status': controller_config.get('status', 'unknown'),
+                            'interface_name': interface.get('name', 'unknown'),
+                            'interface_type': interface.get('_interface_type', 'unknown'),
+                            'interface_speed': interface.get('speed', 'unknown'),
+                            'interface_data': interface,  # Store full interface data for type-specific enrichment
+                            'system_config': controller_config.get('_system_config')
                         }
-            
-        logger.info(f"Loaded controller enrichment data: {len(controllers)} controllers, {len(self.interface_lookup)} interface references")
     
     def _get_controller_label(self, controller: Dict) -> str:
         """Get controller label (A/B) for enrichment - customize logic as needed"""
@@ -127,6 +165,22 @@ class ControllerEnrichmentProcessor:
         # Add interface tags
         enriched['interface_type'] = interface_enrichment['interface_type']
         enriched['is_management_interface'] = interface_enrichment.get('is_management', False)
+        
+        # Add system tags if system config is available
+        system_config = interface_enrichment.get('system_config')
+        if system_config:
+            enriched['system_name'] = system_config.get('name', 'unknown')
+            enriched['system_wwn'] = system_config.get('wwn', 'unknown')
+            enriched['system_id'] = system_config.get('id', 'unknown')
+            enriched['system_model'] = system_config.get('model', 'unknown')
+            enriched['system_firmware_version'] = system_config.get('firmwareVersion', 'unknown')
+        else:
+            # Fallback to unknown values if no system config
+            enriched['system_name'] = 'unknown'
+            enriched['system_wwn'] = 'unknown'
+            enriched['system_id'] = 'unknown'
+            enriched['system_model'] = 'unknown'
+            enriched['system_firmware_version'] = 'unknown'
         
         # Add interface-type specific enrichment
         interface_data = interface_enrichment.get('interface_data', {})
@@ -194,6 +248,22 @@ class ControllerEnrichmentProcessor:
         enriched['active'] = controller_config.get('active', False)
         enriched['model_name'] = controller_config.get('modelName', 'unknown')
         enriched['status'] = controller_config.get('status', 'unknown')
+        
+        # Add system tags if system config is available
+        system_config = controller_config.get('_system_config')
+        if system_config:
+            enriched['system_name'] = system_config.get('name', 'unknown')
+            enriched['system_wwn'] = system_config.get('wwn', 'unknown')
+            enriched['system_id'] = system_config.get('id', 'unknown')
+            enriched['system_model'] = system_config.get('model', 'unknown')
+            enriched['system_firmware_version'] = system_config.get('firmwareVersion', 'unknown')
+        else:
+            # Fallback to unknown values if no system config
+            enriched['system_name'] = 'unknown'
+            enriched['system_wwn'] = 'unknown'
+            enriched['system_id'] = 'unknown'
+            enriched['system_model'] = 'unknown'
+            enriched['system_firmware_version'] = 'unknown'
         
         # Add fields (additional data points)
         enriched['cache_memory_size'] = controller_config.get('cacheMemorySize', 0)

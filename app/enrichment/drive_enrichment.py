@@ -18,10 +18,12 @@ class DriveEnrichmentProcessor:
     def __init__(self):
         self.drive_lookup = {}          # drive_id -> drive_config
         self.pool_lookup = {}           # pool_id -> pool_config
+        self.system_lookup = {}         # system_id/system_wwn -> system_config
         
     def load_configuration_data(self, 
                               drives: List[Dict], 
-                              storage_pools: List[Dict]):
+                              storage_pools: List[Dict],
+                              system_configs_data: Optional[List[Dict]] = None):
         """Load drive configuration and storage pool data needed for enrichment"""
         
         # Build lookup tables
@@ -32,8 +34,23 @@ class DriveEnrichmentProcessor:
                 self.drive_lookup[drive['driveRef']] = drive
         
         self.pool_lookup = {p['id']: p for p in storage_pools}
+        
+        # Load system configurations if provided
+        self.system_lookup = {}
+        if system_configs_data:
+            # Handle both single system config dict and list of system configs
+            if isinstance(system_configs_data, dict):
+                system_configs_data = [system_configs_data]
             
-        logger.info(f"Loaded drive enrichment data: {len(drives)} drives, {len(storage_pools)} storage pools")
+            for system_config in system_configs_data:
+                system_id = system_config.get('id')
+                system_wwn = system_config.get('wwn')
+                if system_id:
+                    self.system_lookup[system_id] = system_config
+                if system_wwn:
+                    self.system_lookup[system_wwn] = system_config
+            
+        logger.info(f"Loaded drive enrichment data: {len(drives)} drives, {len(storage_pools)} storage pools, {len(self.system_lookup)} systems")
     
     def enrich_drive_performance(self, drive_performance: Dict) -> Dict:
         """Enrich a single drive performance measurement with configuration data"""
@@ -66,6 +83,33 @@ class DriveEnrichmentProcessor:
         
         # Add fields (additional data points)
         enriched['has_degraded_channel'] = drive_config.get('hasDegradedChannel', False)
+        
+        # Add system tags if system config is available
+        # Try to find system from drive config or storage pool
+        system_config = None
+        system_id = drive_config.get('storage_system_id') or drive_config.get('system_id')
+        if system_id and system_id in self.system_lookup:
+            system_config = self.system_lookup[system_id]
+        elif vol_group_ref and vol_group_ref in self.pool_lookup:
+            # Try to get system from storage pool
+            pool = self.pool_lookup[vol_group_ref]
+            system_id = pool.get('storage_system_id') or pool.get('system_id')
+            if system_id and system_id in self.system_lookup:
+                system_config = self.system_lookup[system_id]
+        
+        if system_config:
+            enriched['system_name'] = system_config.get('name', 'unknown')
+            enriched['system_wwn'] = system_config.get('wwn', 'unknown')
+            enriched['system_id'] = system_config.get('id', 'unknown')
+            enriched['system_model'] = system_config.get('model', 'unknown')
+            enriched['system_firmware_version'] = system_config.get('firmwareVersion', 'unknown')
+        else:
+            # Fallback to unknown values if no system config
+            enriched['system_name'] = 'unknown'
+            enriched['system_wwn'] = 'unknown'
+            enriched['system_id'] = 'unknown'
+            enriched['system_model'] = 'unknown'
+            enriched['system_firmware_version'] = 'unknown'
         
         # Optional: Add drive physical location info as tags
         physical_location = drive_config.get('physicalLocation', {})

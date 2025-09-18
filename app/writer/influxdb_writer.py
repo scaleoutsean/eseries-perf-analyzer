@@ -482,7 +482,9 @@ class InfluxDBWriter(Writer):
             'controller_id': self._sanitize_tag_value(str(self._get_field_value(data, 'controller_id') or 'unknown')),
             'host': self._sanitize_tag_value(str(data.get('host', 'unknown'))),
             'host_group': self._sanitize_tag_value(str(data.get('host_group', 'unknown'))),
-            'storage_pool': self._sanitize_tag_value(str(data.get('storage_pool', 'unknown')))
+            'storage_pool': self._sanitize_tag_value(str(data.get('storage_pool', 'unknown'))),
+            'storage_system_name': self._sanitize_tag_value(str(data.get('storage_system_name', 'unknown'))),
+            'storage_system_wwn': self._sanitize_tag_value(str(data.get('storage_system_wwn', 'unknown')))
         }
         
         # Extract fields (values) using BaseModel conversion
@@ -513,7 +515,7 @@ class InfluxDBWriter(Writer):
             return None
         
         return {
-            'measurement': 'analysed_volume_statistics',  # Use descriptive measurement name
+            'measurement': 'analyzed_volume_statistics',  # Use descriptive measurement name
             'tags': tags,
             'fields': fields,
             'time': timestamp
@@ -527,7 +529,9 @@ class InfluxDBWriter(Writer):
             'controller_id': ('sourceController', 'unknown'),
             'volume_group_id': ('volGroupId', 'unknown'),
             'volume_group_name': ('volGroupName', 'unknown'),
-            'tray_id': ('trayId', 'unknown')
+            'tray_id': ('trayId', 'unknown'),
+            'storage_system_name': ('storageSystemName', 'unknown'),
+            'storage_system_wwn': ('storageSystemWWN', 'unknown')
         }, [
             'combined_iops', 'read_iops', 'write_iops', 'other_iops',
             'combined_throughput', 'read_throughput', 'write_throughput',
@@ -545,7 +549,9 @@ class InfluxDBWriter(Writer):
             for stat in data['statistics']:
                 record = self._convert_schema_record(measurement_name, stat, AnalyzedControllerStatistics, {
                     'controller_id': ('controllerId', 'unknown'),
-                    'source_controller': ('sourceController', 'unknown')
+                    'source_controller': ('sourceController', 'unknown'),
+                    'storage_system_name': ('storageSystemName', 'unknown'),
+                    'storage_system_wwn': ('storageSystemWWN', 'unknown')
                 }, [
                     'combined_iops', 'read_iops', 'write_iops', 'other_iops',
                     'combined_throughput', 'read_throughput', 'write_throughput',
@@ -560,7 +566,9 @@ class InfluxDBWriter(Writer):
         else:
             return self._convert_schema_record(measurement_name, data, AnalyzedControllerStatistics, {
                 'controller_id': ('controllerId', 'unknown'),
-                'source_controller': ('sourceController', 'unknown')
+                'source_controller': ('sourceController', 'unknown'),
+                'storage_system_name': ('storageSystemName', 'unknown'),
+                'storage_system_wwn': ('storageSystemWWN', 'unknown')
             }, [
                 'combined_iops', 'read_iops', 'write_iops', 'other_iops',
                 'combined_throughput', 'read_throughput', 'write_throughput',
@@ -576,7 +584,9 @@ class InfluxDBWriter(Writer):
             'interface_id': ('interfaceId', 'unknown'),
             'controller_id': ('controllerId', 'unknown'),
             'channel_type': ('channelType', 'unknown'),
-            'channel_number': ('channelNumber', 'unknown')
+            'channel_number': ('channelNumber', 'unknown'),
+            'storage_system_name': ('storageSystemName', 'unknown'),
+            'storage_system_wwn': ('storageSystemWWN', 'unknown')
         }, [
             'combined_iops', 'read_iops', 'write_iops', 'other_iops',
             'combined_throughput', 'read_throughput', 'write_throughput',
@@ -1030,7 +1040,7 @@ class InfluxDBWriter(Writer):
         # Special handling for performance_data wrapper - treat as volume performance
         if measurement_name == 'performance_data':
             LOG.debug(f"Converting performance_data as volume performance record")
-            return self._convert_volume_record('analysed_volume_statistics', data)
+            return self._convert_volume_record('analyzed_volume_statistics', data)
         
         # Special handling for lockdown_status 
         if measurement_name == 'lockdown_status':
@@ -1139,8 +1149,11 @@ class InfluxDBWriter(Writer):
         if not value:
             return 'unknown'
         
+        # Strip leading/trailing whitespace and collapse multiple spaces
+        sanitized = ' '.join(value.split())
+        
         # Replace spaces with underscores
-        sanitized = value.replace(' ', '_')
+        sanitized = sanitized.replace(' ', '_')
         
         # Remove or escape problematic characters for InfluxDB tags
         # InfluxDB doesn't like commas, spaces, equals signs in tag values

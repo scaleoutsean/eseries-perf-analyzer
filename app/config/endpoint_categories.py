@@ -24,10 +24,10 @@ ENDPOINT_CATEGORIES = {
     
     # PERFORMANCE: Real-time metrics and statistics
     EndpointCategory.PERFORMANCE: {
-        'analysed_volume_statistics',
-        'analysed_drive_statistics', 
-        'analysed_system_statistics',
-        'analysed_interface_statistics',
+        'analyzed_volume_statistics',
+        'analyzed_drive_statistics', 
+        'analyzed_system_statistics',
+        'analyzed_interface_statistics',
         'analyzed_controller_statistics',
         
         # Aggregate data keys from main collection
@@ -207,10 +207,10 @@ def get_collection_behavior(category: EndpointCategory) -> Dict[str, Any]:
 # This documents which enrichment processors handle which endpoints
 ENRICHMENT_PROCESSOR_MAPPING = {
     # Performance endpoints → specific enrichment processors
-    'analysed_volume_statistics': 'VolumeEnrichmentProcessor',
-    'analysed_drive_statistics': 'DriveEnrichmentProcessor', 
-    'analysed_system_statistics': 'SystemEnrichmentProcessor',
-    'analysed_interface_statistics': 'SystemEnrichmentProcessor',
+    'analyzed_volume_statistics': 'VolumeEnrichmentProcessor',
+    'analyzed_drive_statistics': 'DriveEnrichmentProcessor', 
+    'analyzed_system_statistics': 'SystemEnrichmentProcessor',
+    'analyzed_interface_statistics': 'ControllerEnrichmentProcessor',
     'analyzed_controller_statistics': 'ControllerEnrichmentProcessor',
     
     # Event endpoints → event enrichment processor
