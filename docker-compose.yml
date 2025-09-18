@@ -77,7 +77,8 @@ services:
         PYTHON_VERSION: ${PYTHON_VERSION}
         PYTHON_DIGEST: ${PYTHON_DIGEST}
     # container_name: collector
-    restart: "unless-stopped"
+    restart: "no"  # use for limited max iterations
+    # restart: "unless-stopped" # use for production
     command: ["--fromJson", "/data/samples/in", "--output", "both", "--tlsCa", "/home/app/certs/ca.crt"]
     environment:
       INFLUX_HOST: ${INFLUXDB_HOST:-influxdb}
@@ -89,7 +90,7 @@ services:
       API: ${API}
       USERNAME: ${SANTRICITY_USERNAME}
       PASSWORD: ${SANTRICITY_PASSWORD}
-      COLLECTOR_LOG_LEVEL: DEBUG
+      COLLECTOR_LOG_LEVEL: INFO
       COLLECTOR_LOG_FILE: ${COLLECTOR_LOG_FILE:-/data/samples/out/collector.log}
       MAX_ITERATIONS: 2
     depends_on:

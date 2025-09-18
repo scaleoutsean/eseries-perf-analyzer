@@ -269,7 +269,7 @@ class APICollector:
             deduplicate_method = getattr(self, '_deduplicate_config_files', None)
             if deduplicate_method:
                 files = deduplicate_method(files, pattern)
-                logger.info(f"🔍 After deduplication: {len(files)} unique config files")
+                logger.debug(f"🔍 After deduplication: {len(files)} unique config files")
         
         results = []
         for file_path in files:
@@ -1121,7 +1121,7 @@ class ESeriesCollector(APICollector):
                 if 'performance' in filename and any(x in filename for x in ['volume', 'drive', 'system', 'interface', 'controller']):
                     logger.debug(f"🔍 NO MATCH: {filename}")
         
-        logger.info(f"🔍 Found {len(endpoint_files)} files for endpoint '{endpoint}'")
+        logger.debug(f"🔍 Found {len(endpoint_files)} files for endpoint '{endpoint}'")
         
         # For config endpoints, deduplicate by taking only the most recent file for each unique config item
         if any(config_keyword in endpoint.lower() for config_keyword in ['config', 'tray', 'controller', 'drive', 'system', 'host', 'storage_pool', 'volume_mapping']):
@@ -1138,7 +1138,7 @@ class ESeriesCollector(APICollector):
                 pattern = f"*{endpoint}*"
             
             endpoint_files = self._deduplicate_config_files(endpoint_files, pattern)
-            logger.info(f"🔍 After deduplication: {len(endpoint_files)} unique config files")
+            logger.debug(f"🔍 After deduplication: {len(endpoint_files)} unique config files")
         
         all_data = []
         
@@ -1239,7 +1239,7 @@ class ESeriesCollector(APICollector):
                 
                 logger.debug(f"🔍 Deduplicated {len(files)} files for {unique_key}, kept: {os.path.basename(most_recent)}")
         
-        logger.info(f"🔍 Config deduplication: {len(config_files)} → {len(deduplicated_files)} files")
+        logger.debug(f"🔍 Config deduplication: {len(config_files)} → {len(deduplicated_files)} files")
         return deduplicated_files
     
     def advance_batch(self) -> bool:
