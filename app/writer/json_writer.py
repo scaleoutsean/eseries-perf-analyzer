@@ -137,12 +137,13 @@ class JsonWriter(Writer):
         
         return f"{'_'.join(parts)}.json"
     
-    def write(self, data: Dict[str, Any]) -> bool:
+    def write(self, data: Dict[str, Any], loop_iteration: int = 1) -> bool:
         """
         Write data to JSON files.
         
         Args:
             data: Dictionary containing data to write
+            loop_iteration: Current iteration number for debug file naming
             
         Returns:
             True if write was successful, False otherwise

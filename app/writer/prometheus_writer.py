@@ -40,14 +40,25 @@ class PrometheusWriter(Writer):
         # Only enable debug output when COLLECTOR_LOG_LEVEL=DEBUG
         import os
         self.enable_json_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
-        self.json_output_dir = "/data/samples/out"
-        
+
+        # Use COLLECTOR_LOG_FILE directory for debug outputs, disable if not available
+        collector_log_file = os.getenv('COLLECTOR_LOG_FILE', '')
+        if collector_log_file and collector_log_file != 'None':
+            debug_dir = os.path.dirname(collector_log_file) if os.path.dirname(collector_log_file) else '.'
+            if os.path.exists(debug_dir) and os.access(debug_dir, os.W_OK):
+                self.json_output_dir = debug_dir
+                LOG.info(f"Prometheus debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG) -> {self.json_output_dir}")
+            else:
+                LOG.warning(f"Debug output directory {debug_dir} not accessible, disabling debug file output")
+                self.enable_json_output = False
+        else:
+            # No COLLECTOR_LOG_FILE specified, disable debug output
+            LOG.debug("No COLLECTOR_LOG_FILE specified, debug file output disabled")
+            self.enable_json_output = False
+
         # Add HTML metrics output capability for direct comparison with InfluxDB
         self.enable_html_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
-        
-        if self.enable_json_output:
-            LOG.info(f"Prometheus debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG)")
-        
+
         LOG.info(f"PrometheusWriter initialized, will serve metrics on port {port}")
     
     def _initialize_metrics(self) -> Dict[str, Dict[str, Gauge]]:
@@ -146,12 +157,13 @@ class PrometheusWriter(Writer):
                     LOG.error(f"Failed to start Prometheus server on port {self.port}: {e}")
                     raise
     
-    def write(self, data: Dict[str, Any]) -> bool:
+    def write(self, data: Dict[str, Any], loop_iteration: int = 1) -> bool:
         """
         Write data to Prometheus metrics.
         
         Args:
             data: Dictionary containing measurement data
+            loop_iteration: Current iteration number for debug file naming
             
         Returns:
             bool: True if successful, False otherwise
@@ -192,10 +204,10 @@ class PrometheusWriter(Writer):
                     LOG.debug(f"Skipping non-performance measurement: {measurement_name}")
             
             # Write JSON output for debugging/validation (similar to InfluxDB writer)
-            self._write_json_output(data, "prometheus_writer_input")
+            self._write_json_output(data, "prometheus_writer_input", loop_iteration)
             
             # Write HTML metrics output for direct comparison with InfluxDB
-            self._write_html_metrics_output("prometheus_metrics_export")
+            self._write_html_metrics_output("prometheus_metrics_export", loop_iteration)
             
             LOG.info(f"Updated {measurements_processed} Prometheus measurement types")
             return True
@@ -332,7 +344,7 @@ class PrometheusWriter(Writer):
         except (ValueError, TypeError):
             return None
 
-    def _write_json_output(self, data: Dict[str, Any], filename_prefix: str = "prometheus_writer"):
+    def _write_json_output(self, data: Dict[str, Any], filename_prefix: str = "prometheus_writer", loop_iteration: int = 1):
         """
         Write processed data to JSON file for debugging/validation.
         Similar to InfluxDB writer's JSON output capability.
@@ -348,8 +360,11 @@ class PrometheusWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.json_output_dir, exist_ok=True)
             
-            # Use static filename that overwrites previous debug output
-            filename = f"{filename_prefix}_final.json"
+            # Use iteration-based filename to preserve iteration 1's config data
+            if loop_iteration == 1:
+                filename = f"iteration_1_{filename_prefix}_final.json"
+            else:
+                filename = f"{filename_prefix}_final.json"
             filepath = os.path.join(self.json_output_dir, filename)
             
             # Convert data to JSON-serializable format
@@ -373,7 +388,7 @@ class PrometheusWriter(Writer):
         except Exception as e:
             LOG.error(f"Failed to write JSON output: {e}")
 
-    def _write_html_metrics_output(self, filename_prefix: str = "prometheus_metrics"):
+    def _write_html_metrics_output(self, filename_prefix: str = "prometheus_metrics", loop_iteration: int = 1):
         """
         Export current Prometheus metrics to HTML file for direct comparison with InfluxDB output.
         This captures the actual metrics that would be scraped by Prometheus.
@@ -389,8 +404,11 @@ class PrometheusWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.json_output_dir, exist_ok=True)
             
-            # Use static filename that overwrites previous debug output
-            filename = f"{filename_prefix}_final.txt"
+            # Use iteration-based filename to preserve iteration 1's config data
+            if loop_iteration == 1:
+                filename = f"iteration_1_{filename_prefix}_final.txt"
+            else:
+                filename = f"{filename_prefix}_final.txt"
             filepath = os.path.join(self.json_output_dir, filename)
             
             # Generate Prometheus metrics in text format (same as /metrics endpoint)

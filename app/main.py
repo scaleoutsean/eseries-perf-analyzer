@@ -206,6 +206,19 @@ class EnrichmentProcessor:
                             measurement_type = 'controller_performance'
                     elif 'storageSystemWWN' in first_record and 'maxCpuUtilization' in first_record:
                         measurement_type = 'system_performance'
+                elif measurement_type:
+                    # Convert measurement names to expected types
+                    if 'volume' in measurement_type.lower():
+                        measurement_type = 'volume_performance'
+                    elif 'drive' in measurement_type.lower():
+                        measurement_type = 'drive_performance'
+                    elif 'controller' in measurement_type.lower():
+                        if len(perf_data) > 0 and 'storageSystemWWN' in perf_data[0] and 'maxCpuUtilization' in perf_data[0]:
+                            measurement_type = 'system_performance'
+                        else:
+                            measurement_type = 'controller_performance'
+                    elif 'system' in measurement_type.lower():
+                        measurement_type = 'system_performance'
                 
                 # Route to appropriate enricher
                 if measurement_type == 'volume_performance':
@@ -508,10 +521,27 @@ def main():
     # Configure logging
     FORMAT = '%(asctime)s - %(levelname)s - %(funcName)s - %(lineno)d - %(message)s'
     log_level = getattr(logging, CMD.loglevel.upper())
+
+    # Defensive programming: Check logfile path before configuring file logging
     if CMD.logfile:
-        logging.basicConfig(filename=CMD.logfile, level=log_level,
-                            format=FORMAT, datefmt='%Y-%m-%dT%H:%M:%SZ')
-        logging.info('Logging to file: ' + CMD.logfile)
+        logfile_dir = os.path.dirname(CMD.logfile) if os.path.dirname(CMD.logfile) else '.'
+        if os.path.exists(logfile_dir) and os.access(logfile_dir, os.W_OK):
+            try:
+                logging.basicConfig(filename=CMD.logfile, level=log_level,
+                                    format=FORMAT, datefmt='%Y-%m-%dT%H:%M:%SZ')
+                logging.info('Logging to file: ' + CMD.logfile)
+            except (OSError, IOError) as e:
+                # Fallback to console logging if file logging fails
+                logging.basicConfig(level=log_level, format=FORMAT,
+                                    datefmt='%Y-%m-%dT%H:%M:%SZ')
+                logging.error(f'Failed to configure file logging to {CMD.logfile}: {e}')
+                logging.warning('Falling back to console logging only')
+        else:
+            # Directory doesn't exist or isn't writable
+            logging.basicConfig(level=log_level, format=FORMAT,
+                                datefmt='%Y-%m-%dT%H:%M:%SZ')
+            logging.error(f'Logfile directory {logfile_dir} does not exist or is not writable')
+            logging.warning('Falling back to console logging only')
     else:
         logging.basicConfig(level=log_level, format=FORMAT,
                             datefmt='%Y-%m-%dT%H:%M:%SZ')
@@ -1470,19 +1500,39 @@ def main():
                     print("🔥 FINAL CHECKPOINT - Just before writer.write() call")
                     try:
                         import pickle
-                        
-                        debug_dir = "/home/app/samples/out"
-                        os.makedirs(debug_dir, exist_ok=True)
-                        
-                        LOG.error(f"🔍 FINAL DEBUG - About to call writer.write() with data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else type(serializable_data)}")
-                        
-                        # First, safely pickle the data (this should always work)
-                        try:
-                            with open(f"{debug_dir}/writer_input_final.pkl", "wb") as f:
-                                pickle.dump(serializable_data, f)
-                            LOG.error(f"✅ Successfully pickled final writer input")
-                        except Exception as pickle_e:
-                            LOG.error(f"❌ Pickle dump failed: {pickle_e}")
+
+                        # Use COLLECTOR_LOG_FILE directory for debug outputs, disable if not available
+                        collector_log_file = os.getenv('COLLECTOR_LOG_FILE', '')
+                        if collector_log_file and collector_log_file != 'None':
+                            debug_dir = os.path.dirname(collector_log_file) if os.path.dirname(collector_log_file) else '.'
+                            if not (os.path.exists(debug_dir) and os.access(debug_dir, os.W_OK)):
+                                LOG.warning(f"Debug output directory {debug_dir} not accessible, disabling final debug output")
+                                debug_dir = None
+                        else:
+                            # No COLLECTOR_LOG_FILE specified, disable debug output
+                            LOG.debug("No COLLECTOR_LOG_FILE specified, disabling final debug output")
+                            debug_dir = None
+
+                        if debug_dir:
+                            os.makedirs(debug_dir, exist_ok=True)
+
+                            # Helper function to generate iteration-prefixed filenames
+                            def get_debug_filename(base_name):
+                                if loop_iteration == 1:
+                                    return f"iteration_1_{base_name}"
+                                else:
+                                    return base_name
+
+                            LOG.error(f"🔍 FINAL DEBUG - About to call writer.write() with data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else type(serializable_data)}")
+
+                            # First, safely pickle the data (this should always work)
+                            try:
+                                pickle_filename = get_debug_filename("writer_input_final.pkl")
+                                with open(f"{debug_dir}/{pickle_filename}", "wb") as f:
+                                    pickle.dump(serializable_data, f)
+                                LOG.error(f"✅ Successfully pickled final writer input to {pickle_filename}")
+                            except Exception as pickle_e:
+                                LOG.error(f"❌ Pickle dump failed: {pickle_e}")
                         
                         # Force BaseModel detection one more time
                         def find_basemodel_final_check(obj, path="root", max_depth=3):
@@ -1510,47 +1560,58 @@ def main():
                             return findings
                         
                         basemodel_findings = find_basemodel_final_check(serializable_data)
-                        if basemodel_findings:
+                        if debug_dir and basemodel_findings:
                             LOG.error(f"🚨 CRITICAL: BaseModel objects found RIGHT BEFORE writer.write():")
                             for finding in basemodel_findings:
                                 LOG.error(f"  {finding}")
                             
                             # Save to file
                             try:
-                                with open(f"{debug_dir}/CRITICAL_basemodel_before_write.txt", "w") as f:
+                                basemodel_filename = get_debug_filename("CRITICAL_basemodel_before_write.txt")
+                                with open(f"{debug_dir}/{basemodel_filename}", "w") as f:
                                     f.write("BaseModel objects found RIGHT BEFORE writer.write() call:\n")
                                     for finding in basemodel_findings:
                                         f.write(f"{finding}\n")
-                                LOG.error(f"✅ Saved BaseModel findings to file")
+                                LOG.error(f"✅ Saved BaseModel findings to file: {basemodel_filename}")
                             except Exception as file_e:
                                 LOG.error(f"❌ Failed to save findings: {file_e}")
+                        elif basemodel_findings:
+                            LOG.error(f"🚨 CRITICAL: BaseModel objects found but debug output disabled")
+                            for finding in basemodel_findings:
+                                LOG.error(f"  {finding}")
                         else:
                             LOG.error("✅ Final check: No BaseModel objects detected before writer.write()")
                         
                         # Try JSON dump LAST (this might fail due to BaseModel)
-                        try:
-                            import json
-                            with open(f"{debug_dir}/writer_input_final.json", "w") as f:
-                                json.dump(serializable_data, f, indent=2, default=str)
-                            LOG.error(f"✅ Successfully dumped final writer input to JSON")
-                        except Exception as json_e:
-                            LOG.error(f"❌ JSON dump failed (expected if BaseModel present): {json_e}")
+                        if debug_dir:
+                            try:
+                                import json
+                                json_filename = get_debug_filename("writer_input_final.json")
+                                with open(f"{debug_dir}/{json_filename}", "w") as f:
+                                    json.dump(serializable_data, f, indent=2, default=str)
+                                LOG.error(f"✅ Successfully dumped final writer input to JSON: {json_filename}")
+                            except Exception as json_e:
+                                LOG.error(f"❌ JSON dump failed (expected if BaseModel present): {json_e}")
+                        else:
+                            LOG.debug("Debug output disabled, skipping JSON dump")
                         
                     except Exception as final_debug_e:
                         LOG.error(f"❌ Final debug check failed: {final_debug_e}")
-                        # Make sure we still try to create a basic dump
-                        try:
-                            debug_dir = "/home/app/samples/out"
-                            os.makedirs(debug_dir, exist_ok=True)
-                            with open(f"{debug_dir}/debug_failure.txt", "w") as f:
-                                f.write(f"Final debug failed: {final_debug_e}\n")
-                                f.write(f"Data type: {type(serializable_data)}\n")
-                                if isinstance(serializable_data, dict):
-                                    f.write(f"Data keys: {list(serializable_data.keys())}\n")
-                        except:
-                            pass
+                        # Make sure we still try to create a basic dump if debug_dir is available
+                        if debug_dir:
+                            try:
+                                failure_filename = get_debug_filename("debug_failure.txt")
+                                with open(f"{debug_dir}/{failure_filename}", "w") as f:
+                                    f.write(f"Final debug failed: {final_debug_e}\n")
+                                    f.write(f"Data type: {type(serializable_data)}\n")
+                                    if isinstance(serializable_data, dict):
+                                        f.write(f"Data keys: {list(serializable_data.keys())}\n")
+                            except:
+                                pass
+                        else:
+                            LOG.debug("Debug output disabled, cannot save failure info")
                     
-                    success = writer.write(serializable_data)
+                    success = writer.write(serializable_data, loop_iteration)
                     if success:
                         LOG.info("Data successfully written to output destination")
                     else:

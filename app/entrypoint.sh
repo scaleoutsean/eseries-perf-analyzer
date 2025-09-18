@@ -95,6 +95,9 @@ fi
 if [ -n "$COLLECTOR_LOG_LEVEL" ]; then
     ARGS="$ARGS --loglevel $COLLECTOR_LOG_LEVEL"
 fi
+if [ -n "$COLLECTOR_LOG_FILE" ] && [ "$COLLECTOR_LOG_FILE" != "None" ]; then
+    ARGS="$ARGS --logfile $COLLECTOR_LOG_FILE"
+fi
 
 # Change to the app directory and run the collector
 cd /home/app

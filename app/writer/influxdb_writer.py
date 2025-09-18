@@ -122,11 +122,22 @@ class InfluxDBWriter(Writer):
         
         # Enable debug file output only when COLLECTOR_LOG_LEVEL=DEBUG
         self.enable_debug_output = os.getenv('COLLECTOR_LOG_LEVEL', '').upper() == 'DEBUG'
-        self.debug_output_dir = "/data/samples/out"
-        
-        if self.enable_debug_output:
-            LOG.info(f"InfluxDB debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG)")
-        
+
+        # Use COLLECTOR_LOG_FILE directory for debug outputs, disable if not available
+        collector_log_file = os.getenv('COLLECTOR_LOG_FILE', '')
+        if collector_log_file and collector_log_file != 'None':
+            debug_dir = os.path.dirname(collector_log_file) if os.path.dirname(collector_log_file) else '.'
+            if os.path.exists(debug_dir) and os.access(debug_dir, os.W_OK):
+                self.debug_output_dir = debug_dir
+                LOG.info(f"InfluxDB debug file output enabled (COLLECTOR_LOG_LEVEL=DEBUG) -> {self.debug_output_dir}")
+            else:
+                LOG.warning(f"Debug output directory {debug_dir} not accessible, disabling debug file output")
+                self.enable_debug_output = False
+        else:
+            # No COLLECTOR_LOG_FILE specified, disable debug output
+            LOG.debug("No COLLECTOR_LOG_FILE specified, debug file output disabled")
+            self.enable_debug_output = False
+
         LOG.info(f"InfluxDBWriter initialized: {self.url} -> {self.database}")
     
     def _initialize_client(self):
@@ -247,12 +258,13 @@ class InfluxDBWriter(Writer):
         except Exception as db_error:
             LOG.warning(f"Could not verify database existence (will be created on first write): {db_error}")
     
-    def write(self, measurements: Dict[str, Any]) -> bool:
+    def write(self, measurements: Dict[str, Any], loop_iteration: int = 1) -> bool:
         """
         Write measurement data to InfluxDB using automatic client-side batching.
         
         Args:
             measurements: Dictionary of measurement name -> measurement data
+            loop_iteration: Current iteration number for debug file naming
             
         Returns:
             bool: True if all writes succeeded, False otherwise
@@ -335,8 +347,8 @@ class InfluxDBWriter(Writer):
         
         # Write debug output files if enabled
         if self.enable_debug_output:
-            self._write_debug_input_json(measurements)
-            self._write_debug_line_protocol(measurements)
+            self._write_debug_input_json(measurements, loop_iteration)
+            self._write_debug_line_protocol(measurements, loop_iteration)
         
         return success
     
@@ -1218,7 +1230,7 @@ class InfluxDBWriter(Writer):
             LOG.info("All data has been preserved - terminating cleanly")
             os._exit(0)  # Hard exit - bypasses Python cleanup that can hang
 
-    def _write_debug_input_json(self, measurements: Dict[str, Any]):
+    def _write_debug_input_json(self, measurements: Dict[str, Any], loop_iteration: int = 1):
         """
         Write input measurements to JSON file for debugging/validation.
         Only enabled when COLLECTOR_LOG_LEVEL=DEBUG.
@@ -1234,8 +1246,11 @@ class InfluxDBWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.debug_output_dir, exist_ok=True)
             
-            # Use static filename to prevent disk space explosion during long debug runs
-            filename = "influxdb_writer_input_final.json"
+            # Use iteration-based filename to preserve iteration 1's config data
+            if loop_iteration == 1:
+                filename = "iteration_1_influxdb_writer_input_final.json"
+            else:
+                filename = "influxdb_writer_input_final.json"
             filepath = os.path.join(self.debug_output_dir, filename)
             
             # Convert data to JSON-serializable format
@@ -1272,7 +1287,7 @@ class InfluxDBWriter(Writer):
         except Exception as e:
             LOG.error(f"Failed to write InfluxDB debug input JSON: {e}")
 
-    def _write_debug_line_protocol(self, measurements: Dict[str, Any]):
+    def _write_debug_line_protocol(self, measurements: Dict[str, Any], loop_iteration: int = 1):
         """
         Write generated line protocol to text file for debugging/validation.
         Only enabled when COLLECTOR_LOG_LEVEL=DEBUG.
@@ -1287,8 +1302,11 @@ class InfluxDBWriter(Writer):
             # Ensure output directory exists
             os.makedirs(self.debug_output_dir, exist_ok=True)
             
-            # Use static filename to prevent disk space explosion during long debug runs
-            filename = "influxdb_line_protocol_final.txt"
+            # Use iteration-based filename to preserve iteration 1's config data
+            if loop_iteration == 1:
+                filename = "iteration_1_influxdb_line_protocol_final.txt"
+            else:
+                filename = "influxdb_line_protocol_final.txt"
             filepath = os.path.join(self.debug_output_dir, filename)
             
             # Generate line protocol for all measurements
