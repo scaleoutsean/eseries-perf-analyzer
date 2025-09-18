@@ -334,6 +334,9 @@ _DRIVES_CACHE = {}  # driveRef -> drive info
 # Global iteration counter for config collection timing
 _CONFIG_COLLECTION_ITERATION_COUNTER = 0
 
+# Global controller index for consistent selection within a collection session
+_CURRENT_CONTROLLER_INDEX = None
+
 
 def populate_mappable_objects_cache(system_info):
     """
@@ -359,6 +362,10 @@ def populate_mappable_objects_cache(system_info):
         return
         
     try:
+        # Set controller for consistent selection within this collection session
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+        
         session = get_session()
         
         # Clear and populate mega-cache from mappable-objects API
@@ -380,6 +387,10 @@ def populate_mappable_objects_cache(system_info):
     except Exception as e:
         LOG.warning(f"Could not retrieve mappable-objects for mega-cache: {e}")
         LOG.warning("Performance collector host mapping may be incomplete")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_config_drives(system_info):
@@ -393,6 +404,10 @@ def collect_config_drives(system_info):
         return
 
     try:
+        # Set controller for consistent selection within this collection session
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+        
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -1184,12 +1199,24 @@ def get_controller(query):
         storage_controller_ep = 'https://' + \
             CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + api_path
     else:
-        controller = random.randrange(0, 2)
+        if _CURRENT_CONTROLLER_INDEX is not None:
+            controller = _CURRENT_CONTROLLER_INDEX
+        else:
+            controller = random.randrange(0, 2)
         storage_controller_ep = 'https://' + \
             CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
             api_path
         LOG.info(f"Controller selection: {storage_controller_ep}")
     return storage_controller_ep
+
+
+def set_current_controller_index(index):
+    """
+    Set the current controller index for consistent selection within a collection session.
+    :param index: Controller index (0 or 1) or None to reset
+    """
+    global _CURRENT_CONTROLLER_INDEX
+    _CURRENT_CONTROLLER_INDEX = index
 
 
 def get_drive_location(sys_id, session):
@@ -1225,6 +1252,10 @@ def collect_symbol_stats(system_info):
     Collects temp sensor and PSU consumption (W) and posts them to InfluxDB
     :param system_info: The JSON object
     """
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
@@ -1286,6 +1317,10 @@ def collect_symbol_stats(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post tmp sensors data for {system_info['name']}/{system_info['wwn']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def field_coerce(field_name, value):
@@ -1361,6 +1396,10 @@ def collect_storage_metrics(system_info):
     :param sys: The JSON object of a storage system
     """
     global _MAPPABLE_OBJECTS_CACHE, _HOSTS_CACHE
+    
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
     
     try:
         session = get_session()
@@ -1612,6 +1651,10 @@ def collect_storage_metrics(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post statistics for {system_info['name']}/{system_info['wwn']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_major_event_log(system_info):
@@ -1619,6 +1662,10 @@ def collect_major_event_log(system_info):
     Collects all defined MEL metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
     """
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
@@ -1675,6 +1722,10 @@ def collect_major_event_log(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post MEL for {system_info['name']}/{system_info['wwn']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_active, the_time):
@@ -1703,6 +1754,10 @@ def collect_system_state(system_info, checksums):
     :param sys: The JSON object of a storage_system
     :param checksums: The MD5 checksum of failure response from last time we checked
     """
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
@@ -1736,12 +1791,14 @@ def collect_system_state(system_info, checksums):
 
             # we push if we haven't seen this, or we think it's inactive
             push = True
+
             for point in failure_points:
                 p_fail_type = point["failure_type"]
                 p_obj_ref = point["object_ref"]
                 p_obj_type = point["object_type"]
                 p_active = point["active"]
                 if (r_fail_type == p_fail_type
+                   
                     and r_obj_ref == p_obj_ref
                         and r_obj_type == p_obj_type):
                     if p_active == "True":
@@ -1797,6 +1854,10 @@ def collect_system_state(system_info, checksums):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post state information for {system_info['name']}/{system_info['id']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_config_volumes(system_info):
@@ -1812,6 +1873,10 @@ def collect_config_volumes(system_info):
         return
 
     try:
+        # Set controller for consistent selection within this collection session
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+        
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -1858,7 +1923,7 @@ def collect_config_volumes(system_info):
             config_fields = {}
             for param in CONFIG_VOLUME_PARAMS:
                 if param == 'name':
-                    # Handle name field specially - store as renamed field only
+                    # Handle name field specially - store as volume_name_field only
                     value = volume.get(param)
                     if value is not None:
                         config_fields['volume_name_field'] = value
@@ -1915,9 +1980,9 @@ def collect_config_volumes(system_info):
             LOG.info("LOG: volume configuration data sent")
         else:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
-
-    except RuntimeError:
-        LOG.error(f"Error when attempting to post volume configuration for {system_info['name']}/{system_info['wwn']}")
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_config_storage_pools(system_info):
@@ -1933,6 +1998,10 @@ def collect_config_storage_pools(system_info):
         return
 
     try:
+        # Set controller for consistent selection within this collection session
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+        
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -2041,6 +2110,10 @@ def collect_config_storage_pools(system_info):
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post storage pool configuration for {system_info['name']}/{system_info['wwn']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_config_hosts(system_info):
@@ -2056,6 +2129,10 @@ def collect_config_hosts(system_info):
         return
 
     try:
+        # Set controller for consistent selection within this collection session
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+        
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -2205,6 +2282,10 @@ def collect_config_hosts(system_info):
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post host configuration for {system_info['name']}/{system_info['wwn']}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def collect_controller_metrics(system_info):
@@ -2212,6 +2293,10 @@ def collect_controller_metrics(system_info):
     Collects controller performance metrics from both controllers and posts them to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    
     try:
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -2337,6 +2422,10 @@ def collect_controller_metrics(system_info):
 
     except Exception as e:
         LOG.error(f"Error when attempting to collect controller metrics for {system_info['name']}/{system_info['wwn']}: {e}")
+    
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
 
 
 def parse_retention_weeks(retention_str):
