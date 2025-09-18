@@ -995,7 +995,7 @@ def main():
                         # Collect configuration data in JSON mode
                         try:
                             config_data = config_collector.collect_config(sys_info)
-                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON: config_data collected, type={type(config_data)}, keys={list(config_data.keys()) if isinstance(config_data, dict) else 'Not a dict'}")
+                            LOG.debug(f"JSON config_data collected, type={type(config_data)}")
                             # Add JSON mode metadata
                             if isinstance(config_data, dict):
                                 config_data["json_mode"] = True
@@ -1033,7 +1033,7 @@ def main():
                         # Try to collect config data even when exhausted
                         try:
                             config_data = config_collector.collect_config(sys_info)
-                            LOG.info(f"🔍 DEBUG Checkpoint 2C-JSON-EXHAUSTED: config_data collected, type={type(config_data)}, keys={list(config_data.keys()) if isinstance(config_data, dict) else 'Not a dict'}")
+                            LOG.debug(f"JSON exhausted config_data collected, type={type(config_data)}")
                         except Exception as e:
                             LOG.error(f"Failed to collect config data when exhausted: {e}")
                             config_data = {}
@@ -1093,12 +1093,12 @@ def main():
             # Enrich performance data with configuration data
             try:
                 # Debug: Check perf_data structure before enrichment
-                LOG.info(f"🔍 DEBUG - perf_data before enrichment: type={type(perf_data)}")
+                LOG.debug(f"perf_data before enrichment: type={type(perf_data)}")
                 if isinstance(perf_data, dict):
-                    LOG.info(f"🔍 DEBUG - perf_data keys: {list(perf_data.keys())}")
+                    LOG.debug(f"perf_data keys: {list(perf_data.keys())}")
                     for key, value in perf_data.items():
                         if isinstance(value, list):
-                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items")
+                            LOG.debug(f"{key}: {len(value)} items")
                 
                 # Process and enrich data - handle multiple performance types
                 enriched_data = {}
@@ -1122,20 +1122,18 @@ def main():
                 
                 # Debug: Check enriched_data structure after enrichment
                 if isinstance(enriched_data, dict):
-                    LOG.info(f"Enriched data keys: {list(enriched_data.keys())}")
+                    LOG.debug(f"Enriched data keys: {list(enriched_data.keys())}")
                     for key, value in enriched_data.items():
                         if isinstance(value, list) and len(value) > 0:
-                            LOG.info(f"🔍 DEBUG - enriched {key}: {len(value)} items, first item keys: {list(value[0].keys()) if isinstance(value[0], dict) else 'Not a dict'}")
+                            LOG.debug(f"enriched {key}: {len(value)} items")
                 elif isinstance(enriched_data, list):
-                    LOG.info(f"Enriched data list length: {len(enriched_data)}")
+                    LOG.debug(f"Enriched data list length: {len(enriched_data)}")
             except Exception as e:
                 LOG.error(f"Failed to enrich performance data: {e}", exc_info=True)
                 enriched_data = perf_data
             
             # Send enriched data to writer if available
             if writer:
-                LOG.error("🔥🔥🔥 ENTERING WRITER SECTION - DEBUG CHECKPOINT 1")
-                print("🔥🔥🔥 ENTERING WRITER SECTION - DEBUG CHECKPOINT 1")
                 try:
                     # Initialize writer_data with performance data
                     writer_data = {}
@@ -1165,15 +1163,7 @@ def main():
                         # Fallback
                         writer_data["performance_data"] = enriched_data
                     
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2 - Data preparation complete")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 2 - Data preparation complete")
-                    
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2A - About to check config data")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 2A - About to check config data")
-                    
                     # Add config data if collection was scheduled for this iteration
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2C - About to process config data")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 2C - About to process config data")
                     
                     if isinstance(config_data, dict) and config_data.get("status") == "scheduled_collection":
                         collected_config = config_data.get("collected_data", {})
@@ -1188,51 +1178,25 @@ def main():
                                 if config_items:  # Only add non-empty config data
                                     writer_data[f"config_{config_type.lower()}"] = config_items
                     
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2D - Config processing complete, about to process events")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 2D - Config processing complete, about to process events")
-                    
                     # Process event data with deduplication
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2E - Starting event processing check")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 2E - Starting event processing check")
-                    
-                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2F - event_data type: {type(event_data)}")
-                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2F - event_data type: {type(event_data)}")
                     
                     if isinstance(event_data, dict) and event_data:
-                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2H - Inside event processing block")
-                        print("🔥🔥🔥 DEBUG CHECKPOINT 2H - Inside event processing block")
                         processed_events = []
                         events_to_process = None
                         
                         # Extract events from the event_data structure
-                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2I - About to extract events")
-                        print("🔥🔥🔥 DEBUG CHECKPOINT 2I - About to extract events")
                         
                         if "events" in event_data and event_data["events"]:
                             events_to_process = event_data["events"]
-                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2J - Found events: {len(event_data['events'])} types")
-                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2J - Found events: {len(event_data['events'])} types")
                         elif "active_events" in event_data and event_data["active_events"]:
                             events_to_process = event_data["active_events"]
-                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2K - Found active_events: {len(event_data['active_events'])} types")
-                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2K - Found active_events: {len(event_data['active_events'])} types")
-                        
-                        LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2L - events_to_process: {events_to_process is not None}")
-                        print(f"🔥🔥🔥 DEBUG CHECKPOINT 2L - events_to_process: {events_to_process is not None}")
                         
                         if events_to_process:
                             # Process each event type through deduplication
-                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2M - Starting event loop processing")
-                            print("🔥🔥🔥 DEBUG CHECKPOINT 2M - Starting event loop processing")
                             total_events_before = 0
                             total_events_after = 0
                             
-                            LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2N - About to iterate over {len(events_to_process)} event types")
-                            print(f"🔥🔥🔥 DEBUG CHECKPOINT 2N - About to iterate over {len(events_to_process)} event types")
-                            
                             for endpoint_name, event_list in events_to_process.items():
-                                LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2O - Processing {endpoint_name}")
-                                print(f"🔥🔥🔥 DEBUG CHECKPOINT 2O - Processing {endpoint_name}")
                                 if isinstance(event_list, list) and event_list:
                                     # Skip volume expansion progress events - mostly inactive placeholder data
                                     # TODO: Re-evaluate when we understand what constitutes meaningful expansion events
@@ -1241,15 +1205,11 @@ def main():
                                         continue
                                     
                                     total_events_before += len(event_list)
-                                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2P - About to enrich {len(event_list)} {endpoint_name} events")
-                                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2P - About to enrich {len(event_list)} {endpoint_name} events")
                                     
                                     # Apply deduplication
                                     enriched_events = event_enrichment.enrich_event_data(
                                         endpoint_name, event_list, sys_info
                                     )
-                                    LOG.error(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
-                                    print(f"🔥🔥🔥 DEBUG CHECKPOINT 2Q - Event enrichment completed for {endpoint_name}")
                                     
                                     # Add storage_system enrichment to deduplicated events
                                     if enriched_events:
@@ -1265,40 +1225,26 @@ def main():
                                     else:
                                         LOG.info(f"Event {endpoint_name}: {len(event_list)} → 0 (duplicate/filtered)")
                             
-                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - Event processing completed, stored by endpoint names")
-                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B-PRE - Event processing completed, stored by endpoint names")
-                            
                             if processed_events:
                                 LOG.info(f"Processed {len(processed_events)} total events (filtered from {total_events_before} total), stored by endpoint names in writer_data")
                             else:
                                 LOG.info(f"No events to write after deduplication (filtered {total_events_before} duplicates)")
                                 
-                            LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 2B - Event processing loop completed")
-                            print("🔥🔥🔥 DEBUG CHECKPOINT 2B - Event processing loop completed")
                     
+
                     try:
-                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 3 PRE-CHECK - Before checkpoint 3")
-                        print("🔥🔥🔥 DEBUG CHECKPOINT 3 PRE-CHECK - Before checkpoint 3")
-                        LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 3 - Event processing complete, about to convert data")
-                        print("🔥🔥🔥 DEBUG CHECKPOINT 3 - Event processing complete, about to convert data")
+                        # Convert data to serializable format
+                        pass
                     except Exception as checkpoint_e:
-                        LOG.error(f"🚨 EXCEPTION caught at checkpoint 3: {checkpoint_e}")
-                        print(f"🚨 EXCEPTION caught at checkpoint 3: {checkpoint_e}")
+                        LOG.error(f"Exception during data conversion: {checkpoint_e}")
                         raise  # Re-raise to maintain original behavior
                     
                     # Debug: Check what we're sending to the writer
-                    LOG.info(f"� WRITER DEBUG - About to process {len(writer_data)} data types")
-                    LOG.info(f"�🔍 DEBUG - Sending to writer: {list(writer_data.keys())}")
+                    LOG.debug(f"About to process {len(writer_data)} data types")
+                    LOG.debug(f"Sending to writer: {list(writer_data.keys())}")
                     for key, value in writer_data.items():
                         if isinstance(value, list) and len(value) > 0:
-                            item_type = type(value[0]).__name__
-                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items of type {item_type}")
-                            LOG.info(f"🔍 DEBUG - First {key} item type check - hasattr model_dump: {hasattr(value[0], 'model_dump')}")
-                            LOG.info(f"🔍 DEBUG - First {key} item type check - hasattr __dict__: {hasattr(value[0], '__dict__')}")
-                            LOG.info(f"🔍 DEBUG - First {key} item type check - is BaseModel: {value[0].__class__.__name__}")
-                    
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 4 - About to start BaseModel conversion")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 4 - About to start BaseModel conversion")
+                            LOG.debug(f"{key}: {len(value)} items")
                     
                     # Convert BaseModel objects to dictionaries for JSON serialization
                     def convert_to_serializable(obj, depth=0, max_depth=10):
@@ -1389,14 +1335,11 @@ def main():
                             else:
                                 serializable_data[key] = value
                     
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 5 - BaseModel conversion completed")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 5 - BaseModel conversion completed")
-                    
                     # Final check before writing - ensure complete JSON serializability
-                    LOG.info(f"🔍 DEBUG - About to write: {list(serializable_data.keys())}")
+                    LOG.debug(f"About to write: {list(serializable_data.keys())}")
                     for key, value in serializable_data.items():
                         if isinstance(value, list) and len(value) > 0:
-                            LOG.info(f"🔍 DEBUG - {key}: {len(value)} items, first type: {type(value[0])}")
+                            LOG.debug(f"{key}: {len(value)} items")
                     
                     # Final safety check - try JSON serializing to catch any BaseModel objects
                     try:
@@ -1429,11 +1372,8 @@ def main():
                         serializable_data = force_serialize_dict(serializable_data)
                         LOG.info("Applied emergency serialization conversion")
                     
-                    LOG.error("🔥🔥🔥 DEBUG CHECKPOINT 6 - JSON safety check completed")
-                    print("🔥🔥🔥 DEBUG CHECKPOINT 6 - JSON safety check completed")
-                    
                     # Debug: Check for remaining BaseModel objects before write (ALWAYS RUN)
-                    LOG.info("🔧 ALWAYS RUN - Starting comprehensive BaseModel detection")
+                    LOG.debug("Starting comprehensive BaseModel detection")
                     
                     def find_basemodel_objects(obj, path="root", depth=0):
                         from pydantic import BaseModel
@@ -1473,11 +1413,11 @@ def main():
                     except Exception as test_e:
                         LOG.error(f"🧪 Test failed: {test_e}")
                     
-                    LOG.info(f"� WRITER DEBUG - About to scan serializable_data with {len(serializable_data) if isinstance(serializable_data, dict) else 'unknown'} keys")
+                    LOG.debug(f"About to scan serializable_data with {len(serializable_data) if isinstance(serializable_data, dict) else 'unknown'} keys")
                     
                     try:
                         basemodel_objects = find_basemodel_objects(serializable_data, path="serializable_data")
-                        LOG.info(f"🔧 BaseModel scan returned {len(basemodel_objects) if basemodel_objects else 0} objects")
+                        LOG.debug(f"BaseModel scan returned {len(basemodel_objects) if basemodel_objects else 0} objects")
                         if basemodel_objects:
                             LOG.error(f"❌ FOUND BaseModel objects in data - this WILL cause JSON error:")
                             for obj_path, obj_type, obj_repr in basemodel_objects[:5]:  # Show first 5
@@ -1493,20 +1433,16 @@ def main():
                         import traceback
                         LOG.error(f"❌ Traceback: {traceback.format_exc()}")
                     
-                    LOG.info("🔧 BaseModel detection complete")
+                    LOG.debug("BaseModel detection complete")
                     
                     # Also check the top-level keys of serializable_data
-                    LOG.info(f"🔍 serializable_data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else 'not a dict'}")
+                    LOG.debug(f"serializable_data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else 'not a dict'}")
                     for key in serializable_data:
                         if hasattr(serializable_data[key], '__len__') and not isinstance(serializable_data[key], str):
-                            LOG.info(f"  - {key}: {len(serializable_data[key])} items")
-                    
-                    LOG.error("🚨🚨🚨 CRITICAL DEBUG CHECKPOINT - About to call writer.write()")
-                    print("🚨🚨🚨 CRITICAL DEBUG CHECKPOINT - About to call writer.write()")
+                            LOG.debug(f"  - {key}: {len(serializable_data[key])} items")
                     
                     # FINAL BaseModel check and data dump before writer.write()
-                    LOG.error("🔥 FINAL CHECKPOINT - Just before writer.write() call")
-                    print("🔥 FINAL CHECKPOINT - Just before writer.write() call")
+                    LOG.debug("About to call writer.write()")
                     try:
                         import pickle
 
@@ -1532,7 +1468,7 @@ def main():
                                 else:
                                     return base_name
 
-                            LOG.error(f"🔍 FINAL DEBUG - About to call writer.write() with data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else type(serializable_data)}")
+                            LOG.debug(f"About to call writer.write() with data keys: {list(serializable_data.keys()) if isinstance(serializable_data, dict) else type(serializable_data)}")
 
                             # First, safely pickle the data (this should always work)
                             try:
@@ -1554,7 +1490,7 @@ def main():
                                     obj_type_str = str(type(obj))
                                     obj_mro_str = str(type(obj).__mro__)
                                     if 'BaseModel' in obj_type_str or 'BaseModel' in obj_mro_str:
-                                        findings.append(f"🚨 BASEMODEL FOUND: {path} -> {type(obj)} | MRO: {obj_mro_str}")
+                                        findings.append(f"BASEMODEL FOUND: {path} -> {type(obj)} | MRO: {obj_mro_str}")
                                 
                                 if isinstance(obj, dict):
                                     for key, value in obj.items():
@@ -1570,7 +1506,7 @@ def main():
                         
                         basemodel_findings = find_basemodel_final_check(serializable_data)
                         if debug_dir and basemodel_findings:
-                            LOG.error(f"🚨 CRITICAL: BaseModel objects found RIGHT BEFORE writer.write():")
+                            LOG.warning(f"BaseModel objects found RIGHT BEFORE writer.write():")
                             for finding in basemodel_findings:
                                 LOG.error(f"  {finding}")
                             
@@ -1581,11 +1517,11 @@ def main():
                                     f.write("BaseModel objects found RIGHT BEFORE writer.write() call:\n")
                                     for finding in basemodel_findings:
                                         f.write(f"{finding}\n")
-                                LOG.error(f"✅ Saved BaseModel findings to file: {basemodel_filename}")
+                                LOG.debug(f"Saved BaseModel findings to file: {basemodel_filename}")
                             except Exception as file_e:
-                                LOG.error(f"❌ Failed to save findings: {file_e}")
+                                LOG.error(f"Failed to save findings: {file_e}")
                         elif basemodel_findings:
-                            LOG.error(f"🚨 CRITICAL: BaseModel objects found but debug output disabled")
+                            LOG.warning(f"BaseModel objects found but debug output disabled")
                             for finding in basemodel_findings:
                                 LOG.error(f"  {finding}")
                         else:

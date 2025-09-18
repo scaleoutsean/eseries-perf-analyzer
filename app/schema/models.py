@@ -315,9 +315,9 @@ class ControllerConfig(BaseModel):
             modelName=data.get('modelName'),
             netInterfaces=net_interfaces,
             # networkSettings=data.get('networkSettings'),
-            partNumber=data.get('partNumber'),
+            partNumber=data.get('partNumber').rstrip() if isinstance(data.get('partNumber'), str) else data.get('partNumber'),
             # physicalLocation=data.get('physicalLocation'),
-            serialNumber=data.get('serialNumber'),
+            serialNumber=data.get('serialNumber').rstrip() if isinstance(data.get('serialNumber'), str) else data.get('serialNumber'),
             status=data.get('status'),
             _raw_data=data.copy()
         )
@@ -476,7 +476,7 @@ class DriveConfig(BaseModel):
             productID=data.get("productID"),
             rawCapacity=safe_int(data.get("rawCapacity")),
             sanitizeCapable=data.get("sanitizeCapable"),
-            serialNumber=data.get("serialNumber"),
+            serialNumber=data.get("serialNumber").rstrip() if data.get("serialNumber") and isinstance(data.get("serialNumber"), str) else data.get("serialNumber"),
             softwareVersion=data.get("softwareVersion"),
             sparedForDriveRef=data.get("sparedForDriveRef"),
             spindleSpeed=safe_int(data.get("spindleSpeed")),
@@ -750,6 +750,11 @@ class TrayConfig(BaseModel):
     partNumber: Optional[str] = None
     serialNumber: Optional[str] = None
     id: Optional[str] = None
+    # Enrichment fields added during processing (tray config gets artificially enriched)
+    storage_system_name: Optional[str] = None
+    storage_system_wwn: Optional[str] = None
+    storageSystemName: Optional[str] = None
+    storageSystemWWN: Optional[str] = None
     _raw_data: Dict[str, Any] = field(default_factory=dict)
     # Add fields from schema.md that have high occurrence rates
 
@@ -757,8 +762,13 @@ class TrayConfig(BaseModel):
     def from_api_response(data: Dict) -> 'TrayConfig':
         return TrayConfig(
             id=data.get('id', 'unknown'),
-            partNumber=data.get('partNumber'),
-            serialNumber=data.get('serialNumber'),
+            partNumber=data.get('partNumber').rstrip() if data.get('partNumber') and isinstance(data.get('partNumber'), str) else data.get('partNumber'),
+            serialNumber=data.get('serialNumber').rstrip() if data.get('serialNumber') and isinstance(data.get('serialNumber'), str) else data.get('serialNumber'),
+            # Enrichment fields
+            storage_system_name=data.get('storage_system_name'),
+            storage_system_wwn=data.get('storage_system_wwn'),
+            storageSystemName=data.get('storageSystemName') or data.get('storage_system_name'),
+            storageSystemWWN=data.get('storageSystemWWN') or data.get('storage_system_wwn'),
             _raw_data=data.copy()
         )
 
