@@ -47,7 +47,7 @@ INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
-__version__ = '1.0'
+__version__ = '3.5.1'
 
 #######################
 # LIST OF METRICS #####
@@ -1756,10 +1756,6 @@ def collect_system_failures(system_info, checksums):
     Top-level function that collects failure data once and sends to both InfluxDB and Prometheus.
     Eliminates duplicate API calls when both outputs are enabled.
     """
-    # Set controller for consistent selection within this collection session
-    if len(CMD.api) > 1:
-        set_current_controller_index(random.randrange(0, 2))
-
     try:
         session = get_session()
         sys_id = system_info["wwn"]
@@ -1779,10 +1775,6 @@ def collect_system_failures(system_info, checksums):
 
     except RuntimeError:
         LOG.error(f"Error when attempting to collect failure data for {system_info['name']}/{system_info['wwn']}")
-
-    finally:
-        # Reset controller selection for next collection session
-        set_current_controller_index(None)
 
 
 
