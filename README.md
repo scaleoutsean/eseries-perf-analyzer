@@ -22,7 +22,7 @@
 
 ## What is EPA
 
-This is a fork of the now-archived [E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. This fork's objectives:
+EPA 3 is fork of the now-archived [E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. This fork's objectives:
 
 - Continue development of an OSS monitoring solution for NetApp E-Series
 - Disentangle E-Series Collector from the rest of EPA stack and make it easy to run it stand-alone and anywhere
@@ -30,6 +30,8 @@ This is a fork of the now-archived [E-Series Performance Analyzer](https://githu
 
 EPA Collector collects metrics from E-Series and sends them to InfluxDB.
 Each collector uses own credentials and may (but doesn't have to) write data to the same InfluxDB database or database instance.
+
+**NOTE:** [E-Series SANtricity Collector aka ESC](https://github.com/scaleoutsean/eseries-santricity-collector) is what I planned to release as EPA 4, but now has its own repository. Its focus on gathering configuration details makes it more complex and sensitive to hardware and software differences between different E-Series systems, which is one of the reasons why it has its own home. If you have more than one E-Series system to manage and some developer skills, maybe ESC is a good choice for you.
 
 ## Collected data
 
@@ -68,7 +70,7 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 Pick a version, clone and use it.
 
 ```bash
-TAG="v3.5.0"
+TAG="v3.5.1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa/collector
 # create and activate a venv if you want
@@ -260,9 +262,11 @@ Mon Sep  1 10:49:05 AM UTC 2025
 
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
-
 ## Changelog
 
+- TBD / 3.5.1 (October, 2025)
+  - Export unresolved system failures as Prometheus alerts
+  - Upgrade InfluxDB to latest and greatest v1.12.2
 - 3.5.0 (September 2, 2025)
   - Add several array configuration objects: hosts, volumes, disk groupings, drives. Now the monitoring of hardware configuration and - more importantly - disk group/pool and volume capacity should be easy. Existing EPA 3 users with tight DB disk space upgrading to 3.5.0+ should use `--include` and add `config_` collectors only gradually until they're sure their DB can handle it
   - InfluxDB: expose RPC service on Docker-internal network for convenient access from the utilities container

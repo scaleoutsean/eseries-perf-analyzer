@@ -7,6 +7,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [It's not convenient for me to have multiple storage admins edit the same `./epa/docker-compose.yml`](#its-not-convenient-for-me-to-have-multiple-storage-admins-edit-the-same-epadocker-composeyml)
   - [How can I customize Grafana's options?](#how-can-i-customize-grafanas-options)
   - [What if I run my own InfluxDB v1 and Grafana? Can I use this Collector without EPA?](#what-if-i-run-my-own-influxdb-v1-and-grafana-can-i-use-this-collector-without-epa)
+  - [How can I protect EPA's InfluxDB from unauthorized access?](#how-can-i-protect-epas-influxdb-from-unauthorized-access)
   - [Where's my InfluxDB data?](#wheres-my-influxdb-data)
   - [Where's my Grafana data? I see nothing when I look at the dashboards!](#wheres-my-grafana-data-i-see-nothing-when-i-look-at-the-dashboards)
   - [What do temperature sensors measure?](#what-do-temperature-sensors-measure)
@@ -24,7 +25,6 @@ Below details are mostly related to this fork. For upstream details please check
   - [How to backup and restore EPA or InfluxDB?](#how-to-backup-and-restore-epa-or-influxdb)
   - [How do temperature alarms work?](#how-do-temperature-alarms-work)
   - [InfluxDB capacity and performance requirements](#influxdb-capacity-and-performance-requirements)
-
 
 ## Why do I need to fill in so many details in Collector's YAML file?
 
@@ -45,6 +45,17 @@ EPA doesn't change Grafana in any way, so follow the official Grafana documentat
 Yes. That's another reason why I made collector.py a stand-alone script without dependencies on the WSP. Just build this fork of EPA and collector container, and then run just `docker compose up collector`.
 
 Reference dashboards are in `./epa/grafana-init/dashboards/` and you may need to update them for Grafana other than version 8.
+
+## How can I protect EPA's InfluxDB from unauthorized access?
+
+Within Docker Compose, EPA containers are on own network. Externally, add firewall rules to prevent unrelated clients from accessing InfluxDB.
+
+```sh
+iptables -A INPUT -p tcp --dport 8086 -s <collector-ip> -j ACCEPT
+iptables -A INPUT -p tcp --dport 8086 -j DROP
+```
+
+If you need much better security, consider [InfluxDB 3](https://github.com/scaleoutsean/eseries-santricity-collector).
 
 ## Where's my InfluxDB data?
 
