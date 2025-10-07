@@ -4,7 +4,7 @@ Retrieves and collects data from the the NetApp E-Series API server
 and sends the data to an InfluxDB server and/or exports via Prometheus
 
 -----------------------------------------------------------------------------
-Copyright (c) 2025 E-Series Perf Analyzer (scaleoutSean@Github (post-v3.0.0 
+Copyright (c) 2025 E-Series Perf Analyzer (scaleoutSean@Github (post-v3.0.0
 commits) and NetApp, Inc (pre-v3.1.0 commits))
 Licensed under the MIT License. See LICENSE in the project root for details.
 -----------------------------------------------------------------------------
@@ -341,53 +341,53 @@ _CURRENT_CONTROLLER_INDEX = None
 def populate_mappable_objects_cache(system_info):
     """
     Populate mega-cache from mappable-objects API containing all volume and mapping data.
-    
+
     This function ALWAYS runs (regardless of --include filters) because
     volume/mapping correlation is required for performance data host mapping.
-    
+
     Builds _MAPPABLE_OBJECTS_CACHE containing:
     - Volume information (name, volumeRef, volumeGroupRef, etc.)
     - Volume mappings (listOfMappings with mapRef)
     - Storage pool references (volumeGroupRef)
-    
+
     Replaces the need for separate _VOLUME_NAME_CACHE and _VOLUME_MAPPINGS_CACHE.
-    
+
     :param system_info: The JSON object of a storage_system
     """
     global _MAPPABLE_OBJECTS_CACHE
-    
+
     # Only run during config collection intervals
     if not should_collect_config_data():
         LOG.debug("Skipping mappable objects cache population - not a config collection interval")
         return
-        
+
     try:
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
-        
+
         session = get_session()
-        
+
         # Clear and populate mega-cache from mappable-objects API
         _MAPPABLE_OBJECTS_CACHE.clear()
-        
+
         # Get comprehensive mapping data from mappable-objects API
         mappable_objects_response = session.get(f"{get_controller('sys')}/{sys_id}/mappable-objects").json()
         LOG.debug(f"Retrieved {len(mappable_objects_response)} mappable objects for mega-cache")
-        
+
         # Build comprehensive cache indexed by volumeRef
         for obj in mappable_objects_response:
             volume_ref = obj.get('volumeRef')
             if volume_ref:
                 _MAPPABLE_OBJECTS_CACHE[volume_ref] = obj
                 LOG.debug(f"Cached mappable object: '{obj.get('label')}' -> {volume_ref}")
-        
+
         LOG.info(f"Built mappable objects mega-cache with {len(_MAPPABLE_OBJECTS_CACHE)} volume objects")
-        
+
     except Exception as e:
         LOG.warning(f"Could not retrieve mappable-objects for mega-cache: {e}")
         LOG.warning("Performance collector host mapping may be incomplete")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -407,7 +407,7 @@ def collect_config_drives(system_info):
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
-        
+
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -571,7 +571,7 @@ FIELD_COERCIONS = {
     # All other numeric fields should be floats to match production schema
     # This includes all performance metrics, utilization percentages, etc.
     # String fields (MEL descriptions, failure names) are left unchanged
-    
+
     # Host mapping fields (computed during collection)
     'mapped_host_count': int,  # Number of hosts mapped to volume
     # mapped_host_names is a string (comma-separated), no coercion needed
@@ -905,6 +905,12 @@ def setup_prometheus():
                             ['sys_id', 'sys_name', 'sensor', 'sensor_seq'], registry=prometheus_registry)
     }
 
+    prometheus_metrics['failures'] = {
+        'active_failures': Gauge('eseries_active_failures_total', 'Number of active failures',
+                                ['sys_id', 'sys_name', 'failure_type', 'object_type', 'object_ref'],
+                                registry=prometheus_registry)
+    }
+
     # Start HTTP server in background thread
     start_prometheus_server()
 
@@ -927,7 +933,7 @@ class PrometheusHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, format_string, *args):
         # Suppress default HTTP logging to avoid clutter
         pass
 
@@ -1083,35 +1089,35 @@ def send_to_prometheus(measurement, tags, fields):
 def should_collect_config_data():
     """
     Determine if config data should be collected this iteration.
-    
+
     Uses a smart interval-aware approach that handles different collector intervals:
     - If config interval == collector interval: Always collect (every iteration)
     - If config interval > collector interval: Use iteration-based timing
     - Special case: Always collect on iteration 1 to populate caches immediately
     - Debug mode: Force collection every iteration with --debug-force-config
-    
+
     Config data changes infrequently, so collect only every N minutes based on
     the relationship between CONFIG_COLLECTION_INTERVAL_MINUTES and CMD.intervalTime.
-    
+
     Returns True when config data should be collected this iteration.
     """
     global _CONFIG_COLLECTION_ITERATION_COUNTER
-    
+
     # Note: Iteration counter is incremented once per cycle in the main loop
-    
+
     # Force collection every iteration in debug mode
     if CMD.debug_force_config:
         LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, forced collection (--debug-force-config)")
         return True
-    
+
     # Always collect on first iteration to populate caches immediately
     # This ensures volume name correlation cache is available for performance data
     if _CONFIG_COLLECTION_ITERATION_COUNTER == 1:
         LOG.debug(f"Config collection: Iteration 1, collecting config data (first iteration cache population)")
         return True
-    
+
     collector_interval_minutes = CMD.intervalTime / 60.0
-    
+
     if CONFIG_COLLECTION_INTERVAL_MINUTES == collector_interval_minutes:
         # Equal case: collect every iteration since interval matches exactly
         LOG.debug(f"Config collection: Every iteration (intervals match: {CONFIG_COLLECTION_INTERVAL_MINUTES} min)")
@@ -1120,7 +1126,7 @@ def should_collect_config_data():
         # Greater case: config interval > collector interval, use iteration-based timing
         config_interval_iterations = int(CONFIG_COLLECTION_INTERVAL_MINUTES * 60 // CMD.intervalTime)
         should_collect = (_CONFIG_COLLECTION_ITERATION_COUNTER % config_interval_iterations) == 1
-        
+
         if should_collect:
             LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, "
                      f"collecting every {config_interval_iterations} iterations "
@@ -1128,7 +1134,7 @@ def should_collect_config_data():
         else:
             LOG.debug(f"Config collection: Iteration {_CONFIG_COLLECTION_ITERATION_COUNTER}, "
                      f"skipping (next collection in {config_interval_iterations - (_CONFIG_COLLECTION_ITERATION_COUNTER % config_interval_iterations)} iterations)")
-        
+
         return should_collect
 
 
@@ -1255,11 +1261,9 @@ def collect_symbol_stats(system_info):
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
-    
+
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
         # PSU
         psu_response = session.get(f"{get_controller('sys')}/{sys_id}/symbol/getEnergyStarData",
                                    params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
@@ -1317,7 +1321,7 @@ def collect_symbol_stats(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post tmp sensors data for {system_info['name']}/{system_info['wwn']}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -1396,15 +1400,13 @@ def collect_storage_metrics(system_info):
     :param sys: The JSON object of a storage system
     """
     global _MAPPABLE_OBJECTS_CACHE, _HOSTS_CACHE
-    
+
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
-    
+
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
         drive_stats_list = session.get(
             f"{get_controller('sys')}/{sys_id}/analysed-drive-statistics").json()
@@ -1601,14 +1603,14 @@ def collect_storage_metrics(system_info):
             # Add host mapping information from mega-cache
             volume_name = stats["volumeName"]
             host_names = []
-            
+
             # Find volume object by name in mega-cache
             volume_obj = None
-            for volume_ref, obj in _MAPPABLE_OBJECTS_CACHE.items():
+            for _, obj in _MAPPABLE_OBJECTS_CACHE.items():
                 if obj.get('label') == volume_name:  # 'label' is volume name
                     volume_obj = obj
                     break
-            
+
             if volume_obj:
                 # Extract host mappings from volume object
                 list_of_mappings = volume_obj.get('listOfMappings', [])
@@ -1624,7 +1626,7 @@ def collect_storage_metrics(system_info):
                 LOG.debug(f"Found host mapping for volume '{volume_name}' -> {host_names}")
             else:
                 LOG.debug(f"No volume object found for volume name '{volume_name}' in mega-cache")
-            
+
             # Add host mapping fields to volume metrics
             volume_fields['mapped_host_names'] = ','.join(host_names) if host_names else ''
             volume_fields['mapped_host_count'] = len(host_names)
@@ -1651,7 +1653,7 @@ def collect_storage_metrics(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post statistics for {system_info['name']}/{system_info['wwn']}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -1665,7 +1667,7 @@ def collect_major_event_log(system_info):
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
-    
+
     try:
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
@@ -1722,7 +1724,7 @@ def collect_major_event_log(system_info):
     except RuntimeError:
         LOG.error(
             f"Error when attempting to post MEL for {system_info['name']}/{system_info['wwn']}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -1748,30 +1750,105 @@ def create_failure_dict_item(sys_id, sys_name, fail_type, obj_ref, obj_type, is_
     return item
 
 
-def collect_system_state(system_info, checksums):
+
+def collect_system_failures(system_info, checksums):
     """
-    Collects state information from the storage system and posts it to InfluxDB
-    :param sys: The JSON object of a storage_system
-    :param checksums: The MD5 checksum of failure response from last time we checked
+    Top-level function that collects failure data once and sends to both InfluxDB and Prometheus.
+    Eliminates duplicate API calls when both outputs are enabled.
     """
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
-    
+
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
-
         sys_id = system_info["wwn"]
         sys_name = system_info["name"]
+
+        # Single API call to get current failures
         failure_response = session.get(
             f"{get_controller('sys')}/{sys_id}/failures").json()
 
-        # we can skip us if this is the same response we handled last time
+        # Always send to Prometheus for real-time alerting (if enabled)
+        if CMD.output in ['prometheus', 'both'] and PROMETHEUS_AVAILABLE:
+            create_prometheus_failure_alerts(sys_id, sys_name, failure_response)
+
+        # Send to InfluxDB for detailed tracking (if enabled)
+        if CMD.output in ['influxdb', 'both']:
+            collect_system_state_influxdb(system_info, checksums, failure_response)
+
+    except RuntimeError:
+        LOG.error(f"Error when attempting to collect failure data for {system_info['name']}/{system_info['wwn']}")
+
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
+
+
+
+def create_prometheus_failure_alerts(sys_id, sys_name, failure_response):
+    """
+    Create Prometheus metrics for current failures (for alerting).
+    Always runs regardless of checksums for real-time alerting.
+    """
+    if not PROMETHEUS_AVAILABLE or 'failures' not in prometheus_metrics:
+        return
+
+    failure_gauge = prometheus_metrics['failures']['active_failures']
+
+    # Clear existing metrics for this system first
+    # Note: Prometheus client doesn't have a direct way to clear specific labels,
+    # so we set all current failure combinations to their actual values
+
+    # Group failures by type, object_type, and object_ref for detailed metrics
+    failure_counts = {}
+    for failure in failure_response:
+        failure_type = failure.get("failureType", "unknown")
+        object_type = failure.get("objectType", "unknown")
+        object_ref = failure.get("objectRef", "unknown")
+        # Use object_ref directly, but handle None/null values
+        if object_ref is None:
+            object_ref = ""
+        key = (failure_type, object_type, object_ref)
+        failure_counts[key] = failure_counts.get(key, 0) + 1
+
+    # Set Prometheus metrics for active failures
+    for (failure_type, object_type, object_ref), count in failure_counts.items():
+        failure_gauge.labels(
+            sys_id=sys_id,
+            sys_name=sys_name,
+            failure_type=failure_type,
+            object_type=object_type,
+            object_ref=object_ref
+        ).set(count)
+
+    # If no failures, ensure we still have a metric with 0
+    if not failure_counts:
+        failure_gauge.labels(
+            sys_id=sys_id,
+            sys_name=sys_name,
+            failure_type="none",
+            object_type="none",
+            object_ref=""
+        ).set(0)
+
+    LOG.debug(f"Updated Prometheus failure metrics: {len(failure_counts)} failure types for system {sys_name}")
+
+
+
+def collect_system_state_influxdb(system_info, checksums, failure_response):
+    """
+    Process failures for InfluxDB with checksum-based change detection.
+    This is the existing InfluxDB logic from collect_system_state.
+    """
+    try:
+        client = InfluxDBClient(host=influxdb_host, port=influxdb_port, database=INFLUXDB_DATABASE)
+        sys_id = system_info["wwn"]
+        sys_name = system_info["name"]
+
+        # Check if this is the same response we handled last time (existing logic)
         old_checksum = checksums.get(str(sys_id))
-        new_checksum = hashlib.md5(
-            str(failure_response).encode("utf-8")).hexdigest()
+        new_checksum = hashlib.md5(str(failure_response).encode("utf-8")).hexdigest()
         if old_checksum is not None and str(new_checksum) == str(old_checksum):
             return
         checksums.update({str(sys_id): str(new_checksum)})
@@ -1798,7 +1875,6 @@ def collect_system_state(system_info, checksums):
                 p_obj_type = point["object_type"]
                 p_active = point["active"]
                 if (r_fail_type == p_fail_type
-                   
                     and r_obj_ref == p_obj_ref
                         and r_obj_type == p_obj_type):
                     if p_active == "True":
@@ -1848,17 +1924,12 @@ def collect_system_state(system_info, checksums):
 
         # write failures to InfluxDB
         if CMD.showStateMetrics:
-            LOG.info(f"Writing {len(json_body)} failures")
-        client.write_points(json_body, database=INFLUXDB_DATABASE)
+            LOG.info(f"Writing {len(json_body)} failures to InfluxDB")
+        if not CMD.doNotPost:
+            client.write_points(json_body, database=INFLUXDB_DATABASE)
 
-    except RuntimeError:
-        LOG.error(
-            f"Error when attempting to post state information for {system_info['name']}/{system_info['id']}")
-    
-    finally:
-        # Reset controller selection for next collection session
-        set_current_controller_index(None)
-
+    except Exception as e:
+        LOG.error(f"Error processing failures for InfluxDB: {e}")
 
 def collect_config_volumes(system_info):
     """
@@ -1866,7 +1937,7 @@ def collect_config_volumes(system_info):
     :param system_info: The JSON object of a storage_system
     """
     global _HOSTS_CACHE, _MAPPABLE_OBJECTS_CACHE
-    
+
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_volumes collection - not a scheduled interval (collected every 15 minutes)")
@@ -1876,7 +1947,7 @@ def collect_config_volumes(system_info):
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
-        
+
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -1888,7 +1959,7 @@ def collect_config_volumes(system_info):
         # Use mega-cache for host mapping resolution (consistent with config collection timing)
         # Build volumeRef -> [host_names] mapping from mega-cache
         volume_to_hosts = {}
-        
+
         # Use _MAPPABLE_OBJECTS_CACHE and _HOSTS_CACHE populated by config collection
         for volume_ref, volume_obj in _MAPPABLE_OBJECTS_CACHE.items():
             list_of_mappings = volume_obj.get('listOfMappings', [])
@@ -2001,7 +2072,7 @@ def collect_config_storage_pools(system_info):
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
-        
+
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -2110,7 +2181,7 @@ def collect_config_storage_pools(system_info):
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post storage pool configuration for {system_info['name']}/{system_info['wwn']}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -2122,7 +2193,7 @@ def collect_config_hosts(system_info):
     :param system_info: The JSON object of a storage_system
     """
     global _HOSTS_CACHE, _VOLUME_MAPPINGS_CACHE, _VOLUME_NAME_CACHE
-    
+
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_hosts collection - not a scheduled interval (collected every 15 minutes)")
@@ -2132,7 +2203,7 @@ def collect_config_hosts(system_info):
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
-        
+
         session = get_session()
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
@@ -2155,13 +2226,13 @@ def collect_config_hosts(system_info):
                 'hostRef': host_ref,
                 'id': host.get('id', 'unknown')
             }
-            
+
             if cluster_ref:
                 # Store multiple hosts per cluster (for HA pairs)
                 if cluster_ref not in _HOSTS_CACHE:
                     _HOSTS_CACHE[cluster_ref] = []
                 _HOSTS_CACHE[cluster_ref].append(host_info)
-                
+
                 # For single hosts (clusterRef = all zeros), also index by hostRef
                 # since volume mappings use hostRef as mapRef for single hosts
                 if cluster_ref == "0000000000000000000000000000000000000000" and host_ref:
@@ -2282,7 +2353,7 @@ def collect_config_hosts(system_info):
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post host configuration for {system_info['name']}/{system_info['wwn']}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -2296,10 +2367,8 @@ def collect_controller_metrics(system_info):
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
-    
+
     try:
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Since both controllers return data for all controllers in the cluster,
@@ -2422,7 +2491,7 @@ def collect_controller_metrics(system_info):
 
     except Exception as e:
         LOG.error(f"Error when attempting to collect controller metrics for {system_info['name']}/{system_info['wwn']}: {e}")
-    
+
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -2702,12 +2771,12 @@ if __name__ == "__main__":
     iteration_count = 0
     while True:
         iteration_count += 1
-        
+
         # Check iteration limit for lab testing
         if CMD.max_iterations > 0 and iteration_count > CMD.max_iterations:
             LOG.info(f"Reached maximum iterations limit ({CMD.max_iterations}), exiting...")
             break
-            
+
         time_start = time.time()
         try:
             response = SESSION.get(get_controller("sys"))
@@ -2725,7 +2794,7 @@ if __name__ == "__main__":
 
             # Increment config collection iteration counter once per collection cycle
             _CONFIG_COLLECTION_ITERATION_COUNTER += 1
-            
+
             # Always populate mappable objects mega-cache (required for performance host mapping)
             # This runs regardless of --include filters since volume/mapping correlation is needed
             # for performance data even when config measurements aren't being collected
@@ -2746,7 +2815,7 @@ if __name__ == "__main__":
                     collect_symbol_stats(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_system_state']):
                     LOG.info("Collecting system state and failure information...")
-                    collect_system_state(sys, checksums)
+                    collect_system_failures(sys, checksums)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_major_event_log']):
                     LOG.info("Collecting major event log (MEL)...")
                     collect_major_event_log(sys)
@@ -2772,7 +2841,7 @@ if __name__ == "__main__":
                 LOG.info("Collecting power and temperature data...")
                 collect_symbol_stats(sys)
                 LOG.info("Collecting system state and failure information...")
-                collect_system_state(sys, checksums)
+                collect_system_failures(sys, checksums)
                 LOG.info("Collecting major event log (MEL)...")
                 collect_major_event_log(sys)
                 LOG.info("Collecting storage pool configuration...")
