@@ -139,7 +139,7 @@ From 3.[1,2,3] to 3.4 or newer version 3, I wouldn't try since there aren't new 
 
 EPA 3.4.0's `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
-EPA 3.5.0 doesn't have a changes compared to 3.4, but it has new "tables". Upgrade should be possible.
+EPA 3.5.0 and 3.5.1 don't have a changes compared to 3.4, but it has new "tables". Upgrade should be possible.
 
 ## If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
@@ -152,7 +152,7 @@ Or you can create the DB before you run.
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.5.0
+  epa/collector:3.5.1
 ```
 
 - Using the `utils` container:

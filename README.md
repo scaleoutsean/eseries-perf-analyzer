@@ -51,7 +51,7 @@ Each collector uses own credentials and may (but doesn't have to) write data to 
   - Hosts
   - Disk groupings (RAID or DDP)
 
-Users may use `--include` to limit the type of data collected and constrain InfluxDB data growth. Only Performance metrics can get exported via Prometheus.
+Users may use `--include` to limit the type of data collected and constrain InfluxDB data growth. Only Performance metrics and failures may be exported via Prometheus.
 
 Sample screenshots are available [here](./SCREENSHOTS.md).
 
@@ -157,12 +157,12 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 Download and decompress latest release and enter the `epa` sub-directory:
 
 ```sh
-TAG="v3.5.0"
+TAG="v3.5.1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
 vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name for each collector
-./setup-data-dirs.sh     # create directories for InfluxDB and Grafana and apply correct ownership
+./setup-data-dirs.sh     # (epa subdirectory) creates directories for InfluxDB and Grafana and apply correct ownership
 
 # one shot Hail Mary: docker compose -d up # includes 'utils' container
 # or, step by step:
@@ -200,7 +200,7 @@ If you want to run containerized collector as a CLI program rather than Docker s
 Mind the project/container name and version!
 
 ```sh
-DOCKER_TAG="3.5.0"
+DOCKER_TAG="3.5.1"
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
   epa/collector:${DOCKER_TAG} collector.py -h
@@ -211,7 +211,7 @@ docker run --rm --network eseries_perf_analyzer \
 Example run for limited database population:
 
 ```sh
-DOCKER_TAG="3.5.0"
+DOCKER_TAG="3.5.1"
 docker run -e INCLUDE="power temp" epa/collector:${DOCKER_TAG}
 ```
 
@@ -225,7 +225,7 @@ InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able t
 
 Add another collector service (e.g. `collector-ef300c`) to `docker-compose.yaml`, build it and start it. You may use the same (existing) or own (new) InfluxDB database instance. Enter the `utils` container or use Collector to create it in advance. You may also just run collector with `--dbName` to have it created automatically.
 
-**NOTE:** pay attetion to Prometheus ports if you use them. Mutiple collectors in same Docker Compose need different external ports for Prometheus exporter.
+**NOTE:** pay attetion to Prometheus ports if you use them. Multiple collectors in same Docker Compose need different external ports for Prometheus exporter.
 
 To remove a collector that monitors an array, run `docker compose down <collector-name>`, enter the `utils` container to drop the database - if it's not shared with other collectors.
 
@@ -258,15 +258,37 @@ $ date
 Mon Sep  1 10:49:05 AM UTC 2025
 ```
 
+Example:
+
+```raw
+# HELP eseries_active_failures_total Number of active failures
+# TYPE eseries_active_failures_total gauge
+eseries_active_failures_total{failure_type="nonPreferredPath",object_ref="1",object_type="notOnPreferredPath",sys_id="600A098000F63714000000005E79B17B",sys_name="EF570"} 1.0
+```
+
+Example alert rule:
+
+```raw
+- alert: ESeriesStorageFailure
+  expr: eseries_active_failures_total > 0
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "E-Series failure detected on {{ $labels.sys_name }}"
+    description: "{{ $labels.failure_type }} failure on {{ $labels.object_type }} ({{ $labels.object_ref }})"
+```
+
 ## FAQs
 
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
 
-- TBD / 3.5.1 (October, 2025)
+- 3.5.1 (October 8, 2025)
   - Export unresolved system failures as Prometheus alerts
   - Upgrade InfluxDB to latest and greatest v1.12.2
+
 - 3.5.0 (September 2, 2025)
   - Add several array configuration objects: hosts, volumes, disk groupings, drives. Now the monitoring of hardware configuration and - more importantly - disk group/pool and volume capacity should be easy. Existing EPA 3 users with tight DB disk space upgrading to 3.5.0+ should use `--include` and add `config_` collectors only gradually until they're sure their DB can handle it
   - InfluxDB: expose RPC service on Docker-internal network for convenient access from the utilities container

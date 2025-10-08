@@ -59,7 +59,7 @@ You may also try the Bash script in the `scripts` directory. Pass E-Series syste
 
 ## Schema
 
-For convenience, a list of measurements, fields and keys that v3.5.0 collects are given below. These aren't expected to change, but you can view your own with `SHOW MEASUREMENTS`, `SHOW FIELD KEYS`, `SHOW TAG KEYS`. `"SHOW FIELD KEYS FROM config_volumes"` shows fields from specific measurement.
+For convenience, a list of measurements, fields and keys that v3.5.1 collects are given below. These aren't expected to change, but you can view your own with `SHOW MEASUREMENTS`, `SHOW FIELD KEYS`, `SHOW TAG KEYS`. `"SHOW FIELD KEYS FROM config_volumes"` shows fields from specific measurement.
 
 ```raw
 EPA Database Schema Dump

@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     ports:
       - 8086:8086      
+    environment:
+      - INFLUXDB_REPORTING_DISABLED=true
     logging:
       driver: "json-file"
       options:
@@ -105,7 +107,7 @@ services:
       - DB_ADDRESS=6.6.6.6
       - DB_PORT=8086      
       # Optional: verbose logging
-      - DEBUG=true
+      - DEBUG=false
       # Optional: Set output destination (both|influxdb|prometheus). Default: both. Prometheus port should be exposed to enable remote access.
       - OUTPUT=both
       # Optional: Set Prometheus port (default: 8080)
