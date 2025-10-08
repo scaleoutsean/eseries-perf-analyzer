@@ -1,4 +1,4 @@
-FROM python:3.10.14-alpine3.20
+FROM python:3.14-alpine3.22
 ARG TAG=latest
 
 LABEL VERSION=${TAG}
