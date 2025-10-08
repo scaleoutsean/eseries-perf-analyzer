@@ -47,7 +47,7 @@ INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
-__version__ = '3.5.1'
+__version__ = '3.5.2'
 
 #######################
 # LIST OF METRICS #####
