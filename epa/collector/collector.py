@@ -47,7 +47,7 @@ INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
-__version__ = '3.5.1'
+__version__ = '3.5.2'
 
 #######################
 # LIST OF METRICS #####
@@ -249,6 +249,29 @@ CONFIG_HOSTS_PARAMS = [
     'hostSidePorts_first_mtpIoInterfaceType',
     'hostSidePorts_first_id'
 ]
+
+# Configuration for interface alerting
+# Only includes interfaces with known JSON structure patterns
+# Each config specifies the JSON path to the alert status field and the values that trigger an alert
+INTERFACE_ALERT_CONFIG = {
+    'iscsi': {
+        'enabled': True,
+        'alert_paths': ['interfaceData', 'ethernetData', 'linkStatus'],  # Path to status in iSCSI interface object
+        'alert_values': ['down'],  # Values that trigger alert (1=alert)
+    },
+    'ib': {
+        'enabled': True,
+        'alert_paths': ['physPortState'],  # Path to status in IB interface object
+        'alert_values': ['linkdown'],  # Values that trigger alert (1=alert)
+    },
+    'ethernet': {
+        'enabled': True,
+        'alert_paths': ['ethernet', 'linkStatus'],  # Path to status in management Ethernet interface
+        'alert_values': ['down'],  # Values that trigger alert (1=alert)
+    }
+    # FC, SAS omitted until JSON structure is confirmed in testing
+    # Add additional interface types here after validating their JSON structure
+}
 
 CONFIG_STORAGE_POOLS_PARAMS = [
     # Basic pool metrics
@@ -769,7 +792,7 @@ FUNCTION_MEASUREMENTS = {
     'collect_controller_metrics': ['controllers'],
     'collect_symbol_stats': ['power', 'temp'],
     'collect_major_event_log': ['major_event_log'],
-    'collect_system_state': ['failures'],
+    'collect_system_state': ['failures', 'interface_alerts'],
     'collect_config_storage_pools': ['config_storage_pools'],
     'collect_config_volumes': ['config_volumes'],
     'collect_config_hosts': ['config_hosts'],
@@ -908,6 +931,12 @@ def setup_prometheus():
     prometheus_metrics['failures'] = {
         'active_failures': Gauge('eseries_active_failures_total', 'Number of active failures',
                                 ['sys_id', 'sys_name', 'failure_type', 'object_type', 'object_ref'],
+                                registry=prometheus_registry)
+    }
+
+    prometheus_metrics['interface_alerts'] = {
+        'interface_alert': Gauge('eseries_interface_alert', 'Interface alert status (1=down, 0=ok)',
+                                ['sys_id', 'sys_name', 'interface_ref', 'channel', 'interface_type'],
                                 registry=prometheus_registry)
     }
 
@@ -1825,6 +1854,167 @@ def create_prometheus_failure_alerts(sys_id, sys_name, failure_response):
         ).set(0)
 
     LOG.debug(f"Updated Prometheus failure metrics: {len(failure_counts)} failure types for system {sys_name}")
+
+
+def collect_interface_alerts(system_info):
+    """
+    Collects interface alert information from controller interfaces and updates Prometheus metrics.
+    
+    Checks both management interfaces (netInterfaces) and storage service interfaces (hostInterfaces)
+    from the /controllers endpoint. Only processes interface types explicitly configured in 
+    INTERFACE_ALERT_CONFIG to avoid false positives from unknown JSON structures.
+    
+    Args:
+        system_info: Dictionary containing system information (wwn, name)
+    """
+    if CMD.output not in ['prometheus', 'both'] or not PROMETHEUS_AVAILABLE:
+        return
+    
+    if 'interface_alerts' not in prometheus_metrics:
+        return
+    
+    try:
+        session = get_session()
+        sys_id = system_info["wwn"]
+        sys_name = system_info["name"]
+        
+        # Fixed: Use correct metric key 'interface_alert' (not 'status')
+        interface_alert_gauge = prometheus_metrics['interface_alerts']['interface_alert']
+        
+        # Get controller data which contains both management and storage service interfaces
+        controllers_response = session.get(
+            f"{get_controller('sys')}/{sys_id}/graph/xpath-filter?query=/controller"
+        ).json()
+        
+        alert_count = 0
+        
+        for controller in controllers_response:
+            controller_id = controller.get('controllerRef', 'unknown')
+            
+            # Process management interfaces (wan0, wan1, etc.)
+            net_interfaces = controller.get('netInterfaces', [])
+            for interface in net_interfaces:
+                iface_type = interface.get('interfaceType', '').lower()
+                
+                if iface_type not in INTERFACE_ALERT_CONFIG:
+                    LOG.debug(f"Skipping unconfigured management interface type: {iface_type}")
+                    continue
+                
+                config = INTERFACE_ALERT_CONFIG[iface_type]
+                if not config.get('enabled', False):
+                    continue
+                
+                # Navigate to alert field using configured path
+                current_obj = interface
+                for path_segment in config['alert_paths']:
+                    if isinstance(current_obj, dict) and path_segment in current_obj:
+                        current_obj = current_obj[path_segment]
+                    else:
+                        current_obj = None
+                        break
+                
+                if current_obj is None:
+                    continue
+                
+                # Check if status matches alert condition
+                status_value = str(current_obj).lower()
+                if status_value in config['alert_values']:
+                    # Extract identifier fields - management interfaces have nested 'ethernet' object
+                    eth_data = interface.get('ethernet', {})
+                    interface_name = eth_data.get('interfaceName', 'unknown')
+                    channel = eth_data.get('channel', 0)
+                    interface_ref = eth_data.get('interfaceRef', 'unknown')
+                    
+                    # Fixed: Use correct label names matching metric definition
+                    interface_alert_gauge.labels(
+                        sys_id=sys_id,
+                        sys_name=sys_name,
+                        interface_ref=interface_ref,
+                        channel=str(channel),
+                        interface_type=f"mgmt_{iface_type}_{interface_name}"
+                    ).set(1.0)
+                    
+                    alert_count += 1
+                    LOG.info(f"Management interface alert: {sys_name} controller {controller_id} "
+                            f"{interface_name} ({iface_type}) ch={channel} status={status_value}")
+            
+            # Process storage service interfaces (iSCSI, FC, IB, SAS)
+            host_interfaces = controller.get('hostInterfaces', [])
+            for interface in host_interfaces:
+                iface_type = interface.get('interfaceType', '').lower()
+                
+                if iface_type not in INTERFACE_ALERT_CONFIG:
+                    LOG.debug(f"Skipping unconfigured storage interface type: {iface_type}")
+                    continue
+                
+                config = INTERFACE_ALERT_CONFIG[iface_type]
+                if not config.get('enabled', False):
+                    continue
+                
+                # Navigate to the interface type-specific subtree
+                type_obj = interface.get(iface_type, {})
+                if not type_obj:
+                    continue
+                
+                # Navigate to alert field using configured path
+                current_obj = type_obj
+                for path_segment in config['alert_paths']:
+                    if isinstance(current_obj, dict) and path_segment in current_obj:
+                        current_obj = current_obj[path_segment]
+                    else:
+                        current_obj = None
+                        break
+                
+                if current_obj is None:
+                    continue
+                
+                # Check if status matches alert condition
+                status_value = str(current_obj).lower()
+                if status_value in config['alert_values']:
+                    # Extract identifier fields (varies by interface type)
+                    interface_ref = type_obj.get('interfaceRef', 'unknown')
+                    channel = type_obj.get('channel', 0)
+                    
+                    if iface_type == 'iscsi':
+                        # iSCSI has nested ethernetData with MAC
+                        ethernet_data = type_obj.get('interfaceData', {}).get('ethernetData', {})
+                        mac_address = ethernet_data.get('macAddress', '')
+                        interface_id = f"{iface_type}_ch{channel}_{mac_address}"
+                    elif iface_type == 'ib':
+                        # InfiniBand uses globalIdentifier
+                        global_id = type_obj.get('globalIdentifier', 'unknown')
+                        interface_id = f"{iface_type}_ch{channel}_{global_id}"
+                    else:
+                        # Generic fallback
+                        interface_id = f"{iface_type}_ch{channel}_{interface_ref}"
+                    
+                    # Fixed: Use correct label names matching metric definition
+                    interface_alert_gauge.labels(
+                        sys_id=sys_id,
+                        sys_name=sys_name,
+                        interface_ref=interface_ref,
+                        channel=str(channel),
+                        interface_type=interface_id
+                    ).set(1.0)
+                    
+                    alert_count += 1
+                    LOG.info(f"Storage interface alert: {sys_name} controller {controller_id} "
+                            f"{interface_id} status={status_value}")
+        
+        if alert_count == 0:
+            # Set a zero metric to indicate healthy state
+            interface_alert_gauge.labels(
+                sys_id=sys_id,
+                sys_name=sys_name,
+                interface_ref="none",
+                channel="0",
+                interface_type="healthy"
+            ).set(0)
+        
+        LOG.debug(f"Updated Prometheus interface alert metrics: {alert_count} alerts for system {sys_name}")
+        
+    except Exception as e:
+        LOG.warning(f"Failed to collect interface alerts for system {sys_name}: {e}")
 
 
 
@@ -2808,6 +2998,7 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_system_state']):
                     LOG.info("Collecting system state and failure information...")
                     collect_system_failures(sys, checksums)
+                    collect_interface_alerts(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_major_event_log']):
                     LOG.info("Collecting major event log (MEL)...")
                     collect_major_event_log(sys)
@@ -2834,6 +3025,7 @@ if __name__ == "__main__":
                 collect_symbol_stats(sys)
                 LOG.info("Collecting system state and failure information...")
                 collect_system_failures(sys, checksums)
+                collect_interface_alerts(sys)
                 LOG.info("Collecting major event log (MEL)...")
                 collect_major_event_log(sys)
                 LOG.info("Collecting storage pool configuration...")
