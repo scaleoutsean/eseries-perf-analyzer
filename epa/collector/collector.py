@@ -432,8 +432,10 @@ def collect_config_drives(system_info):
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Get drive configuration data from the API
@@ -499,11 +501,15 @@ def collect_config_drives(system_info):
                 LOG.debug(f"Skipped config_drives measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_drives: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            if client is None:
+                raise RuntimeError("InfluxDB client not initialized for drive config write")
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: drive configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post drive configuration for {system_info['name']}/{system_info['wwn']}")
@@ -785,6 +791,10 @@ if (CMD.retention == '' or CMD.retention is None):
     RETENTION_DUR = DEFAULT_RETENTION
 else:
     RETENTION_DUR = CMD.retention
+
+# Derived flag to indicate whether InfluxDB output is active
+# Used to skip Influx-only collection paths (e.g., --output=prometheus or --doNotPost)
+INFLUX_WRITE_ENABLED = CMD.output in ['influxdb', 'both'] and not CMD.doNotPost
 
 # Define which measurements each collection function provides
 FUNCTION_MEASUREMENTS = {
@@ -1693,15 +1703,25 @@ def collect_major_event_log(system_info):
     Collects all defined MEL metrics and posts them to InfluxDB
     :param sys: The JSON object of a storage_system
     """
+    if not INFLUX_WRITE_ENABLED:
+        LOG.debug("Skipping MEL collection (InfluxDB output disabled)")
+        return
+
+    if CMD.include and 'major_event_log' not in CMD.include:
+        LOG.debug("Skipping MEL collection (major_event_log not in --include filter)")
+        return
+
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
 
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
-        json_body = list()
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
+        json_body = []
         start_from = -1
         mel_grab_count = 8192
         query = client.query(
@@ -1710,11 +1730,16 @@ def collect_major_event_log(system_info):
         if query:
             start_from = int(next(query.get_points())["id"]) + 1
 
-        mel_response = session.get(f"{get_controller('sys')}/{sys_id}/mel-events",
-                                   params={"count": mel_grab_count, "startSequenceNumber": start_from}, timeout=(6.10, CMD.intervalTime*2)).json()
+        mel_response = session.get(
+            f"{get_controller('sys')}/{sys_id}/mel-events",
+            params={"count": mel_grab_count, "startSequenceNumber": start_from},
+            timeout=(6.10, CMD.intervalTime * 2)
+        ).json()
+
         if CMD.showMELMetrics:
             LOG.info("Starting from %s", str(start_from))
             LOG.info("Grabbing %s MELs", str(len(mel_response)))
+
         for mel in mel_response:
             item = {
                 "measurement": "major_event_log",
@@ -1729,30 +1754,40 @@ def collect_major_event_log(system_info):
                     "ascq": mel["ascq"],
                     "asc": mel["asc"]
                 },
-                "fields": coerce_fields_dict(dict(
-                    (metric, mel.get(metric)) for metric in MEL_PARAMS
-                )),
+                "fields": coerce_fields_dict({
+                    metric: mel.get(metric) for metric in MEL_PARAMS
+                }),
                 "time": datetime.fromtimestamp(
-                    int(mel["timeStamp"]), timezone.utc).isoformat()
+                    int(mel["timeStamp"]), timezone.utc
+                ).isoformat()
             }
+
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
+
             if not CMD.include or item["measurement"] in CMD.include:
                 json_body.append(item)
+
         try:
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: MEL payload sent")
         except InfluxDBClientError as e:
             if "beyond retention policy" in str(e):
-                LOG.debug(f"Some MEL events were beyond retention policy and dropped by InfluxDB: {e}")
+                LOG.debug(
+                    "Some MEL events were beyond retention policy and dropped by InfluxDB: %s",
+                    e
+                )
                 LOG.info("LOG: MEL payload sent (some events outside retention dropped)")
             else:
                 # Re-raise other InfluxDB errors
                 raise
     except RuntimeError:
         LOG.error(
-            f"Error when attempting to post MEL for {system_info['name']}/{system_info['wwn']}")
+            "Error when attempting to post MEL for %s/%s",
+            system_info['name'],
+            system_info['wwn']
+        )
 
     finally:
         # Reset controller selection for next collection session
@@ -2228,11 +2263,14 @@ def collect_config_volumes(system_info):
                 LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: volume configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -2249,15 +2287,16 @@ def collect_config_storage_pools(system_info):
     if not should_collect_config_data():
         LOG.info("Skipping config_storage_pools collection - not a scheduled interval (collected every 15 minutes)")
         return
-
     try:
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Get storage pool configuration data from the API
@@ -2355,11 +2394,14 @@ def collect_config_storage_pools(system_info):
                 LOG.debug(f"Skipped config_storage_pools measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_storage_pools: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: storage pool configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post storage pool configuration for {system_info['name']}/{system_info['wwn']}")
@@ -2387,8 +2429,10 @@ def collect_config_hosts(system_info):
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Get host configuration data from the API
@@ -2527,11 +2571,14 @@ def collect_config_hosts(system_info):
         LOG.debug(f"Populated _HOSTS_CACHE with {len(_HOSTS_CACHE)} hosts")
 
         LOG.debug(f"collect_config_hosts: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: host configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post host configuration for {system_info['name']}/{system_info['wwn']}")
