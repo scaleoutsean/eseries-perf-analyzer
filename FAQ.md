@@ -25,6 +25,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [How to backup and restore EPA or InfluxDB?](#how-to-backup-and-restore-epa-or-influxdb)
   - [How do temperature alarms work?](#how-do-temperature-alarms-work)
   - [InfluxDB capacity and performance requirements](#influxdb-capacity-and-performance-requirements)
+  - [How to use the capture feature](#how-to-use-the-capture-feature)
 
 ## Why do I need to fill in so many details in Collector's YAML file?
 
@@ -139,7 +140,7 @@ From 3.[1,2,3] to 3.4 or newer version 3, I wouldn't try since there aren't new 
 
 EPA 3.4.0's `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
-EPA 3.5.0 and 3.5.1 don't have a changes compared to 3.4, but it has new "tables". Upgrade should be possible.
+EPA 3.5.0, 3.5.1, 3.5.2, 3.5.4 don't have changes compared to 3.4, but it has new "tables". Upgrade should be possible.
 
 ## If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
@@ -152,7 +153,7 @@ Or you can create the DB before you run.
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.5.1
+  epa/collector:3.5.3
 ```
 
 - Using the `utils` container:
@@ -209,3 +210,12 @@ Anecdotally, v3.5.0 (this includes the extra configuration metrics) collecting 2
 - This amounts less than 1 GB/month or ~500 MB/mo for a small array
 
 For many arrays or volumes, showing weeks at once may benefit from more RAM given to Grafana, but you can evaluate that based on your use case.
+
+## How to use the capture feature
+
+- Use timestamped or other unique directory names to store capture data without overwrites from multiple runs
+- Test-replay capture files
+
+```sh
+python3 scripts/test_replay.py --captures tests/captures
+```

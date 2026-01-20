@@ -1,7 +1,5 @@
 # InfluxDB v1 in EPA 3.5
 
-InfluxDB v1 uses InfluxQL which is supported in InfluxDB 3 Core which EPA 4 uses, so there's still value in learning it. Although in the case of EPA 4, database schema will differ, similar queries will work with small adjustments.
-
 - `DISTINCT` only works on **tags**, not fields. Use `SHOW TAG VALUES` for tags, `GROUP BY` for field de-duplication in query results
 - Use `GROUP BY` for uniqueness. When you want unique records, group by a unique identifier (like `volumeRef` below)
 - Mix tags and fields in `WHERE`. Tags use `=` or `=~`, while fields can use comparison operators
@@ -59,7 +57,7 @@ You may also try the Bash script in the `scripts` directory. Pass E-Series syste
 
 ## Schema
 
-For convenience, a list of measurements, fields and keys that v3.5.1 collects are given below. These aren't expected to change, but you can view your own with `SHOW MEASUREMENTS`, `SHOW FIELD KEYS`, `SHOW TAG KEYS`. `"SHOW FIELD KEYS FROM config_volumes"` shows fields from specific measurement.
+For convenience, a list of measurements, fields and keys that v3.5.2 collects are given below. These aren't expected to change, but you can view your own with `SHOW MEASUREMENTS`, `SHOW FIELD KEYS`, `SHOW TAG KEYS`. `"SHOW FIELD KEYS FROM config_volumes"` shows fields from specific measurement. (v3.5.3 adds optional "point-in-time" volume statistics that disabled by default and not shown below.)
 
 ```raw
 EPA Database Schema Dump

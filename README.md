@@ -70,7 +70,7 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 Pick a version, clone and use it.
 
 ```bash
-TAG="v3.5.1"
+TAG="v3.5.3"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa/collector
 # create and activate a venv if you want
@@ -115,7 +115,7 @@ services:
 
   collector-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.5.0 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.5.3 # it exists, but best build your own
     container_name: collector-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -157,7 +157,7 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 Download and decompress latest release and enter the `epa` sub-directory:
 
 ```sh
-TAG="v3.5.1"
+TAG="v3.5.3"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
@@ -200,7 +200,7 @@ If you want to run containerized collector as a CLI program rather than Docker s
 Mind the project/container name and version!
 
 ```sh
-DOCKER_TAG="3.5.1"
+DOCKER_TAG="3.5.3"
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
   epa/collector:${DOCKER_TAG} collector.py -h
@@ -211,7 +211,7 @@ docker run --rm --network eseries_perf_analyzer \
 Example run for limited database population:
 
 ```sh
-DOCKER_TAG="3.5.1"
+DOCKER_TAG="3.5.3"
 docker run -e INCLUDE="power temp" epa/collector:${DOCKER_TAG}
 ```
 
@@ -284,11 +284,15 @@ Example alert rule:
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
-
+- 3.5.3 (January 20, 2026)
+  - Add Prometheus alerts for downed interfaces
+  - Add optional "point-in-time" volume performance metrics (default: off) for use cases where default (rolling 5 minute average) is not enough. Enable with `--realtime`
+  - Minor bug fixes and improvements (including GHCR container builds)
+- 3.5.2 (October 8, 2025)
+  - Update dependencies (container base image to 3.14-alpine3.22 and requests library v2.32.5)
 - 3.5.1 (October 8, 2025)
   - Export unresolved system failures as Prometheus alerts
   - Upgrade InfluxDB to latest and greatest v1.12.2
-
 - 3.5.0 (September 2, 2025)
   - Add several array configuration objects: hosts, volumes, disk groupings, drives. Now the monitoring of hardware configuration and - more importantly - disk group/pool and volume capacity should be easy. Existing EPA 3 users with tight DB disk space upgrading to 3.5.0+ should use `--include` and add `config_` collectors only gradually until they're sure their DB can handle it
   - InfluxDB: expose RPC service on Docker-internal network for convenient access from the utilities container
