@@ -1,5 +1,5 @@
 python-dotenv
-requests==2.32.4
+requests==2.32.5
 urllib3==2.5.0
 influxdb3-python>=0.14.0
 prometheus_client>=0.19.0
