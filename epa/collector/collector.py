@@ -14,13 +14,18 @@ Repository: https://github.com/scaleoutsean/eseries-perf-analyzer
 import argparse
 import concurrent.futures
 import hashlib
+import json
 import logging
 import random
+import re
 import sys
 import time
 from datetime import datetime, timezone
-from threading import Thread
+from itertools import count
+from pathlib import Path
+from threading import Thread, Lock
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
 
 import requests
 from influxdb import InfluxDBClient
@@ -179,6 +184,28 @@ VOLUME_PARAMS = [
     'mapped_host_count'   # Number of hosts this volume is mapped to
 ]
 
+VOLUME_REALTIME_PARAMS = [
+    'readIOps',
+    'writeIOps',
+    'otherIOps',
+    'combinedIOps',
+    'readThroughput',
+    'writeThroughput',
+    'combinedThroughput',
+    'readResponseTime',
+    'writeResponseTime',
+    'combinedResponseTime',
+    'averageReadOpSize',
+    'averageWriteOpSize',
+    # Deltas
+    'readOps',
+    'writeOps',
+    'otherOps',
+    # Host mapping fields
+    'mapped_host_names',
+    'mapped_host_count'
+]
+
 MEL_PARAMS = [
     'id',
     'description',
@@ -256,18 +283,24 @@ CONFIG_HOSTS_PARAMS = [
 INTERFACE_ALERT_CONFIG = {
     'iscsi': {
         'enabled': True,
-        'alert_paths': ['interfaceData', 'ethernetData', 'linkStatus'],  # Path to status in iSCSI interface object
-        'alert_values': ['down'],  # Values that trigger alert (1=alert)
+        # Path to status in iSCSI interface object
+        'alert_paths': ['interfaceData', 'ethernetData', 'linkStatus'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['down'],
     },
     'ib': {
         'enabled': True,
-        'alert_paths': ['physPortState'],  # Path to status in IB interface object
-        'alert_values': ['linkdown'],  # Values that trigger alert (1=alert)
+        # Path to status in IB interface object
+        'alert_paths': ['physPortState'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['linkdown'],
     },
     'ethernet': {
         'enabled': True,
-        'alert_paths': ['ethernet', 'linkStatus'],  # Path to status in management Ethernet interface
-        'alert_values': ['down'],  # Values that trigger alert (1=alert)
+        # Path to status in management Ethernet interface
+        'alert_paths': ['ethernet', 'linkStatus'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['down'],
     }
     # FC, SAS omitted until JSON structure is confirmed in testing
     # Add additional interface types here after validating their JSON structure
@@ -353,12 +386,118 @@ _HOSTS_CACHE = {}          # clusterRef -> host info
 _MAPPABLE_OBJECTS_CACHE = {}  # volumeRef -> complete volume object with mappings
 # Cache for cross-referencing drive config (driveRef -> drive info)
 _DRIVES_CACHE = {}  # driveRef -> drive info
+# Cache for real-time volume statistics (volumeRef -> {timestamp, readOps, writeOps, etc.})
+_VOLUME_STATS_CACHE = {}
 
 # Global iteration counter for config collection timing
 _CONFIG_COLLECTION_ITERATION_COUNTER = 0
 
 # Global controller index for consistent selection within a collection session
 _CURRENT_CONTROLLER_INDEX = None
+
+# Optional capture settings for recording SANtricity API responses
+CAPTURE_ENABLED = False
+_CAPTURE_DIR = None
+_CAPTURE_SEQUENCE = count()
+_CAPTURE_LOCK = Lock()
+
+
+def initialize_capture(target_dir):
+    """Enable capture of SANtricity API request/response payloads."""
+    global CAPTURE_ENABLED, _CAPTURE_DIR
+
+    if target_dir:
+        capture_path = Path(target_dir).expanduser()
+    else:
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        capture_path = Path.cwd() / 'captures' / timestamp
+
+    capture_path.mkdir(parents=True, exist_ok=True)
+    capture_path = capture_path.resolve()
+    _CAPTURE_DIR = capture_path
+    CAPTURE_ENABLED = True
+    LOG.info("SANtricity API capture enabled; writing responses to %s", _CAPTURE_DIR)
+
+
+def _serialize_capture_field(value):
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode('utf-8', errors='replace')
+    if isinstance(value, dict):
+        return {str(key): _serialize_capture_field(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_serialize_capture_field(item) for item in value]
+    try:
+        json.dumps(value)
+        return value
+    except TypeError:
+        return repr(value)
+
+
+def _capture_slug_from_url(url):
+    path = urlparse(url).path or ''
+    slug = path.strip('/').replace('/', '_') or 'root'
+    slug = re.sub(r'[^A-Za-z0-9_.-]+', '_', slug)
+    return slug[:80]
+
+
+def _record_capture(method, url, kwargs, *, session, response=None, error=None, duration=None):
+    if not CAPTURE_ENABLED or _CAPTURE_DIR is None:
+        return
+
+    capture_entry = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'method': method.upper(),
+        'url': url,
+        'duration_seconds': duration,
+        'request': {
+            'params': _serialize_capture_field(kwargs.get('params')),
+            'json': _serialize_capture_field(kwargs.get('json')),
+            'data': _serialize_capture_field(kwargs.get('data')),
+            'headers': _serialize_capture_field(dict(session.headers)),
+        }
+    }
+
+    if kwargs.get('headers'):
+        capture_entry['request']['headers_override'] = _serialize_capture_field(kwargs['headers'])
+
+    if response is not None:
+        capture_entry['response'] = {
+            'status_code': response.status_code,
+            'headers': _serialize_capture_field(dict(response.headers)),
+            'body': _serialize_capture_field(response.text),
+        }
+
+    if error is not None:
+        capture_entry['error'] = _serialize_capture_field(str(error))
+
+    sequence = next(_CAPTURE_SEQUENCE)
+    filename = _CAPTURE_DIR / f"{sequence:05d}_{_capture_slug_from_url(url)}.json"
+
+    try:
+        with _CAPTURE_LOCK:
+            filename.write_text(json.dumps(capture_entry, indent=2, sort_keys=True), encoding='utf-8')
+        LOG.debug("Captured %s %s -> %s", method.upper(), url, filename.name)
+    except OSError as exc:
+        LOG.warning("Failed to write capture file %s: %s", filename, exc)
+
+
+class CaptureSession(requests.Session):
+    """requests.Session that records outbound requests when capture mode is enabled."""
+
+    def request(self, method, url, **kwargs):  # pylint: disable=arguments-renamed
+        start_time = time.time()
+        try:
+            response = super().request(method, url, **kwargs)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            _record_capture(method, url, kwargs, session=self, error=exc, duration=time.time() - start_time)
+            raise
+
+        _record_capture(method, url, kwargs, session=self, response=response, duration=time.time() - start_time)
+        return response
 
 
 def populate_mappable_objects_cache(system_info):
@@ -381,7 +520,9 @@ def populate_mappable_objects_cache(system_info):
 
     # Only run during config collection intervals
     if not should_collect_config_data():
-        LOG.debug("Skipping mappable objects cache population - not a config collection interval")
+        LOG.debug(
+            "Skipping mappable objects cache population - not a config collection interval"
+        )
         return
 
     try:
@@ -395,20 +536,34 @@ def populate_mappable_objects_cache(system_info):
         _MAPPABLE_OBJECTS_CACHE.clear()
 
         # Get comprehensive mapping data from mappable-objects API
-        mappable_objects_response = session.get(f"{get_controller('sys')}/{sys_id}/mappable-objects").json()
-        LOG.debug(f"Retrieved {len(mappable_objects_response)} mappable objects for mega-cache")
+        url = f"{get_controller('sys')}/{sys_id}/mappable-objects"
+        mappable_objects_response = session.get(url).json()
+        LOG.debug(
+            "Retrieved %d mappable objects for mega-cache",
+            len(mappable_objects_response),
+        )
 
         # Build comprehensive cache indexed by volumeRef
         for obj in mappable_objects_response:
             volume_ref = obj.get('volumeRef')
             if volume_ref:
                 _MAPPABLE_OBJECTS_CACHE[volume_ref] = obj
-                LOG.debug(f"Cached mappable object: '{obj.get('label')}' -> {volume_ref}")
+                LOG.debug(
+                    "Cached mappable object: '%s' -> %s",
+                    obj.get('label'),
+                    volume_ref,
+                )
 
-        LOG.info(f"Built mappable objects mega-cache with {len(_MAPPABLE_OBJECTS_CACHE)} volume objects")
+        LOG.info(
+            "Built mappable objects mega-cache with %d volume objects",
+            len(_MAPPABLE_OBJECTS_CACHE),
+        )
 
-    except Exception as e:
-        LOG.warning(f"Could not retrieve mappable-objects for mega-cache: {e}")
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        LOG.warning(
+            "Could not retrieve mappable-objects for mega-cache: %s",
+            exc,
+        )
         LOG.warning("Performance collector host mapping may be incomplete")
 
     finally:
@@ -423,7 +578,10 @@ def collect_config_drives(system_info):
     """
     # Early exit if not a config collection interval
     if not should_collect_config_data():
-        LOG.info("Skipping config_drives collection - not a scheduled interval (collected every 15 minutes)")
+        LOG.info(
+            "Skipping config_drives collection - not a scheduled interval "
+            "(collected every 15 minutes)"
+        )
         return
 
     try:
@@ -434,14 +592,21 @@ def collect_config_drives(system_info):
         session = get_session()
         client = None
         if INFLUX_WRITE_ENABLED:
-            client = InfluxDBClient(host=influxdb_host,
-                                    port=influxdb_port, database=INFLUXDB_DATABASE)
+            client = InfluxDBClient(
+                host=influxdb_host,
+                port=influxdb_port,
+                database=INFLUXDB_DATABASE,
+            )
         json_body = list()
 
         # Get drive configuration data from the API
-        drives_response = session.get(f"{get_controller('sys')}/{sys_id}/drives").json()
+        drive_url = f"{get_controller('sys')}/{sys_id}/drives"
+        drives_response = session.get(drive_url).json()
 
-        LOG.debug(f"Retrieved {len(drives_response)} drive configurations")
+        LOG.debug(
+            "Retrieved %d drive configurations",
+            len(drives_response),
+        )
 
         for drive in drives_response:
             config_fields = {}
@@ -450,7 +615,14 @@ def collect_config_drives(system_info):
                 if param.startswith('interfaceType_'):
                     continue
                 # skip tags, will be handled in tags dict
-                if param in ['driveRef', 'serialNumber', 'productID', 'driveMediaType', 'physicalLocation__trayRef', 'physicalLocation_slot']:
+                if param in [
+                    'driveRef',
+                    'serialNumber',
+                    'productID',
+                    'driveMediaType',
+                    'physicalLocation__trayRef',
+                    'physicalLocation_slot',
+                ]:
                     continue
                 value = drive.get(param)
                 if value is not None:
@@ -713,7 +885,7 @@ PARSER.add_argument('--debug-force-config', action='store_true', default=False,
                     help='Force config data collection every iteration (for testing). Optional. <switch>')
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
-                         'disks, interface, systems, volumes, controllers, power, temp, '
+                         'disks, interface, systems, volumes, volumes_realtime, controllers, power, temp, '
                          'major_event_log, failures, config_storage_pools, config_volumes, config_hosts, config_drives. '
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
@@ -726,7 +898,17 @@ PARSER.add_argument('--prometheus-port', type=int, default=8080,
                     help='Port for Prometheus metrics HTTP server. Default: 8080. Only used when --output includes prometheus.')
 PARSER.add_argument('--max-iterations', type=int, default=0,
                     help='Maximum number of collection iterations to run (0 = unlimited). Useful for testing. Default: 0.')
+PARSER.add_argument('--realtime', action='store_true', default=False,
+                    help='Enable collection of real-time volume statistics (30s interval) in addition to analysed stats (5m interval). '
+                         'Increases API load and storage usage. Disabled by default. '
+                         'If --include is used, volumes_realtime must also be included.')
+PARSER.add_argument('--capture', nargs='?', const='', default=None, metavar='DIR',
+                    help='Capture SANtricity API request/response payloads to disk for replay or debugging. '
+                         'Optionally specify a directory; if omitted, files are stored under ./captures/<timestamp>.')
 CMD = PARSER.parse_args()
+
+if CMD.capture is not None:
+    initialize_capture(CMD.capture)
 
 # Set logging level based on debug flag
 if CMD.debug:
@@ -799,6 +981,7 @@ INFLUX_WRITE_ENABLED = CMD.output in ['influxdb', 'both'] and not CMD.doNotPost
 # Define which measurements each collection function provides
 FUNCTION_MEASUREMENTS = {
     'collect_storage_metrics': ['disks', 'interface', 'systems', 'volumes'],
+    'collect_volume_stats_realtime': ['volumes_realtime'],
     'collect_controller_metrics': ['controllers'],
     'collect_symbol_stats': ['power', 'temp'],
     'collect_major_event_log': ['major_event_log'],
@@ -861,8 +1044,7 @@ def setup_prometheus():
     if not PROMETHEUS_AVAILABLE:
         if CMD.output == 'prometheus':
             LOG.error("Prometheus client library not available. Install with: pip install prometheus-client")
-            import sys as system
-            system.exit(1)
+            sys.exit(1)
         else:
             LOG.warning("Prometheus client library not available. Continuing with InfluxDB only.")
             return
@@ -908,6 +1090,16 @@ def setup_prometheus():
         'throughput': Gauge('eseries_volume_throughput_bytes_per_second', 'Volume throughput in bytes/sec',
                            ['sys_id', 'sys_name', 'vol_name', 'direction'], registry=prometheus_registry),
         'response_time': Gauge('eseries_volume_response_time_seconds', 'Volume response time in seconds',
+                              ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry)
+    }
+
+    # Volume Realtime metrics
+    prometheus_metrics['volumes_realtime'] = {
+        'iops': Gauge('eseries_volume_realtime_iops_total', 'Volume Realtime IOPS',
+                     ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry),
+        'throughput': Gauge('eseries_volume_realtime_throughput_bytes_per_second', 'Volume Realtime throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'vol_name', 'direction'], registry=prometheus_registry),
+        'response_time': Gauge('eseries_volume_realtime_response_time_seconds', 'Volume Realtime response time in seconds',
                               ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry)
     }
 
@@ -972,7 +1164,7 @@ class PrometheusHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format_string, *args):
+    def log_message(self, format, *args):  # pylint: disable=redefined-builtin
         # Suppress default HTTP logging to avoid clutter
         pass
 
@@ -1011,7 +1203,7 @@ def send_to_prometheus(measurement, tags, fields):
 
     # Only send performance metrics to Prometheus, skip events/config data
     prometheus_metrics_whitelist = {
-        'disks', 'controllers', 'volumes', 'systems', 'interface', 'power', 'temp'
+        'disks', 'controllers', 'volumes', 'volumes_realtime', 'systems', 'interface', 'power', 'temp'
     }
 
     if measurement not in prometheus_metrics_whitelist:
@@ -1079,6 +1271,22 @@ def send_to_prometheus(measurement, tags, fields):
                     measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
 
             # Volume response time
+            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
+
+        elif measurement == 'volumes_realtime':
+            # Volume Realtime IOPS
+            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
+
+            # Volume Realtime throughput
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # Volume Realtime response time
             for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
@@ -1211,7 +1419,7 @@ def get_session():
     Returns a session with the appropriate content type and login information.
     :return: Returns a request session for the SANtricity API endpoint
     """
-    request_session = requests.Session()
+    request_session = CaptureSession()
 
     username = CMD.username
     password = CMD.password
@@ -1698,6 +1906,178 @@ def collect_storage_metrics(system_info):
         set_current_controller_index(None)
 
 
+def collect_volume_stats_realtime(system_info):
+    """
+    Collects real-time volume statistics using cumulative counters.
+    Calculates deltas and rates based on previous iteration.
+    """
+    if CMD.include and 'volumes_realtime' not in CMD.include:
+        return
+
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+
+    try:
+        session = get_session()
+        json_body = []
+
+        # Get raw cumulative stats
+        stats_url = f"{get_controller('sys')}/{sys_id}/volume-statistics?usecache=false"
+        try:
+            stats_list = session.get(stats_url).json()
+        except Exception as e:
+            LOG.warning(f"Failed to retrieve realtime volume statistics: {e}")
+            return
+
+        current_ts = time.time()
+
+        for stats in stats_list:
+            vol_ref = stats.get('volumeRef')
+            if not vol_ref:
+                continue
+
+            # Try to get volume name from mega-cache
+            vol_name = vol_ref
+            volume_obj = _MAPPABLE_OBJECTS_CACHE.get(vol_ref)
+            if volume_obj:
+                vol_name = volume_obj.get('label', vol_ref)
+
+            # Host mapping info
+            host_names = []
+            if volume_obj:
+                list_of_mappings = volume_obj.get('listOfMappings', [])
+                for mapping in list_of_mappings:
+                    map_ref = mapping.get('mapRef')
+                    if map_ref and map_ref in _HOSTS_CACHE:
+                        host_list = _HOSTS_CACHE[map_ref]
+                        for host_info in host_list:
+                            hname = host_info.get('name', 'unknown')
+                            if hname not in host_names:
+                                host_names.append(hname)
+
+            # Check cache for previous values
+            prev_stats = _VOLUME_STATS_CACHE.get(vol_ref)
+
+            # Store current values for next iteration
+            # Use 'observedTime' from API if available for more precise delta, else local time
+            api_ts = stats.get('observedTime')
+            if not api_ts:
+                # Fallback if observedTime is missing or 0
+                api_ts = current_ts
+            else:
+                # Usually observedTime is in seconds, but sometimes milliseconds depending on firmware
+                # Safety check: if > 100 billion, assume ms
+                if float(api_ts) > 100000000000:
+                    api_ts = float(api_ts) / 1000.0
+                else:
+                    api_ts = float(api_ts)
+
+            current_values = {
+                'timestamp': float(api_ts),
+                'readOps': float(stats.get('readOps', 0)),
+                'writeOps': float(stats.get('writeOps', 0)),
+                'otherOps': float(stats.get('otherOps', 0)),
+                'readBytes': float(stats.get('readBytes', 0)),
+                'writeBytes': float(stats.get('writeBytes', 0)),
+                'readTimeTotal': float(stats.get('readTimeTotal', 0)),
+                'writeTimeTotal': float(stats.get('writeTimeTotal', 0)),
+                'otherTimeTotal': float(stats.get('otherTimeTotal', 0))
+            }
+
+            _VOLUME_STATS_CACHE[vol_ref] = current_values
+
+            # If no previous stats, skip calculation (first run)
+            if not prev_stats:
+                continue
+
+            # Calculate deltas
+            # Check for counter reset (reboot or rollover)
+            if current_values['readOps'] < prev_stats['readOps'] or current_values['writeOps'] < prev_stats['writeOps']:
+                LOG.debug(f"Counter reset detected for volume {vol_name}, skipping delta calculation")
+                continue
+
+            dt = current_values['timestamp'] - prev_stats['timestamp']
+            if dt <= 0:
+                # Should not happen typically unless minimal interval or clock skew
+                continue
+
+            delta_read_ops = current_values['readOps'] - prev_stats['readOps']
+            delta_write_ops = current_values['writeOps'] - prev_stats['writeOps']
+            delta_other_ops = current_values['otherOps'] - prev_stats['otherOps']
+            delta_read_bytes = current_values['readBytes'] - prev_stats['readBytes']
+            delta_write_bytes = current_values['writeBytes'] - prev_stats['writeBytes']
+            delta_read_time = current_values['readTimeTotal'] - prev_stats['readTimeTotal']
+            delta_write_time = current_values['writeTimeTotal'] - prev_stats['writeTimeTotal']
+            delta_other_time = current_values['otherTimeTotal'] - prev_stats['otherTimeTotal']
+
+            # Derived rate metrics
+            read_iops = delta_read_ops / dt
+            write_iops = delta_write_ops / dt
+            other_iops = delta_other_ops / dt
+            combined_iops = (delta_read_ops + delta_write_ops + delta_other_ops) / dt
+
+            read_throughput = delta_read_bytes / dt # bytes/sec
+            write_throughput = delta_write_bytes / dt
+            combined_throughput = (delta_read_bytes + delta_write_bytes) / dt
+
+            # Average Response Time (ms)
+            read_response_time = delta_read_time / delta_read_ops if delta_read_ops > 0 else 0
+            write_response_time = delta_write_time / delta_write_ops if delta_write_ops > 0 else 0
+            total_ops = delta_read_ops + delta_write_ops + delta_other_ops
+            total_time = delta_read_time + delta_write_time + delta_other_time
+            combined_response_time = total_time / total_ops if total_ops > 0 else 0
+
+            # Average Op Size (bytes)
+            avg_read_op_size = delta_read_bytes / delta_read_ops if delta_read_ops > 0 else 0
+            avg_write_op_size = delta_write_bytes / delta_write_ops if delta_write_ops > 0 else 0
+
+            fields = {
+                'readIOps': read_iops,
+                'writeIOps': write_iops,
+                'otherIOps': other_iops,
+                'combinedIOps': combined_iops,
+                'readThroughput': read_throughput,
+                'writeThroughput': write_throughput,
+                'combinedThroughput': combined_throughput,
+                'readResponseTime': read_response_time,
+                'writeResponseTime': write_response_time,
+                'combinedResponseTime': combined_response_time,
+                'averageReadOpSize': avg_read_op_size,
+                'averageWriteOpSize': avg_write_op_size,
+                'readOps': delta_read_ops,
+                'writeOps': delta_write_ops,
+                'otherOps': delta_other_ops,
+                'mapped_host_names': ','.join(host_names) if host_names else '',
+                'mapped_host_count': len(host_names)
+            }
+
+            item = {
+                "measurement": "volumes_realtime",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "vol_name": vol_name
+                },
+                "fields": fields
+            }
+
+            if not CMD.include or item["measurement"] in CMD.include:
+                json_body.append(item)
+                # Send to Prometheus
+                send_to_prometheus(item["measurement"], item["tags"], item["fields"])
+
+        if json_body:
+            LOG.debug(f"collect_volume_stats_realtime: Prepared {len(json_body)} measurements")
+            write_to_outputs(json_body, "realtime volume metrics")
+
+    except Exception as e:
+        LOG.error(f"Error in collect_volume_stats_realtime for {system_info['name']}: {e}")
+
+    finally:
+        set_current_controller_index(None)
+
+
 def collect_major_event_log(system_info):
     """
     Collects all defined MEL metrics and posts them to InfluxDB
@@ -1892,54 +2272,56 @@ def create_prometheus_failure_alerts(sys_id, sys_name, failure_response):
 
 
 def collect_interface_alerts(system_info):
-    """
-    Collects interface alert information from controller interfaces and updates Prometheus metrics.
-    
-    Checks both management interfaces (netInterfaces) and storage service interfaces (hostInterfaces)
-    from the /controllers endpoint. Only processes interface types explicitly configured in 
-    INTERFACE_ALERT_CONFIG to avoid false positives from unknown JSON structures.
-    
-    Args:
-        system_info: Dictionary containing system information (wwn, name)
-    """
+    """Collect interface alert information and update Prometheus metrics."""
     if CMD.output not in ['prometheus', 'both'] or not PROMETHEUS_AVAILABLE:
         return
-    
+
     if 'interface_alerts' not in prometheus_metrics:
         return
-    
+
+    sys_id = system_info.get("wwn", "unknown")
+    sys_name = system_info.get("name", "unknown")
+
     try:
         session = get_session()
-        sys_id = system_info["wwn"]
-        sys_name = system_info["name"]
-        
-        # Fixed: Use correct metric key 'interface_alert' (not 'status')
         interface_alert_gauge = prometheus_metrics['interface_alerts']['interface_alert']
-        
-        # Get controller data which contains both management and storage service interfaces
-        controllers_response = session.get(
+
+        response = session.get(
             f"{get_controller('sys')}/{sys_id}/graph/xpath-filter?query=/controller"
-        ).json()
-        
+        )
+        response.raise_for_status()
+        controllers_response = response.json()
+
         alert_count = 0
-        
+
         for controller in controllers_response:
             controller_id = controller.get('controllerRef', 'unknown')
-            
+
             # Process management interfaces (wan0, wan1, etc.)
             net_interfaces = controller.get('netInterfaces', [])
             for interface in net_interfaces:
                 iface_type = interface.get('interfaceType', '').lower()
-                
+
                 if iface_type not in INTERFACE_ALERT_CONFIG:
-                    LOG.debug(f"Skipping unconfigured management interface type: {iface_type}")
+                    LOG.debug("Skipping unconfigured management interface type: %s", iface_type)
                     continue
-                
+
                 config = INTERFACE_ALERT_CONFIG[iface_type]
                 if not config.get('enabled', False):
                     continue
-                
-                # Navigate to alert field using configured path
+
+                eth_data = interface.get('ethernet', {})
+                interface_name = eth_data.get('interfaceName', 'unknown')
+                channel = str(eth_data.get('channel', 0))
+                interface_ref = eth_data.get('interfaceRef', 'unknown')
+                label_values = {
+                    'sys_id': sys_id,
+                    'sys_name': sys_name,
+                    'interface_ref': interface_ref,
+                    'channel': channel,
+                    'interface_type': f"mgmt_{iface_type}_{interface_name}",
+                }
+
                 current_obj = interface
                 for path_segment in config['alert_paths']:
                     if isinstance(current_obj, dict) and path_segment in current_obj:
@@ -1947,51 +2329,40 @@ def collect_interface_alerts(system_info):
                     else:
                         current_obj = None
                         break
-                
-                if current_obj is None:
-                    continue
-                
-                # Check if status matches alert condition
-                status_value = str(current_obj).lower()
-                if status_value in config['alert_values']:
-                    # Extract identifier fields - management interfaces have nested 'ethernet' object
-                    eth_data = interface.get('ethernet', {})
-                    interface_name = eth_data.get('interfaceName', 'unknown')
-                    channel = eth_data.get('channel', 0)
-                    interface_ref = eth_data.get('interfaceRef', 'unknown')
-                    
-                    # Fixed: Use correct label names matching metric definition
-                    interface_alert_gauge.labels(
-                        sys_id=sys_id,
-                        sys_name=sys_name,
-                        interface_ref=interface_ref,
-                        channel=str(channel),
-                        interface_type=f"mgmt_{iface_type}_{interface_name}"
-                    ).set(1.0)
-                    
+
+                status_value = str(current_obj).lower() if current_obj is not None else ''
+                is_alert = status_value in config['alert_values']
+                interface_alert_gauge.labels(**label_values).set(1.0 if is_alert else 0.0)
+
+                if is_alert:
                     alert_count += 1
-                    LOG.info(f"Management interface alert: {sys_name} controller {controller_id} "
-                            f"{interface_name} ({iface_type}) ch={channel} status={status_value}")
-            
+                    LOG.info(
+                        "Management interface alert: %s controller %s %s (%s) ch=%s status=%s",
+                        sys_name,
+                        controller_id,
+                        interface_name,
+                        iface_type,
+                        channel,
+                        status_value,
+                    )
+
             # Process storage service interfaces (iSCSI, FC, IB, SAS)
             host_interfaces = controller.get('hostInterfaces', [])
             for interface in host_interfaces:
                 iface_type = interface.get('interfaceType', '').lower()
-                
+
                 if iface_type not in INTERFACE_ALERT_CONFIG:
-                    LOG.debug(f"Skipping unconfigured storage interface type: {iface_type}")
+                    LOG.debug("Skipping unconfigured storage interface type: %s", iface_type)
                     continue
-                
+
                 config = INTERFACE_ALERT_CONFIG[iface_type]
                 if not config.get('enabled', False):
                     continue
-                
-                # Navigate to the interface type-specific subtree
+
                 type_obj = interface.get(iface_type, {})
-                if not type_obj:
+                if not isinstance(type_obj, dict) or not type_obj:
                     continue
-                
-                # Navigate to alert field using configured path
+
                 current_obj = type_obj
                 for path_segment in config['alert_paths']:
                     if isinstance(current_obj, dict) and path_segment in current_obj:
@@ -1999,57 +2370,63 @@ def collect_interface_alerts(system_info):
                     else:
                         current_obj = None
                         break
-                
-                if current_obj is None:
-                    continue
-                
-                # Check if status matches alert condition
-                status_value = str(current_obj).lower()
-                if status_value in config['alert_values']:
-                    # Extract identifier fields (varies by interface type)
-                    interface_ref = type_obj.get('interfaceRef', 'unknown')
-                    channel = type_obj.get('channel', 0)
-                    
-                    if iface_type == 'iscsi':
-                        # iSCSI has nested ethernetData with MAC
-                        ethernet_data = type_obj.get('interfaceData', {}).get('ethernetData', {})
-                        mac_address = ethernet_data.get('macAddress', '')
-                        interface_id = f"{iface_type}_ch{channel}_{mac_address}"
-                    elif iface_type == 'ib':
-                        # InfiniBand uses globalIdentifier
-                        global_id = type_obj.get('globalIdentifier', 'unknown')
-                        interface_id = f"{iface_type}_ch{channel}_{global_id}"
-                    else:
-                        # Generic fallback
-                        interface_id = f"{iface_type}_ch{channel}_{interface_ref}"
-                    
-                    # Fixed: Use correct label names matching metric definition
-                    interface_alert_gauge.labels(
-                        sys_id=sys_id,
-                        sys_name=sys_name,
-                        interface_ref=interface_ref,
-                        channel=str(channel),
-                        interface_type=interface_id
-                    ).set(1.0)
-                    
+
+                status_value = str(current_obj).lower() if current_obj is not None else ''
+                interface_ref = type_obj.get('interfaceRef', 'unknown')
+                channel = str(type_obj.get('channel', 0))
+
+                if iface_type == 'iscsi':
+                    ethernet_data = type_obj.get('interfaceData', {}).get('ethernetData', {})
+                    mac_address = ethernet_data.get('macAddress', '')
+                    interface_id = f"{iface_type}_ch{channel}_{mac_address}"
+                elif iface_type == 'ib':
+                    global_id = type_obj.get('globalIdentifier', 'unknown')
+                    interface_id = f"{iface_type}_ch{channel}_{global_id}"
+                else:
+                    interface_id = f"{iface_type}_ch{channel}_{interface_ref}"
+
+                label_values = {
+                    'sys_id': sys_id,
+                    'sys_name': sys_name,
+                    'interface_ref': interface_ref,
+                    'channel': channel,
+                    'interface_type': interface_id,
+                }
+
+                is_alert = status_value in config['alert_values']
+                interface_alert_gauge.labels(**label_values).set(1.0 if is_alert else 0.0)
+
+                if is_alert:
                     alert_count += 1
-                    LOG.info(f"Storage interface alert: {sys_name} controller {controller_id} "
-                            f"{interface_id} status={status_value}")
-        
+                    LOG.info(
+                        "Storage interface alert: %s controller %s %s status=%s",
+                        sys_name,
+                        controller_id,
+                        interface_id,
+                        status_value,
+                    )
+
         if alert_count == 0:
-            # Set a zero metric to indicate healthy state
             interface_alert_gauge.labels(
                 sys_id=sys_id,
                 sys_name=sys_name,
                 interface_ref="none",
                 channel="0",
-                interface_type="healthy"
-            ).set(0)
-        
-        LOG.debug(f"Updated Prometheus interface alert metrics: {alert_count} alerts for system {sys_name}")
-        
-    except Exception as e:
-        LOG.warning(f"Failed to collect interface alerts for system {sys_name}: {e}")
+                interface_type="healthy",
+            ).set(0.0)
+
+        LOG.debug(
+            "Updated Prometheus interface alert metrics: %d alerts for system %s",
+            alert_count,
+            sys_name,
+        )
+
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        LOG.warning(
+            "Failed to collect interface alerts for system %s: %s",
+            sys_name,
+            exc,
+        )
 
 
 
@@ -2966,6 +3343,7 @@ if __name__ == "__main__":
                 'disks': (DRIVE_PARAMS, "disks"),
                 'systems': (SYSTEM_PARAMS, "systems"),
                 'volumes': (VOLUME_PARAMS, "volumes"),
+                'volumes_realtime': (VOLUME_REALTIME_PARAMS, "volumes_realtime"),
                 'interface': (INTERFACE_PARAMS, "interface"),
                 'power': (PSU_PARAMS, "power"),
                 'temp': (SENSOR_PARAMS, "temp"),
@@ -2985,6 +3363,7 @@ if __name__ == "__main__":
             create_continuous_query(client, DRIVE_PARAMS, "disks")
             create_continuous_query(client, SYSTEM_PARAMS, "systems")
             create_continuous_query(client, VOLUME_PARAMS, "volumes")
+            create_continuous_query(client, VOLUME_REALTIME_PARAMS, "volumes_realtime")
             create_continuous_query(client, INTERFACE_PARAMS, "interface")
             create_continuous_query(client, CONTROLLER_PARAMS, "controllers")
             create_continuous_query(client, PSU_PARAMS, "power")
@@ -3036,6 +3415,15 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_storage_metrics']):
                     LOG.info("Collecting storage metrics (disks, interface, systems, volumes)...")
                     collect_storage_metrics(sys)
+                
+                # Check for volumes_realtime in includes AND --realtime flag
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_volume_stats_realtime']):
+                    if CMD.realtime:
+                        LOG.info("Collecting real-time volume statistics...")
+                        collect_volume_stats_realtime(sys)
+                    else:
+                        LOG.debug("Skipping real-time volume statistics (volumes_realtime included but --realtime flag not set)")
+                
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_controller_metrics']):
                     LOG.info("Collecting controller metrics...")
                     collect_controller_metrics(sys)
@@ -3066,6 +3454,12 @@ if __name__ == "__main__":
                 LOG.info("Starting full collection cycle for all measurements...")
                 LOG.info("Collecting storage metrics (disks, interface, systems, volumes)...")
                 collect_storage_metrics(sys)
+                
+                # Only collect realtime stats if flag is set
+                if CMD.realtime:
+                    LOG.info("Collecting real-time volume statistics...")
+                    collect_volume_stats_realtime(sys)
+                    
                 LOG.info("Collecting controller metrics...")
                 collect_controller_metrics(sys)
                 LOG.info("Collecting power and temperature data...")

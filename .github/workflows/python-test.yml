@@ -1,0 +1,156 @@
+name: Python Application Test
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8
+        if [ -f epa/collector/requirements.txt ]; then pip install -r epa/collector/requirements.txt; fi
+
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 epa/collector --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 epa/collector --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Check for Python syntax errors
+      run: |
+        python -m compileall epa/collector/collector.py
+
+    - name: Create Dummy Captures for Testing
+      run: |
+        mkdir -p tests/captures
+        
+        # --- Array 1: Capture Set 1 (T1) ---
+        cat <<EOF > tests/captures/00001_volume_statistics_sys1.json
+        {
+          "timestamp": "2026-01-20T04:18:00+00:00",
+          "method": "GET",
+          "url": "https://1.2.3.4:8443/devmgr/v2/storage-systems/test_sys_id_1/volume-statistics?usecache=false",
+          "response": {
+            "status_code": 200,
+            "headers": {},
+            "body": [
+              {
+                "observedTime": "1000",
+                "volumeRef": "vol1",
+                "readOps": 100.0,
+                "writeOps": 100.0,
+                "otherOps": 10.0,
+                "readBytes": 102400.0,
+                "writeBytes": 102400.0,
+                "readTimeTotal": 1000.0,
+                "writeTimeTotal": 1000.0,
+                "otherTimeTotal": 100.0
+              }
+            ]
+          }
+        }
+        EOF
+        
+        # --- Array 1: Capture Set 2 (T2) ---
+        cat <<EOF > tests/captures/00002_volume_statistics_sys1.json
+        {
+          "timestamp": "2026-01-20T04:18:30+00:00",
+          "method": "GET",
+          "url": "https://1.2.3.4:8443/devmgr/v2/storage-systems/test_sys_id_1/volume-statistics?usecache=false",
+          "response": {
+            "status_code": 200,
+            "headers": {},
+            "body": [
+              {
+                "observedTime": "1030",
+                "volumeRef": "vol1",
+                "readOps": 200.0,
+                "writeOps": 200.0,
+                "otherOps": 20.0,
+                "readBytes": 204800.0,
+                "writeBytes": 204800.0,
+                "readTimeTotal": 2000.0,
+                "writeTimeTotal": 2000.0,
+                "otherTimeTotal": 200.0
+              }
+            ]
+          }
+        }
+        EOF
+
+        # --- Array 2: Capture Set 1 (T1) ---
+        cat <<EOF > tests/captures/00003_volume_statistics_sys2.json
+        {
+          "timestamp": "2026-01-20T04:18:00+00:00",
+          "method": "GET",
+          "url": "https://1.2.3.4:8443/devmgr/v2/storage-systems/test_sys_id_2/volume-statistics?usecache=false",
+          "response": {
+            "status_code": 200,
+            "headers": {},
+            "body": [
+              {
+                "observedTime": "5000",
+                "volumeRef": "vol_a2_1",
+                "readOps": 500,
+                "writeOps": 500,
+                "otherOps": 50,
+                "readBytes": 512000,
+                "writeBytes": 512000,
+                "readTimeTotal": 5000,
+                "writeTimeTotal": 5000,
+                "otherTimeTotal": 500
+              }
+            ]
+          }
+        }
+        EOF
+
+        # --- Array 2: Capture Set 2 (T2) ---
+        cat <<EOF > tests/captures/00004_volume_statistics_sys2.json
+        {
+          "timestamp": "2026-01-20T04:18:30+00:00",
+          "method": "GET",
+          "url": "https://1.2.3.4:8443/devmgr/v2/storage-systems/test_sys_id_2/volume-statistics?usecache=false",
+          "response": {
+            "status_code": 200,
+            "headers": {},
+            "body": [
+              {
+                "observedTime": "5030",
+                "volumeRef": "vol_a2_1",
+                "readOps": 600,
+                "writeOps": 600,
+                "otherOps": 60,
+                "readBytes": 614400,
+                "writeBytes": 614400,
+                "readTimeTotal": 6000,
+                "writeTimeTotal": 6000,
+                "otherTimeTotal": 600
+              }
+            ]
+          }
+        }
+        EOF
+
+    - name: Run Replay Test
+      run: |
+        python scripts/test_replay.py --captures tests/captures
