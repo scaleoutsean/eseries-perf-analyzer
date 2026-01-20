@@ -1646,7 +1646,6 @@ def collect_storage_metrics(system_info):
     interfaces, and volumes
     :param sys: The JSON object of a storage system
     """
-    global _MAPPABLE_OBJECTS_CACHE, _HOSTS_CACHE
 
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
@@ -2530,7 +2529,6 @@ def collect_config_volumes(system_info):
     Collects volume configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _HOSTS_CACHE, _MAPPABLE_OBJECTS_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
