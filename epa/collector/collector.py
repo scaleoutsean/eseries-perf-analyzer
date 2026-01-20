@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from itertools import count
 from pathlib import Path
 from threading import Thread, Lock
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 import requests
@@ -1149,12 +1149,21 @@ class PrometheusHandler(BaseHTTPRequestHandler):
     """HTTP handler for Prometheus metrics endpoint."""
 
     def do_GET(self):
-        if self.path == '/metrics':
-            self.send_response(200)
-            self.send_header('Content-Type', CONTENT_TYPE_LATEST)
-            self.end_headers()
-            self.wfile.write(generate_latest(prometheus_registry))
-        elif self.path == '/health':
+        # Handle path parsing to ignore query params and trailing slashes
+        parsed_path = urlparse(self.path)
+        clean_path = parsed_path.path.rstrip('/')
+
+        if clean_path == '/metrics':
+            try:
+                self.send_response(200)
+                self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+                self.end_headers()
+                self.wfile.write(generate_latest(prometheus_registry))
+            except Exception as e:
+                LOG.error(f"Error generating Prometheus metrics: {e}")
+                self.send_response(500)
+                self.end_headers()
+        elif clean_path == '/health':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain')
             self.end_headers()
@@ -1163,9 +1172,14 @@ class PrometheusHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+
     def log_message(self, format, *args):  # pylint: disable=redefined-builtin
-        # Suppress default HTTP logging to avoid clutter
-        pass
+        # Log to the standard collector logger if debug is enabled
+        if CMD.debug:
+            LOG.debug("Prometheus HTTP: %s - - [%s] %s\n" %
+                      (self.client_address[0],
+                       self.log_date_time_string(),
+                       format % args))
 
 
 def start_prometheus_server():
@@ -1173,7 +1187,8 @@ def start_prometheus_server():
 
     def run_server():
         try:
-            prometheus_server = HTTPServer(('', CMD.prometheus_port), PrometheusHandler)
+            # Use ThreadingHTTPServer to handle multiple concurrent requests (e.g. browser keep-alive + actual scrape)
+            prometheus_server = ThreadingHTTPServer(('', CMD.prometheus_port), PrometheusHandler)
             LOG.info(f"Prometheus metrics server started on port {CMD.prometheus_port}")
             LOG.info(f"Metrics available at: http://0.0.0.0:{CMD.prometheus_port}/metrics")
             prometheus_server.serve_forever()
