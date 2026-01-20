@@ -1049,6 +1049,7 @@ def setup_prometheus():
 
     LOG.info(f"Setting up Prometheus metrics server on port {CMD.prometheus_port}")
 
+    global prometheus_registry
     # Create custom registry to avoid conflicts with default registry
     prometheus_registry = CollectorRegistry()
 
@@ -1174,7 +1175,7 @@ def start_prometheus_server():
         try:
             prometheus_server = HTTPServer(('', CMD.prometheus_port), PrometheusHandler)
             LOG.info(f"Prometheus metrics server started on port {CMD.prometheus_port}")
-            LOG.info(f"Metrics available at: http://localhost:{CMD.prometheus_port}/metrics")
+            LOG.info(f"Metrics available at: http://0.0.0.0:{CMD.prometheus_port}/metrics")
             prometheus_server.serve_forever()
         except Exception as e:
             LOG.error(f"Failed to start Prometheus server: {e}")
@@ -1928,7 +1929,7 @@ def collect_volume_stats_realtime(system_info):
         current_ts = time.time()
 
         for stats in stats_list:
-            vol_ref = stats.get('volumeRef')
+            vol_ref = stats.get('volumeRef') or stats.get('volumeId')
             if not vol_ref:
                 continue
 
@@ -1955,18 +1956,38 @@ def collect_volume_stats_realtime(system_info):
             prev_stats = _VOLUME_STATS_CACHE.get(vol_ref)
 
             # Store current values for next iteration
-            # Use 'observedTime' from API if available for more precise delta, else local time
-            api_ts = stats.get('observedTime')
-            if not api_ts:
-                # Fallback if observedTime is missing or 0
+            # Use 'observedTimeInMS' or 'observedTime' from API if available for more precise delta
+            api_ts_val = stats.get('observedTimeInMS')
+            if not api_ts_val:
+                api_ts_val = stats.get('observedTime')
+
+            if not api_ts_val:
+                # Fallback if timestamps are missing
                 api_ts = current_ts
             else:
-                # Usually observedTime is in seconds, but sometimes milliseconds depending on firmware
-                # Safety check: if > 100 billion, assume ms
-                if float(api_ts) > 100000000000:
-                    api_ts = float(api_ts) / 1000.0
-                else:
-                    api_ts = float(api_ts)
+                # Try to parse as float (seconds or ms)
+                try:
+                    val = float(api_ts_val)
+                    # Heuristic: if > 100 billion, assume ms (valid for epoch > 1973)
+                    if val > 100_000_000_000:
+                        api_ts = val / 1000.0
+                    else:
+                        api_ts = val
+                except ValueError:
+                    # Not a simple number, try parsing ISO string
+                    # System often returns ISO 8601 strings in 'observedTime'
+                    try:
+                        # Normalize ISO string (remove 'Z' etc if needed, though fromisoformat covers basic cases)
+                        if isinstance(api_ts_val, str) and 'T' in api_ts_val:
+                            # Replace Z with +00:00 for strict ISO compliance if needed
+                            iso_str = api_ts_val.replace('Z', '+00:00')
+                            dt_obj = datetime.fromisoformat(iso_str)
+                            api_ts = dt_obj.timestamp()
+                        else:
+                            raise ValueError("Not an ISO string")
+                    except Exception:
+                        LOG.warning(f"Could not parse timestamp '{api_ts_val}', using local time")
+                        api_ts = current_ts
 
             current_values = {
                 'timestamp': float(api_ts),
