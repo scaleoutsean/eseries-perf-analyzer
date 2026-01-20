@@ -57,8 +57,8 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 
 ## Requirements
 
-- NetApp SANtricity OS: >= 11.80 recommended. Older releases may work (for the most part), but are not tested and bugs exclusive to releases years old won't be fixed
-- EPA Collector should work on any Linux with recent Python 3.10 or similar - you may run it as a script, systemd service, Docker/Podman/Nomad/K8s container, etc.
+- NetApp SANtricity OS: >= 11.90 recommended. Older releases may work (for the most part), but are not tested and bugs exclusive to releases years old won't be fixed
+- EPA Collector should work on any Linux with recent Python 3.12 or newer - you may run it as a script, systemd service, Docker/Podman/Nomad/K8s container, etc.
 - The rest of EPA "stack" is standard OSS integrated in a stack for reference purposes. Users are encouraged to use own database and Grafana
 
 ## Quick start
@@ -284,6 +284,7 @@ Example alert rule:
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
+
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces
   - Add optional "point-in-time" volume performance metrics (default: off) for use cases where default (rolling 5 minute average) is not enough. Enable with `--realtime`
