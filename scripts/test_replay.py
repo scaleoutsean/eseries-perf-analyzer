@@ -108,11 +108,42 @@ def run_tests(capture_dir):
     collector._MAPPABLE_OBJECTS_CACHE = {}
     collector._HOSTS_CACHE = {}
     
-    # Define systems to test
-    systems_to_test = [
-        {'id': 'test_sys_id_1', 'name': 'array1'},
-        {'id': 'test_sys_id_2', 'name': 'array2'}
-    ]
+    # Analyze captures to determine available systems
+    # We look for /storage-systems/<sys_id> pattern in URLs
+    systems_found = {}
+    
+    # Reload captures fresh for analysis, as ReplaySession pops them
+    # But wait, we haven't created the session yet. We can just peek at the files.
+    temp_files = glob.glob(os.path.join(capture_dir, "*.json"))
+    for f in temp_files:
+        try:
+            with open(f, 'r') as fp:
+                data = json.load(fp)
+                url = data.get('url', '')
+                # Regex to extract sys_id from URL
+                # Matches: .../storage-systems/{sys_id}/...
+                match = re.search(r'/storage-systems/([^/]+)/', url)
+                if match:
+                    s_id = match.group(1)
+                    # Extract IP/Hostname context if possible
+                    # Matches: https://{ip}:{port}/...
+                    ip_match = re.search(r'https://([^:]+):', url)
+                    s_ip = ip_match.group(1) if ip_match else '1.2.3.4'
+                    
+                    if s_id not in systems_found:
+                        systems_found[s_id] = {'id': s_id, 'name': f"detected_{s_id}", 'ip': s_ip}
+        except:
+            pass
+            
+    if systems_found:
+        systems_to_test = list(systems_found.values())
+        LOG.info(f"Auto-detected systems from captures: {[s['id'] for s in systems_to_test]}")
+    else:
+        # Fallback to defaults if detection fails
+        systems_to_test = [
+            {'id': 'test_sys_id_1', 'name': 'array1', 'ip': '1.2.3.4'},
+            {'id': 'test_sys_id_2', 'name': 'array2', 'ip': '1.2.3.4'}
+        ]
     
     # Initialize Replay Session
     replay_session = ReplaySession(capture_dir)
@@ -124,6 +155,11 @@ def run_tests(capture_dir):
             LOG.info(f"=== Testing System: {sys_info['name']} ({sys_info['id']}) ===")
             collector.sys_id = sys_info['id']
             collector.sys_name = sys_info['name']
+            
+            # Update API address for this system so get_controller generates matching URLs
+            # Use detected IP if available, else default
+            current_ip = sys_info.get('ip', '1.2.3.4')
+            collector.CMD.api = [current_ip]
             
             # Reset collector caches for isolation between systems
             collector._VOLUME_STATS_CACHE = {} 
