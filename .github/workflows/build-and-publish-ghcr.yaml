@@ -9,14 +9,22 @@ permissions:
   contents: read
   packages: write
 
-env:
-  IMAGE_NAME: utils               # change if you want a different image name
-  CONTEXT: ./epa/utils
-  DOCKERFILE: ./epa/utils/Dockerfile
-
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image_name: collector
+            context: ./epa/collector
+            dockerfile: ./epa/collector/Dockerfile
+          - image_name: grafana-init
+            context: ./epa/grafana-init
+            dockerfile: ./epa/grafana-init/Dockerfile
+          - image_name: utils
+            context: ./epa/utils
+            dockerfile: ./epa/utils/Dockerfile
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,22 +42,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push ${{ matrix.image_name }}
         uses: docker/build-push-action@v4
         with:
-          context: ${{ env.CONTEXT }}
-          file: ${{ env.DOCKERFILE }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
-            ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:latest
+            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # optional build-args:
-          # build-args: |
-          #   BASE_IMAGE=${{ env.BASE_IMAGE }}
 
       - name: Output pushed image name
         run: |
-          echo "Image pushed: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "Image pushed: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}"
