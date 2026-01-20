@@ -516,7 +516,6 @@ def populate_mappable_objects_cache(system_info):
 
     :param system_info: The JSON object of a storage_system
     """
-    global _MAPPABLE_OBJECTS_CACHE
 
     # Only run during config collection intervals
     if not should_collect_config_data():
@@ -1036,7 +1035,6 @@ def setup_prometheus():
     """
     Initialize Prometheus metrics and HTTP server if Prometheus output is enabled.
     """
-    global prometheus_registry, prometheus_metrics, prometheus_server
 
     if CMD.output not in ['prometheus', 'both']:
         return
@@ -1171,7 +1169,6 @@ class PrometheusHandler(BaseHTTPRequestHandler):
 
 def start_prometheus_server():
     """Start Prometheus metrics HTTP server in background thread."""
-    global prometheus_server
 
     def run_server():
         try:
@@ -1348,7 +1345,6 @@ def should_collect_config_data():
 
     Returns True when config data should be collected this iteration.
     """
-    global _CONFIG_COLLECTION_ITERATION_COUNTER
 
     # Note: Iteration counter is incremented once per cycle in the main loop
 
@@ -2656,7 +2652,6 @@ def collect_config_storage_pools(system_info):
     Collects storage pool configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _STORAGE_POOLS_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
@@ -2791,7 +2786,6 @@ def collect_config_hosts(system_info):
     Collects host configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _HOSTS_CACHE, _VOLUME_MAPPINGS_CACHE, _VOLUME_NAME_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
