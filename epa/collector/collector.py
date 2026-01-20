@@ -1937,6 +1937,7 @@ def collect_volume_stats_realtime(system_info):
         stats_url = f"{get_controller('sys')}/{sys_id}/volume-statistics?usecache=false"
         try:
             stats_list = session.get(stats_url).json()
+            LOG.debug(f"Realtime stats list length: {len(stats_list)}")
         except Exception as e:
             LOG.warning(f"Failed to retrieve realtime volume statistics: {e}")
             return
@@ -1946,6 +1947,7 @@ def collect_volume_stats_realtime(system_info):
         for stats in stats_list:
             vol_ref = stats.get('volumeRef') or stats.get('volumeId')
             if not vol_ref:
+                LOG.debug("Skipping stat entry missing volumeRef/volumeId")
                 continue
 
             # Try to get volume name from mega-cache
@@ -2020,6 +2022,7 @@ def collect_volume_stats_realtime(system_info):
 
             # If no previous stats, skip calculation (first run)
             if not prev_stats:
+                LOG.debug(f"First run for volume {vol_name}, initializing cache")
                 continue
 
             # Calculate deltas
@@ -2030,6 +2033,7 @@ def collect_volume_stats_realtime(system_info):
 
             dt = current_values['timestamp'] - prev_stats['timestamp']
             if dt <= 0:
+                LOG.debug(f"Time delta <= 0 for volume {vol_name} (curr={current_values['timestamp']}, prev={prev_stats['timestamp']}), skipping")
                 # Should not happen typically unless minimal interval or clock skew
                 continue
 
