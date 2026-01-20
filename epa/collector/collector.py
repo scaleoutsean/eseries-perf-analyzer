@@ -14,13 +14,18 @@ Repository: https://github.com/scaleoutsean/eseries-perf-analyzer
 import argparse
 import concurrent.futures
 import hashlib
+import json
 import logging
 import random
+import re
 import sys
 import time
 from datetime import datetime, timezone
-from threading import Thread
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from itertools import count
+from pathlib import Path
+from threading import Thread, Lock
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
 
 import requests
 from influxdb import InfluxDBClient
@@ -47,7 +52,7 @@ INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
-__version__ = '3.5.2'
+__version__ = '3.5.3'
 
 #######################
 # LIST OF METRICS #####
@@ -179,6 +184,28 @@ VOLUME_PARAMS = [
     'mapped_host_count'   # Number of hosts this volume is mapped to
 ]
 
+VOLUME_REALTIME_PARAMS = [
+    'readIOps',
+    'writeIOps',
+    'otherIOps',
+    'combinedIOps',
+    'readThroughput',
+    'writeThroughput',
+    'combinedThroughput',
+    'readResponseTime',
+    'writeResponseTime',
+    'combinedResponseTime',
+    'averageReadOpSize',
+    'averageWriteOpSize',
+    # Deltas
+    'readOps',
+    'writeOps',
+    'otherOps',
+    # Host mapping fields
+    'mapped_host_names',
+    'mapped_host_count'
+]
+
 MEL_PARAMS = [
     'id',
     'description',
@@ -249,6 +276,35 @@ CONFIG_HOSTS_PARAMS = [
     'hostSidePorts_first_mtpIoInterfaceType',
     'hostSidePorts_first_id'
 ]
+
+# Configuration for interface alerting
+# Only includes interfaces with known JSON structure patterns
+# Each config specifies the JSON path to the alert status field and the values that trigger an alert
+INTERFACE_ALERT_CONFIG = {
+    'iscsi': {
+        'enabled': True,
+        # Path to status in iSCSI interface object
+        'alert_paths': ['interfaceData', 'ethernetData', 'linkStatus'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['down'],
+    },
+    'ib': {
+        'enabled': True,
+        # Path to status in IB interface object
+        'alert_paths': ['physPortState'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['linkdown'],
+    },
+    'ethernet': {
+        'enabled': True,
+        # Path to status in management Ethernet interface
+        'alert_paths': ['ethernet', 'linkStatus'],
+        # Values that trigger alert (1=alert)
+        'alert_values': ['down'],
+    }
+    # FC, SAS omitted until JSON structure is confirmed in testing
+    # Add additional interface types here after validating their JSON structure
+}
 
 CONFIG_STORAGE_POOLS_PARAMS = [
     # Basic pool metrics
@@ -330,12 +386,118 @@ _HOSTS_CACHE = {}          # clusterRef -> host info
 _MAPPABLE_OBJECTS_CACHE = {}  # volumeRef -> complete volume object with mappings
 # Cache for cross-referencing drive config (driveRef -> drive info)
 _DRIVES_CACHE = {}  # driveRef -> drive info
+# Cache for real-time volume statistics (volumeRef -> {timestamp, readOps, writeOps, etc.})
+_VOLUME_STATS_CACHE = {}
 
 # Global iteration counter for config collection timing
 _CONFIG_COLLECTION_ITERATION_COUNTER = 0
 
 # Global controller index for consistent selection within a collection session
 _CURRENT_CONTROLLER_INDEX = None
+
+# Optional capture settings for recording SANtricity API responses
+CAPTURE_ENABLED = False
+_CAPTURE_DIR = None
+_CAPTURE_SEQUENCE = count()
+_CAPTURE_LOCK = Lock()
+
+
+def initialize_capture(target_dir):
+    """Enable capture of SANtricity API request/response payloads."""
+    global CAPTURE_ENABLED, _CAPTURE_DIR
+
+    if target_dir:
+        capture_path = Path(target_dir).expanduser()
+    else:
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        capture_path = Path.cwd() / 'captures' / timestamp
+
+    capture_path.mkdir(parents=True, exist_ok=True)
+    capture_path = capture_path.resolve()
+    _CAPTURE_DIR = capture_path
+    CAPTURE_ENABLED = True
+    LOG.info("SANtricity API capture enabled; writing responses to %s", _CAPTURE_DIR)
+
+
+def _serialize_capture_field(value):
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        return value.decode('utf-8', errors='replace')
+    if isinstance(value, dict):
+        return {str(key): _serialize_capture_field(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_serialize_capture_field(item) for item in value]
+    try:
+        json.dumps(value)
+        return value
+    except TypeError:
+        return repr(value)
+
+
+def _capture_slug_from_url(url):
+    path = urlparse(url).path or ''
+    slug = path.strip('/').replace('/', '_') or 'root'
+    slug = re.sub(r'[^A-Za-z0-9_.-]+', '_', slug)
+    return slug[:80]
+
+
+def _record_capture(method, url, kwargs, *, session, response=None, error=None, duration=None):
+    if not CAPTURE_ENABLED or _CAPTURE_DIR is None:
+        return
+
+    capture_entry = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'method': method.upper(),
+        'url': url,
+        'duration_seconds': duration,
+        'request': {
+            'params': _serialize_capture_field(kwargs.get('params')),
+            'json': _serialize_capture_field(kwargs.get('json')),
+            'data': _serialize_capture_field(kwargs.get('data')),
+            'headers': _serialize_capture_field(dict(session.headers)),
+        }
+    }
+
+    if kwargs.get('headers'):
+        capture_entry['request']['headers_override'] = _serialize_capture_field(kwargs['headers'])
+
+    if response is not None:
+        capture_entry['response'] = {
+            'status_code': response.status_code,
+            'headers': _serialize_capture_field(dict(response.headers)),
+            'body': _serialize_capture_field(response.text),
+        }
+
+    if error is not None:
+        capture_entry['error'] = _serialize_capture_field(str(error))
+
+    sequence = next(_CAPTURE_SEQUENCE)
+    filename = _CAPTURE_DIR / f"{sequence:05d}_{_capture_slug_from_url(url)}.json"
+
+    try:
+        with _CAPTURE_LOCK:
+            filename.write_text(json.dumps(capture_entry, indent=2, sort_keys=True), encoding='utf-8')
+        LOG.debug("Captured %s %s -> %s", method.upper(), url, filename.name)
+    except OSError as exc:
+        LOG.warning("Failed to write capture file %s: %s", filename, exc)
+
+
+class CaptureSession(requests.Session):
+    """requests.Session that records outbound requests when capture mode is enabled."""
+
+    def request(self, method, url, **kwargs):  # pylint: disable=arguments-renamed
+        start_time = time.time()
+        try:
+            response = super().request(method, url, **kwargs)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            _record_capture(method, url, kwargs, session=self, error=exc, duration=time.time() - start_time)
+            raise
+
+        _record_capture(method, url, kwargs, session=self, response=response, duration=time.time() - start_time)
+        return response
 
 
 def populate_mappable_objects_cache(system_info):
@@ -354,11 +516,12 @@ def populate_mappable_objects_cache(system_info):
 
     :param system_info: The JSON object of a storage_system
     """
-    global _MAPPABLE_OBJECTS_CACHE
 
     # Only run during config collection intervals
     if not should_collect_config_data():
-        LOG.debug("Skipping mappable objects cache population - not a config collection interval")
+        LOG.debug(
+            "Skipping mappable objects cache population - not a config collection interval"
+        )
         return
 
     try:
@@ -372,20 +535,34 @@ def populate_mappable_objects_cache(system_info):
         _MAPPABLE_OBJECTS_CACHE.clear()
 
         # Get comprehensive mapping data from mappable-objects API
-        mappable_objects_response = session.get(f"{get_controller('sys')}/{sys_id}/mappable-objects").json()
-        LOG.debug(f"Retrieved {len(mappable_objects_response)} mappable objects for mega-cache")
+        url = f"{get_controller('sys')}/{sys_id}/mappable-objects"
+        mappable_objects_response = session.get(url).json()
+        LOG.debug(
+            "Retrieved %d mappable objects for mega-cache",
+            len(mappable_objects_response),
+        )
 
         # Build comprehensive cache indexed by volumeRef
         for obj in mappable_objects_response:
             volume_ref = obj.get('volumeRef')
             if volume_ref:
                 _MAPPABLE_OBJECTS_CACHE[volume_ref] = obj
-                LOG.debug(f"Cached mappable object: '{obj.get('label')}' -> {volume_ref}")
+                LOG.debug(
+                    "Cached mappable object: '%s' -> %s",
+                    obj.get('label'),
+                    volume_ref,
+                )
 
-        LOG.info(f"Built mappable objects mega-cache with {len(_MAPPABLE_OBJECTS_CACHE)} volume objects")
+        LOG.info(
+            "Built mappable objects mega-cache with %d volume objects",
+            len(_MAPPABLE_OBJECTS_CACHE),
+        )
 
-    except Exception as e:
-        LOG.warning(f"Could not retrieve mappable-objects for mega-cache: {e}")
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        LOG.warning(
+            "Could not retrieve mappable-objects for mega-cache: %s",
+            exc,
+        )
         LOG.warning("Performance collector host mapping may be incomplete")
 
     finally:
@@ -400,7 +577,10 @@ def collect_config_drives(system_info):
     """
     # Early exit if not a config collection interval
     if not should_collect_config_data():
-        LOG.info("Skipping config_drives collection - not a scheduled interval (collected every 15 minutes)")
+        LOG.info(
+            "Skipping config_drives collection - not a scheduled interval "
+            "(collected every 15 minutes)"
+        )
         return
 
     try:
@@ -409,14 +589,23 @@ def collect_config_drives(system_info):
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(
+                host=influxdb_host,
+                port=influxdb_port,
+                database=INFLUXDB_DATABASE,
+            )
         json_body = list()
 
         # Get drive configuration data from the API
-        drives_response = session.get(f"{get_controller('sys')}/{sys_id}/drives").json()
+        drive_url = f"{get_controller('sys')}/{sys_id}/drives"
+        drives_response = session.get(drive_url).json()
 
-        LOG.debug(f"Retrieved {len(drives_response)} drive configurations")
+        LOG.debug(
+            "Retrieved %d drive configurations",
+            len(drives_response),
+        )
 
         for drive in drives_response:
             config_fields = {}
@@ -425,7 +614,14 @@ def collect_config_drives(system_info):
                 if param.startswith('interfaceType_'):
                     continue
                 # skip tags, will be handled in tags dict
-                if param in ['driveRef', 'serialNumber', 'productID', 'driveMediaType', 'physicalLocation__trayRef', 'physicalLocation_slot']:
+                if param in [
+                    'driveRef',
+                    'serialNumber',
+                    'productID',
+                    'driveMediaType',
+                    'physicalLocation__trayRef',
+                    'physicalLocation_slot',
+                ]:
                     continue
                 value = drive.get(param)
                 if value is not None:
@@ -476,11 +672,15 @@ def collect_config_drives(system_info):
                 LOG.debug(f"Skipped config_drives measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_drives: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            if client is None:
+                raise RuntimeError("InfluxDB client not initialized for drive config write")
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: drive configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post drive configuration for {system_info['name']}/{system_info['wwn']}")
@@ -684,7 +884,7 @@ PARSER.add_argument('--debug-force-config', action='store_true', default=False,
                     help='Force config data collection every iteration (for testing). Optional. <switch>')
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
-                         'disks, interface, systems, volumes, controllers, power, temp, '
+                         'disks, interface, systems, volumes, volumes_realtime, controllers, power, temp, '
                          'major_event_log, failures, config_storage_pools, config_volumes, config_hosts, config_drives. '
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
@@ -697,7 +897,17 @@ PARSER.add_argument('--prometheus-port', type=int, default=8080,
                     help='Port for Prometheus metrics HTTP server. Default: 8080. Only used when --output includes prometheus.')
 PARSER.add_argument('--max-iterations', type=int, default=0,
                     help='Maximum number of collection iterations to run (0 = unlimited). Useful for testing. Default: 0.')
+PARSER.add_argument('--realtime', action='store_true', default=False,
+                    help='Enable collection of real-time volume statistics (30s interval) in addition to analysed stats (5m interval). '
+                         'Increases API load and storage usage. Disabled by default. '
+                         'If --include is used, volumes_realtime must also be included.')
+PARSER.add_argument('--capture', nargs='?', const='', default=None, metavar='DIR',
+                    help='Capture SANtricity API request/response payloads to disk for replay or debugging. '
+                         'Optionally specify a directory; if omitted, files are stored under ./captures/<timestamp>.')
 CMD = PARSER.parse_args()
+
+if CMD.capture is not None:
+    initialize_capture(CMD.capture)
 
 # Set logging level based on debug flag
 if CMD.debug:
@@ -763,13 +973,18 @@ if (CMD.retention == '' or CMD.retention is None):
 else:
     RETENTION_DUR = CMD.retention
 
+# Derived flag to indicate whether InfluxDB output is active
+# Used to skip Influx-only collection paths (e.g., --output=prometheus or --doNotPost)
+INFLUX_WRITE_ENABLED = CMD.output in ['influxdb', 'both'] and not CMD.doNotPost
+
 # Define which measurements each collection function provides
 FUNCTION_MEASUREMENTS = {
     'collect_storage_metrics': ['disks', 'interface', 'systems', 'volumes'],
+    'collect_volume_stats_realtime': ['volumes_realtime'],
     'collect_controller_metrics': ['controllers'],
     'collect_symbol_stats': ['power', 'temp'],
     'collect_major_event_log': ['major_event_log'],
-    'collect_system_state': ['failures'],
+    'collect_system_state': ['failures', 'interface_alerts'],
     'collect_config_storage_pools': ['config_storage_pools'],
     'collect_config_volumes': ['config_volumes'],
     'collect_config_hosts': ['config_hosts'],
@@ -820,7 +1035,6 @@ def setup_prometheus():
     """
     Initialize Prometheus metrics and HTTP server if Prometheus output is enabled.
     """
-    global prometheus_registry, prometheus_metrics, prometheus_server
 
     if CMD.output not in ['prometheus', 'both']:
         return
@@ -828,14 +1042,14 @@ def setup_prometheus():
     if not PROMETHEUS_AVAILABLE:
         if CMD.output == 'prometheus':
             LOG.error("Prometheus client library not available. Install with: pip install prometheus-client")
-            import sys as system
-            system.exit(1)
+            sys.exit(1)
         else:
             LOG.warning("Prometheus client library not available. Continuing with InfluxDB only.")
             return
 
     LOG.info(f"Setting up Prometheus metrics server on port {CMD.prometheus_port}")
 
+    global prometheus_registry
     # Create custom registry to avoid conflicts with default registry
     prometheus_registry = CollectorRegistry()
 
@@ -878,6 +1092,16 @@ def setup_prometheus():
                               ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry)
     }
 
+    # Volume Realtime metrics
+    prometheus_metrics['volumes_realtime'] = {
+        'iops': Gauge('eseries_volume_realtime_iops_total', 'Volume Realtime IOPS',
+                     ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry),
+        'throughput': Gauge('eseries_volume_realtime_throughput_bytes_per_second', 'Volume Realtime throughput in bytes/sec',
+                           ['sys_id', 'sys_name', 'vol_name', 'direction'], registry=prometheus_registry),
+        'response_time': Gauge('eseries_volume_realtime_response_time_seconds', 'Volume Realtime response time in seconds',
+                              ['sys_id', 'sys_name', 'vol_name', 'operation'], registry=prometheus_registry)
+    }
+
     # System metrics
     prometheus_metrics['systems'] = {
         'cpu_utilization': Gauge('eseries_system_cpu_utilization_percent', 'System CPU utilization',
@@ -911,6 +1135,12 @@ def setup_prometheus():
                                 registry=prometheus_registry)
     }
 
+    prometheus_metrics['interface_alerts'] = {
+        'interface_alert': Gauge('eseries_interface_alert', 'Interface alert status (1=down, 0=ok)',
+                                ['sys_id', 'sys_name', 'interface_ref', 'channel', 'interface_type'],
+                                registry=prometheus_registry)
+    }
+
     # Start HTTP server in background thread
     start_prometheus_server()
 
@@ -919,12 +1149,21 @@ class PrometheusHandler(BaseHTTPRequestHandler):
     """HTTP handler for Prometheus metrics endpoint."""
 
     def do_GET(self):
-        if self.path == '/metrics':
-            self.send_response(200)
-            self.send_header('Content-Type', CONTENT_TYPE_LATEST)
-            self.end_headers()
-            self.wfile.write(generate_latest(prometheus_registry))
-        elif self.path == '/health':
+        # Handle path parsing to ignore query params and trailing slashes
+        parsed_path = urlparse(self.path)
+        clean_path = parsed_path.path.rstrip('/')
+
+        if clean_path == '/metrics':
+            try:
+                self.send_response(200)
+                self.send_header('Content-Type', CONTENT_TYPE_LATEST)
+                self.end_headers()
+                self.wfile.write(generate_latest(prometheus_registry))
+            except Exception as e:
+                LOG.error(f"Error generating Prometheus metrics: {e}")
+                self.send_response(500)
+                self.end_headers()
+        elif clean_path == '/health':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain')
             self.end_headers()
@@ -933,20 +1172,25 @@ class PrometheusHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format_string, *args):
-        # Suppress default HTTP logging to avoid clutter
-        pass
+
+    def log_message(self, format, *args):  # pylint: disable=redefined-builtin
+        # Log to the standard collector logger if debug is enabled
+        if CMD.debug:
+            LOG.debug("Prometheus HTTP: %s - - [%s] %s\n" %
+                      (self.client_address[0],
+                       self.log_date_time_string(),
+                       format % args))
 
 
 def start_prometheus_server():
     """Start Prometheus metrics HTTP server in background thread."""
-    global prometheus_server
 
     def run_server():
         try:
-            prometheus_server = HTTPServer(('', CMD.prometheus_port), PrometheusHandler)
+            # Use ThreadingHTTPServer to handle multiple concurrent requests (e.g. browser keep-alive + actual scrape)
+            prometheus_server = ThreadingHTTPServer(('', CMD.prometheus_port), PrometheusHandler)
             LOG.info(f"Prometheus metrics server started on port {CMD.prometheus_port}")
-            LOG.info(f"Metrics available at: http://localhost:{CMD.prometheus_port}/metrics")
+            LOG.info(f"Metrics available at: http://0.0.0.0:{CMD.prometheus_port}/metrics")
             prometheus_server.serve_forever()
         except Exception as e:
             LOG.error(f"Failed to start Prometheus server: {e}")
@@ -972,7 +1216,7 @@ def send_to_prometheus(measurement, tags, fields):
 
     # Only send performance metrics to Prometheus, skip events/config data
     prometheus_metrics_whitelist = {
-        'disks', 'controllers', 'volumes', 'systems', 'interface', 'power', 'temp'
+        'disks', 'controllers', 'volumes', 'volumes_realtime', 'systems', 'interface', 'power', 'temp'
     }
 
     if measurement not in prometheus_metrics_whitelist:
@@ -1044,6 +1288,22 @@ def send_to_prometheus(measurement, tags, fields):
                 if field in fields and fields[field] is not None:
                     measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
 
+        elif measurement == 'volumes_realtime':
+            # Volume Realtime IOPS
+            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
+
+            # Volume Realtime throughput
+            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
+
+            # Volume Realtime response time
+            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+                if field in fields and fields[field] is not None:
+                    measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
+
         elif measurement == 'systems':
             # System CPU utilization
             for metric, field in [('max', 'maxCpuUtilization'), ('average', 'cpuAvgUtilization')]:
@@ -1101,7 +1361,6 @@ def should_collect_config_data():
 
     Returns True when config data should be collected this iteration.
     """
-    global _CONFIG_COLLECTION_ITERATION_COUNTER
 
     # Note: Iteration counter is incremented once per cycle in the main loop
 
@@ -1172,7 +1431,7 @@ def get_session():
     Returns a session with the appropriate content type and login information.
     :return: Returns a request session for the SANtricity API endpoint
     """
-    request_session = requests.Session()
+    request_session = CaptureSession()
 
     username = CMD.username
     password = CMD.password
@@ -1399,7 +1658,6 @@ def collect_storage_metrics(system_info):
     interfaces, and volumes
     :param sys: The JSON object of a storage system
     """
-    global _MAPPABLE_OBJECTS_CACHE, _HOSTS_CACHE
 
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
@@ -1659,20 +1917,226 @@ def collect_storage_metrics(system_info):
         set_current_controller_index(None)
 
 
-def collect_major_event_log(system_info):
+def collect_volume_stats_realtime(system_info):
     """
-    Collects all defined MEL metrics and posts them to InfluxDB
-    :param sys: The JSON object of a storage_system
+    Collects real-time volume statistics using cumulative counters.
+    Calculates deltas and rates based on previous iteration.
     """
+    if CMD.include and 'volumes_realtime' not in CMD.include:
+        return
+
     # Set controller for consistent selection within this collection session
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
 
     try:
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
-        json_body = list()
+        json_body = []
+
+        # Get raw cumulative stats
+        stats_url = f"{get_controller('sys')}/{sys_id}/volume-statistics?usecache=false"
+        try:
+            stats_list = session.get(stats_url).json()
+            LOG.debug(f"Realtime stats list length: {len(stats_list)}")
+        except Exception as e:
+            LOG.warning(f"Failed to retrieve realtime volume statistics: {e}")
+            return
+
+        current_ts = time.time()
+
+        for stats in stats_list:
+            vol_ref = stats.get('volumeRef') or stats.get('volumeId')
+            if not vol_ref:
+                LOG.debug("Skipping stat entry missing volumeRef/volumeId")
+                continue
+
+            # Try to get volume name from mega-cache
+            vol_name = vol_ref
+            volume_obj = _MAPPABLE_OBJECTS_CACHE.get(vol_ref)
+            if volume_obj:
+                vol_name = volume_obj.get('label', vol_ref)
+
+            # Host mapping info
+            host_names = []
+            if volume_obj:
+                list_of_mappings = volume_obj.get('listOfMappings', [])
+                for mapping in list_of_mappings:
+                    map_ref = mapping.get('mapRef')
+                    if map_ref and map_ref in _HOSTS_CACHE:
+                        host_list = _HOSTS_CACHE[map_ref]
+                        for host_info in host_list:
+                            hname = host_info.get('name', 'unknown')
+                            if hname not in host_names:
+                                host_names.append(hname)
+
+            # Check cache for previous values
+            prev_stats = _VOLUME_STATS_CACHE.get(vol_ref)
+
+            # Store current values for next iteration
+            # Use 'observedTimeInMS' or 'observedTime' from API if available for more precise delta
+            api_ts_val = stats.get('observedTimeInMS')
+            if not api_ts_val:
+                api_ts_val = stats.get('observedTime')
+
+            if not api_ts_val:
+                # Fallback if timestamps are missing
+                api_ts = current_ts
+            else:
+                # Try to parse as float (seconds or ms)
+                try:
+                    val = float(api_ts_val)
+                    # Heuristic: if > 100 billion, assume ms (valid for epoch > 1973)
+                    if val > 100_000_000_000:
+                        api_ts = val / 1000.0
+                    else:
+                        api_ts = val
+                except ValueError:
+                    # Not a simple number, try parsing ISO string
+                    # System often returns ISO 8601 strings in 'observedTime'
+                    try:
+                        # Normalize ISO string (remove 'Z' etc if needed, though fromisoformat covers basic cases)
+                        if isinstance(api_ts_val, str) and 'T' in api_ts_val:
+                            # Replace Z with +00:00 for strict ISO compliance if needed
+                            iso_str = api_ts_val.replace('Z', '+00:00')
+                            dt_obj = datetime.fromisoformat(iso_str)
+                            api_ts = dt_obj.timestamp()
+                        else:
+                            raise ValueError("Not an ISO string")
+                    except Exception:
+                        LOG.warning(f"Could not parse timestamp '{api_ts_val}', using local time")
+                        api_ts = current_ts
+
+            current_values = {
+                'timestamp': float(api_ts),
+                'readOps': float(stats.get('readOps', 0)),
+                'writeOps': float(stats.get('writeOps', 0)),
+                'otherOps': float(stats.get('otherOps', 0)),
+                'readBytes': float(stats.get('readBytes', 0)),
+                'writeBytes': float(stats.get('writeBytes', 0)),
+                'readTimeTotal': float(stats.get('readTimeTotal', 0)),
+                'writeTimeTotal': float(stats.get('writeTimeTotal', 0)),
+                'otherTimeTotal': float(stats.get('otherTimeTotal', 0))
+            }
+
+            _VOLUME_STATS_CACHE[vol_ref] = current_values
+
+            # If no previous stats, skip calculation (first run)
+            if not prev_stats:
+                LOG.debug(f"First run for volume {vol_name}, initializing cache")
+                continue
+
+            # Calculate deltas
+            # Check for counter reset (reboot or rollover)
+            if current_values['readOps'] < prev_stats['readOps'] or current_values['writeOps'] < prev_stats['writeOps']:
+                LOG.debug(f"Counter reset detected for volume {vol_name}, skipping delta calculation")
+                continue
+
+            dt = current_values['timestamp'] - prev_stats['timestamp']
+            if dt <= 0:
+                LOG.debug(f"Time delta <= 0 for volume {vol_name} (curr={current_values['timestamp']}, prev={prev_stats['timestamp']}), skipping")
+                # Should not happen typically unless minimal interval or clock skew
+                continue
+
+            delta_read_ops = current_values['readOps'] - prev_stats['readOps']
+            delta_write_ops = current_values['writeOps'] - prev_stats['writeOps']
+            delta_other_ops = current_values['otherOps'] - prev_stats['otherOps']
+            delta_read_bytes = current_values['readBytes'] - prev_stats['readBytes']
+            delta_write_bytes = current_values['writeBytes'] - prev_stats['writeBytes']
+            delta_read_time = current_values['readTimeTotal'] - prev_stats['readTimeTotal']
+            delta_write_time = current_values['writeTimeTotal'] - prev_stats['writeTimeTotal']
+            delta_other_time = current_values['otherTimeTotal'] - prev_stats['otherTimeTotal']
+
+            # Derived rate metrics
+            read_iops = delta_read_ops / dt
+            write_iops = delta_write_ops / dt
+            other_iops = delta_other_ops / dt
+            combined_iops = (delta_read_ops + delta_write_ops + delta_other_ops) / dt
+
+            read_throughput = delta_read_bytes / dt # bytes/sec
+            write_throughput = delta_write_bytes / dt
+            combined_throughput = (delta_read_bytes + delta_write_bytes) / dt
+
+            # Average Response Time (ms)
+            read_response_time = delta_read_time / delta_read_ops if delta_read_ops > 0 else 0
+            write_response_time = delta_write_time / delta_write_ops if delta_write_ops > 0 else 0
+            total_ops = delta_read_ops + delta_write_ops + delta_other_ops
+            total_time = delta_read_time + delta_write_time + delta_other_time
+            combined_response_time = total_time / total_ops if total_ops > 0 else 0
+
+            # Average Op Size (bytes)
+            avg_read_op_size = delta_read_bytes / delta_read_ops if delta_read_ops > 0 else 0
+            avg_write_op_size = delta_write_bytes / delta_write_ops if delta_write_ops > 0 else 0
+
+            fields = {
+                'readIOps': read_iops,
+                'writeIOps': write_iops,
+                'otherIOps': other_iops,
+                'combinedIOps': combined_iops,
+                'readThroughput': read_throughput,
+                'writeThroughput': write_throughput,
+                'combinedThroughput': combined_throughput,
+                'readResponseTime': read_response_time,
+                'writeResponseTime': write_response_time,
+                'combinedResponseTime': combined_response_time,
+                'averageReadOpSize': avg_read_op_size,
+                'averageWriteOpSize': avg_write_op_size,
+                'readOps': delta_read_ops,
+                'writeOps': delta_write_ops,
+                'otherOps': delta_other_ops,
+                'mapped_host_names': ','.join(host_names) if host_names else '',
+                'mapped_host_count': len(host_names)
+            }
+
+            item = {
+                "measurement": "volumes_realtime",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name,
+                    "vol_name": vol_name
+                },
+                "fields": fields
+            }
+
+            if not CMD.include or item["measurement"] in CMD.include:
+                json_body.append(item)
+                # Send to Prometheus
+                send_to_prometheus(item["measurement"], item["tags"], item["fields"])
+
+        if json_body:
+            LOG.debug(f"collect_volume_stats_realtime: Prepared {len(json_body)} measurements")
+            write_to_outputs(json_body, "realtime volume metrics")
+
+    except Exception as e:
+        LOG.error(f"Error in collect_volume_stats_realtime for {system_info['name']}: {e}")
+
+    finally:
+        set_current_controller_index(None)
+
+
+def collect_major_event_log(system_info):
+    """
+    Collects all defined MEL metrics and posts them to InfluxDB
+    :param sys: The JSON object of a storage_system
+    """
+    if not INFLUX_WRITE_ENABLED:
+        LOG.debug("Skipping MEL collection (InfluxDB output disabled)")
+        return
+
+    if CMD.include and 'major_event_log' not in CMD.include:
+        LOG.debug("Skipping MEL collection (major_event_log not in --include filter)")
+        return
+
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+
+    try:
+        session = get_session()
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
+        json_body = []
         start_from = -1
         mel_grab_count = 8192
         query = client.query(
@@ -1681,11 +2145,16 @@ def collect_major_event_log(system_info):
         if query:
             start_from = int(next(query.get_points())["id"]) + 1
 
-        mel_response = session.get(f"{get_controller('sys')}/{sys_id}/mel-events",
-                                   params={"count": mel_grab_count, "startSequenceNumber": start_from}, timeout=(6.10, CMD.intervalTime*2)).json()
+        mel_response = session.get(
+            f"{get_controller('sys')}/{sys_id}/mel-events",
+            params={"count": mel_grab_count, "startSequenceNumber": start_from},
+            timeout=(6.10, CMD.intervalTime * 2)
+        ).json()
+
         if CMD.showMELMetrics:
             LOG.info("Starting from %s", str(start_from))
             LOG.info("Grabbing %s MELs", str(len(mel_response)))
+
         for mel in mel_response:
             item = {
                 "measurement": "major_event_log",
@@ -1700,30 +2169,40 @@ def collect_major_event_log(system_info):
                     "ascq": mel["ascq"],
                     "asc": mel["asc"]
                 },
-                "fields": coerce_fields_dict(dict(
-                    (metric, mel.get(metric)) for metric in MEL_PARAMS
-                )),
+                "fields": coerce_fields_dict({
+                    metric: mel.get(metric) for metric in MEL_PARAMS
+                }),
                 "time": datetime.fromtimestamp(
-                    int(mel["timeStamp"]), timezone.utc).isoformat()
+                    int(mel["timeStamp"]), timezone.utc
+                ).isoformat()
             }
+
             if CMD.showMELMetrics:
                 LOG.info("MEL payload: %s", item)
+
             if not CMD.include or item["measurement"] in CMD.include:
                 json_body.append(item)
+
         try:
             client.write_points(
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: MEL payload sent")
         except InfluxDBClientError as e:
             if "beyond retention policy" in str(e):
-                LOG.debug(f"Some MEL events were beyond retention policy and dropped by InfluxDB: {e}")
+                LOG.debug(
+                    "Some MEL events were beyond retention policy and dropped by InfluxDB: %s",
+                    e
+                )
                 LOG.info("LOG: MEL payload sent (some events outside retention dropped)")
             else:
                 # Re-raise other InfluxDB errors
                 raise
     except RuntimeError:
         LOG.error(
-            f"Error when attempting to post MEL for {system_info['name']}/{system_info['wwn']}")
+            "Error when attempting to post MEL for %s/%s",
+            system_info['name'],
+            system_info['wwn']
+        )
 
     finally:
         # Reset controller selection for next collection session
@@ -1827,6 +2306,164 @@ def create_prometheus_failure_alerts(sys_id, sys_name, failure_response):
     LOG.debug(f"Updated Prometheus failure metrics: {len(failure_counts)} failure types for system {sys_name}")
 
 
+def collect_interface_alerts(system_info):
+    """Collect interface alert information and update Prometheus metrics."""
+    if CMD.output not in ['prometheus', 'both'] or not PROMETHEUS_AVAILABLE:
+        return
+
+    if 'interface_alerts' not in prometheus_metrics:
+        return
+
+    sys_id = system_info.get("wwn", "unknown")
+    sys_name = system_info.get("name", "unknown")
+
+    try:
+        session = get_session()
+        interface_alert_gauge = prometheus_metrics['interface_alerts']['interface_alert']
+
+        response = session.get(
+            f"{get_controller('sys')}/{sys_id}/graph/xpath-filter?query=/controller"
+        )
+        response.raise_for_status()
+        controllers_response = response.json()
+
+        alert_count = 0
+
+        for controller in controllers_response:
+            controller_id = controller.get('controllerRef', 'unknown')
+
+            # Process management interfaces (wan0, wan1, etc.)
+            net_interfaces = controller.get('netInterfaces', [])
+            for interface in net_interfaces:
+                iface_type = interface.get('interfaceType', '').lower()
+
+                if iface_type not in INTERFACE_ALERT_CONFIG:
+                    LOG.debug("Skipping unconfigured management interface type: %s", iface_type)
+                    continue
+
+                config = INTERFACE_ALERT_CONFIG[iface_type]
+                if not config.get('enabled', False):
+                    continue
+
+                eth_data = interface.get('ethernet', {})
+                interface_name = eth_data.get('interfaceName', 'unknown')
+                channel = str(eth_data.get('channel', 0))
+                interface_ref = eth_data.get('interfaceRef', 'unknown')
+                label_values = {
+                    'sys_id': sys_id,
+                    'sys_name': sys_name,
+                    'interface_ref': interface_ref,
+                    'channel': channel,
+                    'interface_type': f"mgmt_{iface_type}_{interface_name}",
+                }
+
+                current_obj = interface
+                for path_segment in config['alert_paths']:
+                    if isinstance(current_obj, dict) and path_segment in current_obj:
+                        current_obj = current_obj[path_segment]
+                    else:
+                        current_obj = None
+                        break
+
+                status_value = str(current_obj).lower() if current_obj is not None else ''
+                is_alert = status_value in config['alert_values']
+                interface_alert_gauge.labels(**label_values).set(1.0 if is_alert else 0.0)
+
+                if is_alert:
+                    alert_count += 1
+                    LOG.info(
+                        "Management interface alert: %s controller %s %s (%s) ch=%s status=%s",
+                        sys_name,
+                        controller_id,
+                        interface_name,
+                        iface_type,
+                        channel,
+                        status_value,
+                    )
+
+            # Process storage service interfaces (iSCSI, FC, IB, SAS)
+            host_interfaces = controller.get('hostInterfaces', [])
+            for interface in host_interfaces:
+                iface_type = interface.get('interfaceType', '').lower()
+
+                if iface_type not in INTERFACE_ALERT_CONFIG:
+                    LOG.debug("Skipping unconfigured storage interface type: %s", iface_type)
+                    continue
+
+                config = INTERFACE_ALERT_CONFIG[iface_type]
+                if not config.get('enabled', False):
+                    continue
+
+                type_obj = interface.get(iface_type, {})
+                if not isinstance(type_obj, dict) or not type_obj:
+                    continue
+
+                current_obj = type_obj
+                for path_segment in config['alert_paths']:
+                    if isinstance(current_obj, dict) and path_segment in current_obj:
+                        current_obj = current_obj[path_segment]
+                    else:
+                        current_obj = None
+                        break
+
+                status_value = str(current_obj).lower() if current_obj is not None else ''
+                interface_ref = type_obj.get('interfaceRef', 'unknown')
+                channel = str(type_obj.get('channel', 0))
+
+                if iface_type == 'iscsi':
+                    ethernet_data = type_obj.get('interfaceData', {}).get('ethernetData', {})
+                    mac_address = ethernet_data.get('macAddress', '')
+                    interface_id = f"{iface_type}_ch{channel}_{mac_address}"
+                elif iface_type == 'ib':
+                    global_id = type_obj.get('globalIdentifier', 'unknown')
+                    interface_id = f"{iface_type}_ch{channel}_{global_id}"
+                else:
+                    interface_id = f"{iface_type}_ch{channel}_{interface_ref}"
+
+                label_values = {
+                    'sys_id': sys_id,
+                    'sys_name': sys_name,
+                    'interface_ref': interface_ref,
+                    'channel': channel,
+                    'interface_type': interface_id,
+                }
+
+                is_alert = status_value in config['alert_values']
+                interface_alert_gauge.labels(**label_values).set(1.0 if is_alert else 0.0)
+
+                if is_alert:
+                    alert_count += 1
+                    LOG.info(
+                        "Storage interface alert: %s controller %s %s status=%s",
+                        sys_name,
+                        controller_id,
+                        interface_id,
+                        status_value,
+                    )
+
+        if alert_count == 0:
+            interface_alert_gauge.labels(
+                sys_id=sys_id,
+                sys_name=sys_name,
+                interface_ref="none",
+                channel="0",
+                interface_type="healthy",
+            ).set(0.0)
+
+        LOG.debug(
+            "Updated Prometheus interface alert metrics: %d alerts for system %s",
+            alert_count,
+            sys_name,
+        )
+
+    except (requests.RequestException, ValueError, KeyError) as exc:
+        LOG.warning(
+            "Failed to collect interface alerts for system %s: %s",
+            sys_name,
+            exc,
+        )
+
+
 
 def collect_system_state_influxdb(system_info, checksums, failure_response):
     """
@@ -1928,7 +2565,6 @@ def collect_config_volumes(system_info):
     Collects volume configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _HOSTS_CACHE, _MAPPABLE_OBJECTS_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
@@ -2038,11 +2674,14 @@ def collect_config_volumes(system_info):
                 LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: volume configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
     finally:
         # Reset controller selection for next collection session
         set_current_controller_index(None)
@@ -2053,21 +2692,21 @@ def collect_config_storage_pools(system_info):
     Collects storage pool configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _STORAGE_POOLS_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
         LOG.info("Skipping config_storage_pools collection - not a scheduled interval (collected every 15 minutes)")
         return
-
     try:
         # Set controller for consistent selection within this collection session
         if len(CMD.api) > 1:
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Get storage pool configuration data from the API
@@ -2165,11 +2804,14 @@ def collect_config_storage_pools(system_info):
                 LOG.debug(f"Skipped config_storage_pools measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_storage_pools: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: storage pool configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post storage pool configuration for {system_info['name']}/{system_info['wwn']}")
@@ -2184,7 +2826,6 @@ def collect_config_hosts(system_info):
     Collects host configuration information and posts it to InfluxDB
     :param system_info: The JSON object of a storage_system
     """
-    global _HOSTS_CACHE, _VOLUME_MAPPINGS_CACHE, _VOLUME_NAME_CACHE
 
     # Early exit if not a config collection interval
     if not should_collect_config_data():
@@ -2197,8 +2838,10 @@ def collect_config_hosts(system_info):
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        client = InfluxDBClient(host=influxdb_host,
-                                port=influxdb_port, database=INFLUXDB_DATABASE)
+        client = None
+        if INFLUX_WRITE_ENABLED:
+            client = InfluxDBClient(host=influxdb_host,
+                                    port=influxdb_port, database=INFLUXDB_DATABASE)
         json_body = list()
 
         # Get host configuration data from the API
@@ -2337,11 +2980,14 @@ def collect_config_hosts(system_info):
         LOG.debug(f"Populated _HOSTS_CACHE with {len(_HOSTS_CACHE)} hosts")
 
         LOG.debug(f"collect_config_hosts: Prepared {len(json_body)} measurements for InfluxDB")
-        if not CMD.doNotPost:
+        if INFLUX_WRITE_ENABLED:
+            assert client is not None
             client.write_points(json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: host configuration data sent")
-        else:
+        elif CMD.doNotPost:
             LOG.debug("Skipped posting to InfluxDB (--doNotPost enabled)")
+        else:
+            LOG.debug("Skipped posting to InfluxDB (InfluxDB output disabled)")
 
     except RuntimeError:
         LOG.error(f"Error when attempting to post host configuration for {system_info['name']}/{system_info['wwn']}")
@@ -2729,6 +3375,7 @@ if __name__ == "__main__":
                 'disks': (DRIVE_PARAMS, "disks"),
                 'systems': (SYSTEM_PARAMS, "systems"),
                 'volumes': (VOLUME_PARAMS, "volumes"),
+                'volumes_realtime': (VOLUME_REALTIME_PARAMS, "volumes_realtime"),
                 'interface': (INTERFACE_PARAMS, "interface"),
                 'power': (PSU_PARAMS, "power"),
                 'temp': (SENSOR_PARAMS, "temp"),
@@ -2748,6 +3395,7 @@ if __name__ == "__main__":
             create_continuous_query(client, DRIVE_PARAMS, "disks")
             create_continuous_query(client, SYSTEM_PARAMS, "systems")
             create_continuous_query(client, VOLUME_PARAMS, "volumes")
+            create_continuous_query(client, VOLUME_REALTIME_PARAMS, "volumes_realtime")
             create_continuous_query(client, INTERFACE_PARAMS, "interface")
             create_continuous_query(client, CONTROLLER_PARAMS, "controllers")
             create_continuous_query(client, PSU_PARAMS, "power")
@@ -2799,6 +3447,15 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_storage_metrics']):
                     LOG.info("Collecting storage metrics (disks, interface, systems, volumes)...")
                     collect_storage_metrics(sys)
+                
+                # Check for volumes_realtime in includes AND --realtime flag
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_volume_stats_realtime']):
+                    if CMD.realtime:
+                        LOG.info("Collecting real-time volume statistics...")
+                        collect_volume_stats_realtime(sys)
+                    else:
+                        LOG.debug("Skipping real-time volume statistics (volumes_realtime included but --realtime flag not set)")
+                
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_controller_metrics']):
                     LOG.info("Collecting controller metrics...")
                     collect_controller_metrics(sys)
@@ -2808,6 +3465,7 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_system_state']):
                     LOG.info("Collecting system state and failure information...")
                     collect_system_failures(sys, checksums)
+                    collect_interface_alerts(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_major_event_log']):
                     LOG.info("Collecting major event log (MEL)...")
                     collect_major_event_log(sys)
@@ -2828,12 +3486,19 @@ if __name__ == "__main__":
                 LOG.info("Starting full collection cycle for all measurements...")
                 LOG.info("Collecting storage metrics (disks, interface, systems, volumes)...")
                 collect_storage_metrics(sys)
+                
+                # Only collect realtime stats if flag is set
+                if CMD.realtime:
+                    LOG.info("Collecting real-time volume statistics...")
+                    collect_volume_stats_realtime(sys)
+                    
                 LOG.info("Collecting controller metrics...")
                 collect_controller_metrics(sys)
                 LOG.info("Collecting power and temperature data...")
                 collect_symbol_stats(sys)
                 LOG.info("Collecting system state and failure information...")
                 collect_system_failures(sys, checksums)
+                collect_interface_alerts(sys)
                 LOG.info("Collecting major event log (MEL)...")
                 collect_major_event_log(sys)
                 LOG.info("Collecting storage pool configuration...")
