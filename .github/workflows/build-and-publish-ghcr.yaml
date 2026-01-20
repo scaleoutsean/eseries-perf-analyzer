@@ -51,4 +51,5 @@ jobs:
           #   BASE_IMAGE=${{ env.BASE_IMAGE }}
 
       - name: Output pushed image name
-        run: echo "Image pushed: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        run: |
+          echo "Image pushed: ghcr.io/${{ github.repository }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
