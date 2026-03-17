@@ -229,11 +229,16 @@ class GrafanaInitializer:
                     dashboard_json['tags'].append('NetAppESeries')
                     logger.info(f"Added NetAppESeries tag to {dashboard_title}")
                 
-                # Remove id and uid if present (let Grafana assign new ones)
+                # Remove id so Grafana creates a new one if this is the first import
                 if 'id' in dashboard_json:
                     del dashboard_json['id']
-                if 'uid' in dashboard_json:
-                    del dashboard_json['uid']
+                
+                # Provide a consistent UID based on the filename so overwrite works correctly
+                # (Without a stable UID, Grafana treats every import as a brand new dashboard)
+                dashboard_uid = f"epa-{dashboard_title.lower()[:35]}"
+                # Make UID URL-safe (no spaces/special chars)
+                dashboard_uid = "".join(c if c.isalnum() else '-' for c in dashboard_uid)
+                dashboard_json['uid'] = dashboard_uid
                 
                 # Fix datasource references - replace template variables and ensure EPA datasource
                 self._fix_datasource_references(dashboard_json)
