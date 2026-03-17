@@ -2185,9 +2185,12 @@ def collect_volume_stats_realtime(system_info):
                 continue
 
             # Calculate deltas
-            # Check for counter reset (reboot or rollover)
-            if current_values['readOps'] < prev_stats['readOps'] or current_values['writeOps'] < prev_stats['writeOps']:
-                LOG.debug(f"Counter reset detected for volume {vol_name}, skipping delta calculation")
+            # Check for counter reset (reboot or rollover), or simulator weirdness (dropping bytes)
+            if (current_values['readOps'] < prev_stats['readOps'] or 
+                current_values['writeOps'] < prev_stats['writeOps'] or
+                current_values['readBytes'] < prev_stats['readBytes'] or
+                current_values['writeBytes'] < prev_stats['writeBytes']):
+                LOG.debug(f"Counter reset/rollback detected for volume {vol_name}, skipping delta calculation")
                 continue
 
             dt = current_values['timestamp'] - prev_stats['timestamp']
