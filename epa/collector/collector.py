@@ -577,6 +577,11 @@ def populate_mappable_objects_cache(system_info):
         # Build comprehensive cache indexed by volumeRef
         for obj in mappable_objects_response:
             volume_ref = obj.get('volumeRef')
+            
+            # Skip snapshot repository volumes
+            if obj.get('label', '').startswith('repos_'):
+                continue
+
             if volume_ref:
                 _MAPPABLE_OBJECTS_CACHE[volume_ref] = obj
                 LOG.debug(
@@ -2013,12 +2018,18 @@ def collect_storage_metrics(system_info):
             for stats in volume_stats_list:
                 LOG.info(stats["volumeName"])
         for stats in volume_stats_list:
+            volume_name = stats["volumeName"]
+            
+            # Skip snapshot repository volumes
+            if volume_name.startswith('repos_'):
+                LOG.debug(f"Skipping repository volume {volume_name}")
+                continue
+
             volume_fields = dict((metric, stats.get(metric))
                                  for metric in VOLUME_PARAMS)
             volume_fields = coerce_fields_dict(volume_fields)
 
             # Add host mapping information from mega-cache
-            volume_name = stats["volumeName"]
             host_names = []
 
             # Find volume object by name in mega-cache
@@ -2114,6 +2125,11 @@ def collect_volume_stats_realtime(system_info):
             volume_obj = _MAPPABLE_OBJECTS_CACHE.get(vol_ref)
             if volume_obj:
                 vol_name = volume_obj.get('label', vol_ref)
+
+            # Skip snapshot repository volumes
+            if vol_name.startswith('repos_'):
+                LOG.debug(f"Skipping repository volume {vol_name} from realtime stats")
+                continue
 
             # Host mapping info
             host_names = []
@@ -2770,6 +2786,11 @@ def collect_config_volumes(system_info):
         LOG.debug(f"Using cached data: {len(_HOSTS_CACHE)} hosts, {len(_MAPPABLE_OBJECTS_CACHE)} mappable objects")
 
         for volume in volumes_response:
+            # Skip snapshot repository volumes
+            if volume.get('name', '').startswith('repos_'):
+                LOG.debug(f"Skipping repository volume config {volume.get('name')}")
+                continue
+
             # Add computed host mapping fields to the volume object
             volume_ref = volume.get('volumeRef')
             if volume_ref and volume_ref in volume_to_hosts:
