@@ -206,6 +206,34 @@ VOLUME_REALTIME_PARAMS = [
     'mapped_host_count'
 ]
 
+FLASHCACHE_REALTIME_COUNTERS = [
+    'reads',
+    'readBlocks',
+    'writes',
+    'writeBlocks',
+    'fullCacheHits',
+    'fullCacheHitBlocks',
+    'partialCacheHits',
+    'partialCacheHitBlocks',
+    'completeCacheMiss',
+    'completeCacheMissBlocks',
+    'populateOnReads',
+    'populateOnReadBlocks',
+    'populateOnWrites',
+    'populateOnWriteBlocks',
+    'invalidates',
+    'recycles'
+]
+
+FLASHCACHE_REALTIME_GAUGES = [
+    'availableBytes',
+    'allocatedBytes',
+    'populatedCleanBytes',
+    'populatedDirtyBytes',
+    'cached_volumes_count',
+    'cache_drive_count'
+]
+
 MEL_PARAMS = [
     'id',
     'description',
@@ -388,6 +416,10 @@ _MAPPABLE_OBJECTS_CACHE = {}  # volumeRef -> complete volume object with mapping
 _DRIVES_CACHE = {}  # driveRef -> drive info
 # Cache for real-time volume statistics (volumeRef -> {timestamp, readOps, writeOps, etc.})
 _VOLUME_STATS_CACHE = {}
+# Cache for Flash Cache configuration (sys_id -> {flash_cache_id, flash_cache_name, ...})
+_FLASHCACHE_METADATA_CACHE = {} 
+# Cache for Flash Cache real-time statistics (sys_id -> counter dict)
+_FLASHCACHE_STATS_CACHE = {}
 
 # Global iteration counter for config collection timing
 _CONFIG_COLLECTION_ITERATION_COUNTER = 0
@@ -760,6 +792,30 @@ FIELD_COERCIONS = {
     'freeSpace': int,
     'extents_rawCapacity': int,
 
+    # Flash Cache fields - must be integers
+    'reads': int,
+    'readBlocks': int,
+    'writes': int,
+    'writeBlocks': int,
+    'fullCacheHits': int,
+    'fullCacheHitBlocks': int,
+    'partialCacheHits': int,
+    'partialCacheHitBlocks': int,
+    'completeCacheMiss': int,
+    'completeCacheMissBlocks': int,
+    'populateOnReads': int,
+    'populateOnReadBlocks': int,
+    'populateOnWrites': int,
+    'populateOnWriteBlocks': int,
+    'invalidates': int,
+    'recycles': int,
+    'availableBytes': int,
+    'allocatedBytes': int,
+    'populatedCleanBytes': int,
+    'populatedDirtyBytes': int,
+    'cached_volumes_count': int,
+    'cache_drive_count': int,
+
     # Flattened mapping fields
     'listOfMappings_lun': int,
     'listOfMappings_ssid': int,
@@ -825,6 +881,7 @@ PARSER.add_argument('--api', default='',  nargs='+', required=False,
                          'Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to: \'' +
                     DEFAULT_SYSTEM_PORT + '\'. '
                          'May be provided twice (for two controllers). <IPv4 Address>')
+PARSER.add_argument("--api-port", default=DEFAULT_SYSTEM_PORT, type=str, required=False, help="The port for the SANtricity API endpoint. Default: '" + DEFAULT_SYSTEM_PORT + "'.")
 PARSER.add_argument('--sysname', default='', type=str, required=False,
                     help='SANtricity system\'s user-configured array name. '
                          'Required unless --createDb is used. Example: dc1r226-elk. Default: None. <String>')
@@ -852,6 +909,8 @@ PARSER.add_argument('-s', '--showStorageNames', action='store_true',
                     help='Outputs the storage array names found from the SANtricity API to console. Optional. <switch>')
 PARSER.add_argument('-v', '--showVolumeNames', action='store_true', default=0,
                     help='Outputs the volume names found from the SANtricity API to console.  Optional. <switch>')
+PARSER.add_argument('--showFlashCache', action='store_true', default=False,
+                    help='Outputs the Flash Cache IDs, names, and real-time stats to console. Optional. <switch>')
 PARSER.add_argument('-f', '--showInterfaceNames', action='store_true', default=0,
                     help='Outputs the interface names found from the SANtricity API to console. Optional. <switch>')
 PARSER.add_argument('-a', '--showVolumeMetrics', action='store_true', default=0,
@@ -885,7 +944,7 @@ PARSER.add_argument('--debug-force-config', action='store_true', default=False,
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
                          'disks, interface, systems, volumes, volumes_realtime, controllers, power, temp, '
-                         'major_event_log, failures, config_storage_pools, config_volumes, config_hosts, config_drives. '
+                         'major_event_log, failures, config_storage_pools, config_volumes, config_hosts, config_drives, flashcache. '
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
 PARSER.add_argument('--output', choices=['influxdb', 'prometheus', 'both'], default='both',
@@ -988,7 +1047,8 @@ FUNCTION_MEASUREMENTS = {
     'collect_config_storage_pools': ['config_storage_pools'],
     'collect_config_volumes': ['config_volumes'],
     'collect_config_hosts': ['config_hosts'],
-    'collect_config_drives': ['config_drives']
+    'collect_config_drives': ['config_drives'],
+    'collect_flashcache_stats': ['flashcache']
 }
 
 # Validate --include options if provided
@@ -1129,6 +1189,18 @@ def setup_prometheus():
                             ['sys_id', 'sys_name', 'sensor', 'sensor_seq'], registry=prometheus_registry)
     }
 
+    # Flash Cache metrics
+    prometheus_metrics['flashcache'] = {
+        'bytes': Gauge('eseries_flashcache_bytes', 'Flash Cache byte metrics',
+                      ['sys_id', 'sys_name', 'flash_cache_id', 'flash_cache_name', 'metric'], registry=prometheus_registry),
+        'blocks': Gauge('eseries_flashcache_blocks_total', 'Flash Cache block metrics (delta)',
+                      ['sys_id', 'sys_name', 'flash_cache_id', 'flash_cache_name', 'metric'], registry=prometheus_registry),
+        'ops': Gauge('eseries_flashcache_ops_total', 'Flash Cache operations (delta)',
+                    ['sys_id', 'sys_name', 'flash_cache_id', 'flash_cache_name', 'metric'], registry=prometheus_registry),
+        'components': Gauge('eseries_flashcache_components', 'Flash Cache related component counts',
+                           ['sys_id', 'sys_name', 'flash_cache_id', 'flash_cache_name', 'metric'], registry=prometheus_registry)
+    }
+
     prometheus_metrics['failures'] = {
         'active_failures': Gauge('eseries_active_failures_total', 'Number of active failures',
                                 ['sys_id', 'sys_name', 'failure_type', 'object_type', 'object_ref'],
@@ -1216,7 +1288,7 @@ def send_to_prometheus(measurement, tags, fields):
 
     # Only send performance metrics to Prometheus, skip events/config data
     prometheus_metrics_whitelist = {
-        'disks', 'controllers', 'volumes', 'volumes_realtime', 'systems', 'interface', 'power', 'temp'
+        'disks', 'controllers', 'volumes', 'volumes_realtime', 'systems', 'interface', 'power', 'temp', 'flashcache'
     }
 
     if measurement not in prometheus_metrics_whitelist:
@@ -1333,6 +1405,25 @@ def send_to_prometheus(measurement, tags, fields):
         elif measurement == 'temp':
             if 'temp' in fields and fields['temp'] is not None:
                 measurement_metrics['temperature'].labels(**tags).set(fields['temp'])
+
+        elif measurement == 'flashcache':
+            # Bytes metrics
+            for gauge_m in ['availableBytes', 'allocatedBytes', 'populatedCleanBytes', 'populatedDirtyBytes']:
+                if gauge_m in fields and fields[gauge_m] is not None:
+                    measurement_metrics['bytes'].labels(**tags, metric=gauge_m).set(fields[gauge_m])
+            
+            # Component counts
+            for comp_m in ['cached_volumes_count', 'cache_drive_count']:
+                if comp_m in fields and fields[comp_m] is not None:
+                    measurement_metrics['components'].labels(**tags, metric=comp_m).set(fields[comp_m])
+                    
+            # Ops and Blocks
+            for c in FLASHCACHE_REALTIME_COUNTERS:
+                if c in fields and fields[c] is not None:
+                    if 'Blocks' in c:
+                        measurement_metrics['blocks'].labels(**tags, metric=c).set(fields[c])
+                    else:
+                        measurement_metrics['ops'].labels(**tags, metric=c).set(fields[c])
 
         # Log successful Prometheus update with timestamp
         LOG.info(f"Prometheus metrics updated for '{measurement}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -1459,17 +1550,17 @@ def get_controller(query):
         raise ValueError(f"Unsupported query type: {query}")
     if (len(CMD.api) == 0) or (CMD.api is None) or (CMD.api == ''):
         storage_controller_ep = 'https://' + \
-            DEFAULT_SYSTEM_API_IP + ':' + DEFAULT_SYSTEM_PORT + api_path
+            DEFAULT_SYSTEM_API_IP + ':' + CMD.api_port + api_path
     elif len(CMD.api) == 1:
         storage_controller_ep = 'https://' + \
-            CMD.api[0] + ':' + DEFAULT_SYSTEM_PORT + api_path
+            CMD.api[0] + ':' + CMD.api_port + api_path
     else:
         if _CURRENT_CONTROLLER_INDEX is not None:
             controller = _CURRENT_CONTROLLER_INDEX
         else:
             controller = random.randrange(0, 2)
         storage_controller_ep = 'https://' + \
-            CMD.api[controller] + ':' + DEFAULT_SYSTEM_PORT + \
+            CMD.api[controller] + ':' + CMD.api_port + \
             api_path
         LOG.info(f"Controller selection: {storage_controller_ep}")
     return storage_controller_ep
@@ -1523,56 +1614,65 @@ def collect_symbol_stats(system_info):
 
     try:
         session = get_session()
+        json_body = list()
         # PSU
         psu_response = session.get(f"{get_controller('sys')}/{sys_id}/symbol/getEnergyStarData",
                                    params={"controller": "auto", "verboseErrorResponse": "false"}, timeout=(6.10, CMD.intervalTime*2)).json()
-        psu_total = psu_response['energyStarData']['totalPower']
-        if CMD.showPower:
-            LOG.info("PSU response (total): %s", psu_total)
-        json_body = list()
-        item = {
-            "measurement": "power",
-            "tags": {
-                "sys_id": sys_id,
-                "sys_name": sys_name
-            },
-            "fields": coerce_fields_dict({"totalPower": psu_total})
-        }
-        if not CMD.include or item["measurement"] in CMD.include:
-            json_body.append(item)
-            # Send to Prometheus
-            send_to_prometheus(item["measurement"], item["tags"], item["fields"])
-            LOG.debug(f"Added {item['measurement']} measurement to collection")
+        
+        if psu_response and psu_response.get('energyStarData'):
+            psu_total = psu_response['energyStarData'].get('totalPower')
+            if psu_total is not None:
+                if CMD.showPower:
+                    LOG.info("PSU response (total): %s", psu_total)
+                item = {
+                    "measurement": "power",
+                    "tags": {
+                        "sys_id": sys_id,
+                        "sys_name": sys_name
+                    },
+                    "fields": coerce_fields_dict({"totalPower": psu_total})
+                }
+                if not CMD.include or item["measurement"] in CMD.include:
+                    json_body.append(item)
+                    # Send to Prometheus
+                    send_to_prometheus(item["measurement"], item["tags"], item["fields"])
+                    LOG.debug(f"Added {item['measurement']} measurement to collection")
+                else:
+                    LOG.debug(f"Skipped {item['measurement']} measurement (not in --include filter)")
+                LOG.info("LOG: PSU data prepared")
         else:
-            LOG.debug(f"Skipped {item['measurement']} measurement (not in --include filter)")
-        LOG.info("LOG: PSU data prepared")
+            LOG.debug("LOG: PSU data unavailable or unsupported, skipping power measurement")
 
         # ENVIRONMENTAL SENSORS
         response = session.get(
             f"{get_controller('sys')}/{sys_id}/symbol/getEnclosureTemperatures",
             params={"controller": "auto", "verboseErrorResponse": "false"},
             timeout=(6.10, CMD.intervalTime*2)).json()
-        if CMD.showSensor:
-            LOG.info("Sensor response: %s", response['thermalSensorData'])
-        env_response = order_sensor_response_list(response)
-        for i, sensor in enumerate(env_response):
-            sensor_id = sensor['thermalSensorRef']
-            sensor_order = f"sensor_{i}"
-            item = {
-                "measurement": "temp",
-                "tags": {
-                    "sensor": sensor_id,
-                    "sensor_seq": sensor_order,
-                    "sys_id": sys_id,
-                    "sys_name": sys_name
-                },
-                "fields": coerce_fields_dict({"temp": sensor['currentTemp']})
-            }
-            if not CMD.include or item["measurement"] in CMD.include:
-                json_body.append(item)
-                # Send to Prometheus
-                send_to_prometheus(item["measurement"], item["tags"], item["fields"])
-        LOG.info("LOG: sensor data prepared")
+            
+        if response and response.get('thermalSensorData'):
+            if CMD.showSensor:
+                LOG.info("Sensor response: %s", response['thermalSensorData'])
+            env_response = order_sensor_response_list(response)
+            for i, sensor in enumerate(env_response):
+                sensor_id = sensor['thermalSensorRef']
+                sensor_order = f"sensor_{i}"
+                item = {
+                    "measurement": "temp",
+                    "tags": {
+                        "sensor": sensor_id,
+                        "sensor_seq": sensor_order,
+                        "sys_id": sys_id,
+                        "sys_name": sys_name
+                    },
+                    "fields": coerce_fields_dict({"temp": sensor['currentTemp']})
+                }
+                if not CMD.include or item["measurement"] in CMD.include:
+                    json_body.append(item)
+                    # Send to Prometheus
+                    send_to_prometheus(item["measurement"], item["tags"], item["fields"])
+            LOG.info("LOG: sensor data prepared")
+        else:
+            LOG.debug("LOG: sensor data unavailable, skipping temp measurements")
 
         LOG.debug(f"collect_symbol_stats: Prepared {len(json_body)} measurements")
         write_to_outputs(json_body, "SYMbol V2 PSU and sensor readings")
@@ -2997,6 +3097,146 @@ def collect_config_hosts(system_info):
         set_current_controller_index(None)
 
 
+def collect_flashcache_stats(system_info):
+    """
+    Collects Flash Cache stats and posts them to InfluxDB and Prometheus.
+    """
+    if CMD.include and 'flashcache' not in CMD.include:
+        return
+
+    # Set controller for consistent selection within this collection session
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+
+    sys_id = system_info.get('wwn', system_info.get('id'))
+    sys_name = system_info['name']
+
+    try:
+        session = get_session()
+        
+        # 1. Obtain Flash Cache Metadata
+        fc_url = f"{get_controller('sys')}/{sys_id}/flash-cache"
+        try:
+            fc_resp = session.get(fc_url).json()
+        except Exception as e:
+            LOG.warning(f"Failed to retrieve Flash Cache metadata: {e}")
+            return
+            
+        if not fc_resp or not isinstance(fc_resp, dict) or 'flashCacheRef' not in fc_resp:
+            # Flash Cache does not exist
+            return
+            
+        fc_id = fc_resp.get('flashCacheRef')
+        fc_name = fc_resp.get('flashCacheBase', {}).get('label', 'Unknown')
+        cached_volumes = len(fc_resp.get('cachedVolumes', []))
+        cache_drives = len(fc_resp.get('driveRefs', []))
+        
+        # 2. Collect Performance Stats (SYMbol API)
+        stats_url = f"{get_controller('sys')}/{sys_id}/symbol/getFlashCacheStatistics?verboseErrorResponse=true&controller=auto"
+        try:
+            stats_resp = session.post(
+                stats_url, 
+                json=fc_id, 
+                headers={"Content-Type": "application/json;charset=utf-8"}
+            ).json()
+        except Exception as e:
+            LOG.warning(f"Failed to POST to getFlashCacheStatistics: {e}")
+            return
+            
+        if stats_resp.get('returnCode') != 'ok' or 'flashCacheStatistics' not in stats_resp:
+            LOG.warning(f"Failed to get Flash Cache statistics (returnCode={stats_resp.get('returnCode')})")
+            return
+            
+        api_stats = stats_resp['flashCacheStatistics']
+        current_ts = float(api_stats.get('timestamp', time.time()))
+        
+        # Extract current raw values (counters + gauges)
+        current_values = {'timestamp': current_ts}
+        
+        for p in FLASHCACHE_REALTIME_COUNTERS + FLASHCACHE_REALTIME_GAUGES:
+            # Only exact params
+            if p not in ["cached_volumes_count", "cache_drive_count"]:
+                val = api_stats.get(p, 0)
+                current_values[p] = float(val) if val is not None else 0.0
+                
+        # Get previous stats
+        prev_stats = _FLASHCACHE_STATS_CACHE.get(sys_id)
+        
+        # Store for next run
+        _FLASHCACHE_STATS_CACHE[sys_id] = current_values
+        
+        # On first run, we skip deltas (like volumes_realtime counters)
+        if not prev_stats:
+            LOG.debug(f"First run for Flash Cache on {sys_name}, initializing cache")
+            return
+            
+        dt = current_values['timestamp'] - prev_stats['timestamp']
+        if dt <= 0:
+            LOG.debug(f"Time delta <= 0 for Flash Cache on {sys_name}, skipping")
+            return
+            
+        fields = {
+            "cached_volumes_count": cached_volumes,
+            "cache_drive_count": cache_drives
+        }
+        
+        # Process Gauges
+        for p in FLASHCACHE_REALTIME_GAUGES:
+            if p not in ["cached_volumes_count", "cache_drive_count"]:
+                fields[p] = current_values[p]
+                
+        # Process Counters and calc delta
+        valid_deltas = True
+        for p in FLASHCACHE_REALTIME_COUNTERS:
+            if current_values[p] < prev_stats[p]:
+                # Counter reset
+                valid_deltas = False
+                break
+            fields[p] = current_values[p] - prev_stats[p]
+            
+        if not valid_deltas:
+            LOG.debug(f"Counter reset detected for Flash Cache on {sys_name}, skipping delta calculations")
+            return
+            
+        # Coerce values to int per requirements
+        fields = coerce_fields_dict(fields)
+        
+        tags = {
+            "sys_id": sys_id,
+            "sys_name": sys_name,
+            "flash_cache_id": fc_id,
+            "flash_cache_name": fc_name
+        }
+        
+        if getattr(CMD, 'showFlashCache', False):
+            LOG.info(f"Flash Cache [{fc_id}] name: {fc_name}")
+            LOG.info(f"Flash Cache Stats: {fields}")
+        
+        # POST to InfluxDB/Prometheus
+        json_body = [{
+            "measurement": "flashcache",
+            "tags": tags,
+            "fields": fields
+        }]
+        
+        send_to_prometheus("flashcache", tags, fields)
+
+        if not CMD.doNotPost and CMD.output in ['influxdb', 'both']:
+            client = get_db_connection()
+            client.write_points(json_body)
+            LOG.debug(f"Posted flashcache metrics to InfluxDB for {sys_name}")
+            
+    except Exception as e:
+        LOG.error(f"Error collecting Flash Cache stats for {system_info['name']}/{sys_id}: {e}")
+        
+    finally:
+        # Reset controller selection for next collection session
+        set_current_controller_index(None)
+
+
+
+
+
 def collect_controller_metrics(system_info):
     """
     Collects controller performance metrics from both controllers and posts them to InfluxDB
@@ -3298,9 +3538,9 @@ if __name__ == "__main__":
     if CMD.dbName:
         INFLUXDB_DATABASE = CMD.dbName
 
-    # Only create InfluxDB client if we're using InfluxDB output
+    # Only create InfluxDB client if we're using InfluxDB output and not skipping post
     client = None
-    if CMD.output in ['influxdb', 'both'] or CMD.createDb:
+    if (CMD.output in ['influxdb', 'both'] and not CMD.doNotPost) or CMD.createDb:
         client = InfluxDBClient(host=influxdb_host,
                                 port=influxdb_port, database=INFLUXDB_DATABASE)
 
@@ -3444,6 +3684,9 @@ if __name__ == "__main__":
             if hasattr(CMD, 'include') and CMD.include:
                 LOG.info(f"Starting selective collection for measurements: {', '.join(CMD.include)}")
                 # Only run functions whose measurements are included
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_flashcache_stats']):
+                    LOG.info("Collecting Flash Cache statistics...")
+                    collect_flashcache_stats(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_storage_metrics']):
                     LOG.info("Collecting storage metrics (disks, interface, systems, volumes)...")
                     collect_storage_metrics(sys)
@@ -3492,6 +3735,9 @@ if __name__ == "__main__":
                     LOG.info("Collecting real-time volume statistics...")
                     collect_volume_stats_realtime(sys)
                     
+                LOG.info("Collecting Flash Cache statistics...")
+                collect_flashcache_stats(sys)
+
                 LOG.info("Collecting controller metrics...")
                 collect_controller_metrics(sys)
                 LOG.info("Collecting power and temperature data...")

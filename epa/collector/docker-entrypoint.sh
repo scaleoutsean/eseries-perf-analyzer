@@ -51,6 +51,11 @@ else
     
     CMD="${CMD} -u ${USERNAME} -p ${PASSWORD} --api ${API} --sysname ${SYSNAME} --sysid ${SYSID}"
     
+    # Add API port if specified
+    if [ -n "${API_PORT}" ]; then
+        CMD="${CMD} --api-port ${API_PORT}"
+    fi
+    
     # Add optional database name override
     if [ -n "${DB_NAME}" ]; then
         CMD="${CMD} --dbName ${DB_NAME}"
