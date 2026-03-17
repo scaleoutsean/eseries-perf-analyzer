@@ -93,7 +93,7 @@ Note that you can't do much with just the CLI - you need a DB where data can be 
   ```sh
   ./collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME -u monitor -p p@ss
   ```
-- Gather volume and Flash Cache metrics and expose only via Prometheus (InfluxDB is not used), save responses to `/tmp/`
+- Gather volume and Flash Cache metrics and expose only via Prometheus (InfluxDB is not used), save responses to `/tmp/`:
   ```sh
    PASS="fakePass"
   ./collector.py -n --api 1.2.3.4 --sysname e4012 --username monitor --password ${PASS} --output prometheus --sysid 6d039ea0009317330000000066f433d1 --max-iterations 3 --capture /tmp/ --showStorageNames --showFlashCache --include flashcache volumes
@@ -151,7 +151,7 @@ services:
       - SYSID=600A098000F63714000000005E79C888
       - API=5.5.5.5 6.6.6.6 # it's OK to set only one
       - RETENTION_PERIOD=8w
-      - DB_ADDRESS=7.7.7.7  # influxdb instead of IPv4 when running in same Compose or K8s namespace
+      - DB_ADDRESS=7.7.7.7  # use 'influxdb' instead of IPv4/FQDN when running in same Compose or K8s namespace
       - DB_PORT=8086
       # Optional: Override default database name (eseries) on a per-collector basis
       # - DB_NAME=eseries
