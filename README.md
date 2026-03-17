@@ -178,10 +178,11 @@ TAG="v3.5.4"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
-vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name for each collector
-./setup-data-dirs.sh     # (epa subdirectory) creates directories for InfluxDB and Grafana and apply correct ownership
+vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name
+./setup-data-dirs.sh     # (epa subdirectory) creates directories for InfluxDB and Grafana and applies correct ownership
 
-# one shot Hail Mary: docker compose -d up # includes 'utils' container
+# one shot Hail Mary
+# docker compose -d up # includes 'utils' container
 # or, step by step:
 
 docker compose build
@@ -197,7 +198,7 @@ docker compose up grafana-init
 docker compose up -d collector
 docker compose logs collector
 
-# not required, best to start it on-demand
+# not required, best to start it on-demand when you need it
 # docker compose up -d utils
 
 ```
@@ -265,7 +266,7 @@ You can import them to your own Grafana instance. If you use the included `./epa
 
 ### Prometheus metrics freshness
 
-You should see it in Collector logs, but here's a simple test to check the freshness of Prometheus records client-side:
+You should see it in Collector logs, but here's a simple test to check the freshness of Prometheus records client-side (assuming the default 8080 port):
 
 ```sh
 $ curl -v http://localhost:8080/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HTTP)"
@@ -311,11 +312,14 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
   - Add Prometheus alerts for downed interfaces
   - Add optional "point-in-time" volume performance metrics (default: off) for use cases where default (rolling 5 minute average) is not enough. Enable with `--realtime`
   - Minor bug fixes and improvements (including GHCR container builds)
+
 - 3.5.2 (October 8, 2025)
   - Update dependencies (container base image to 3.14-alpine3.22 and requests library v2.32.5)
+
 - 3.5.1 (October 8, 2025)
   - Export unresolved system failures as Prometheus alerts
   - Upgrade InfluxDB to latest and greatest v1.12.2
+
 - 3.5.0 (September 2, 2025)
   - Add several array configuration objects: hosts, volumes, disk groupings, drives. Now the monitoring of hardware configuration and - more importantly - disk group/pool and volume capacity should be easy. Existing EPA 3 users with tight DB disk space upgrading to 3.5.0+ should use `--include` and add `config_` collectors only gradually until they're sure their DB can handle it
   - InfluxDB: expose RPC service on Docker-internal network for convenient access from the utilities container
