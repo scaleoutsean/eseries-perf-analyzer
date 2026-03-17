@@ -602,6 +602,65 @@ def populate_mappable_objects_cache(system_info):
         set_current_controller_index(None)
 
 
+
+def populate_hosts_cache(system_info):
+    """
+    Populate _HOSTS_CACHE with host mappings to resolve performance data host mapping.
+    This also runs on config collection intervals.
+    """
+    if not should_collect_config_data():
+        return
+
+    try:
+        if len(CMD.api) > 1:
+            set_current_controller_index(random.randrange(0, 2))
+            
+        sys_id = system_info.get('wwn', system_info.get('id'))
+        session = get_session()
+        
+        # Get host and host-group configurations
+        hosts_response = session.get(f"{get_controller('sys')}/{sys_id}/hosts").json()
+        try:
+            host_groups_response = session.get(f"{get_controller('sys')}/{sys_id}/host-groups").json()
+        except Exception as e:
+            LOG.warning(f"Could not retrieve host-groups for cache: {e}")
+            host_groups_response = []
+
+        _HOSTS_CACHE.clear()
+        
+        # 1. Register Host Groups (even if empty, to map their IDs)
+        for hg in host_groups_response:
+            cluster_ref = hg.get('clusterRef', hg.get('id'))
+            if cluster_ref and cluster_ref not in _HOSTS_CACHE:
+                _HOSTS_CACHE[cluster_ref] = []
+                
+        # 2. Register Hosts
+        for host in hosts_response:
+            cluster_ref = host.get('clusterRef')
+            host_ref = host.get('hostRef')
+            host_info = {
+                'name': host.get('name', host.get('label', 'unknown')),
+                'hostRef': host_ref,
+                'id': host.get('id', 'unknown')
+            }
+
+            if cluster_ref:
+                if cluster_ref not in _HOSTS_CACHE:
+                    _HOSTS_CACHE[cluster_ref] = []
+                _HOSTS_CACHE[cluster_ref].append(host_info)
+
+                if cluster_ref == "0000000000000000000000000000000000000000" and host_ref:
+                    _HOSTS_CACHE[host_ref] = [host_info]
+                    
+        LOG.info(f"Built hosts cache with {len(_HOSTS_CACHE)} entries")
+        
+    except Exception as exc:
+        LOG.warning(f"Could not retrieve hosts for cache: {exc}")
+        
+    finally:
+        set_current_controller_index(None)
+
+
 def collect_config_drives(system_info):
     """
     Collects drive configuration information and posts it to InfluxDB
@@ -2949,30 +3008,7 @@ def collect_config_hosts(system_info):
 
         LOG.debug(f"Retrieved {len(hosts_response)} host configurations")
 
-        # Clear and populate _HOSTS_CACHE for cross-referencing with volumes
-        _HOSTS_CACHE.clear()
-
         for host in hosts_response:
-            # Populate _HOSTS_CACHE for cross-referencing with volumes
-            cluster_ref = host.get('clusterRef')
-            host_ref = host.get('hostRef')
-            host_info = {
-                'name': host.get('name', 'unknown'),
-                'hostRef': host_ref,
-                'id': host.get('id', 'unknown')
-            }
-
-            if cluster_ref:
-                # Store multiple hosts per cluster (for HA pairs)
-                if cluster_ref not in _HOSTS_CACHE:
-                    _HOSTS_CACHE[cluster_ref] = []
-                _HOSTS_CACHE[cluster_ref].append(host_info)
-
-                # For single hosts (clusterRef = all zeros), also index by hostRef
-                # since volume mappings use hostRef as mapRef for single hosts
-                if cluster_ref == "0000000000000000000000000000000000000000" and host_ref:
-                    _HOSTS_CACHE[host_ref] = [host_info]
-
             # Extract configuration fields (numeric/boolean values from CONFIG_HOSTS_PARAMS)
             config_fields = {}
             for param in CONFIG_HOSTS_PARAMS:
@@ -3678,6 +3714,7 @@ if __name__ == "__main__":
             # Always populate mappable objects mega-cache (required for performance host mapping)
             # This runs regardless of --include filters since volume/mapping correlation is needed
             # for performance data even when config measurements aren't being collected
+            populate_hosts_cache(sys)
             populate_mappable_objects_cache(sys)
 
             # Conditionally collect measurements based on --include filter

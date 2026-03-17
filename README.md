@@ -306,6 +306,9 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 - 3.5.4 (March 20, 2026)
   - Add SSD Flash Cache metrics 
   - Make Prometheus service port configurable
+  - Upgrade Grafana from last v8 release to v12.4.1
+  - Minor InfluxDB update (1.12.2 to 1.12.3)
+  - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
   - Minor bug fixes and improvements (including better handling of unavailable metrics)
 
 - 3.5.3 (January 20, 2026)
