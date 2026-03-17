@@ -153,7 +153,7 @@ Or you can create the DB before you run.
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.5.3
+  epa/collector:3.5.4
 ```
 
 - Using the `utils` container:

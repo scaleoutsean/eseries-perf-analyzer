@@ -31,7 +31,15 @@ EPA 3 is fork of the now-archived [E-Series Performance Analyzer](https://github
 EPA Collector collects metrics from E-Series and sends them to InfluxDB.
 Each collector uses own credentials and may (but doesn't have to) write data to the same InfluxDB database or database instance.
 
-**NOTE:** [E-Series SANtricity Collector aka ESC](https://github.com/scaleoutsean/eseries-santricity-collector) is what I planned to release as EPA 4, but now has its own repository. Its focus on gathering configuration details makes it more complex and sensitive to hardware and software differences between different E-Series systems, which is one of the reasons why it has its own home. If you have more than one E-Series system to manage and some developer skills, maybe ESC is a good choice for you.
+### Should you use EPA, ESC or NetApp Harvest?
+
+[E-Series SANtricity Collector aka ESC](https://github.com/scaleoutsean/eseries-santricity-collector) is what I planned to release as EPA 4, but now has its own repository. Its focus on gathering configuration details makes it more complex and sensitive to hardware and software differences between different E-Series systems, which is one of the reasons why it has its own home. If you have more than one E-Series system to manage and some developer skills, ESC may be a good choice for you.
+
+You can use all three at the same time, any of them, or none.
+
+- Harvest may be the best choice for users with ONTAP or StorageGRID systems. It's "good enough" for generic use with E-Series, especially if you already deploy it for other NetApp storage or want dashboards included.
+- EPA is simpler to use, lighter on resources, and more flexible (can run from shell, requires no build process or containers, features can be added or changed without waiting for next scheduled Harvest release).
+- ESC is more focused on E-Series and (in my opinion) more suitable for E-Series power users. It likely gathers more E-Series configuration data than Harvest and MCP-related features were included via MCP in InfluxDB UI before Harvest had them.
 
 ## Collected data
 
@@ -40,6 +48,7 @@ Each collector uses own credentials and may (but doesn't have to) write data to 
   - Volumes
   - Disks
   - Interfaces
+  - SSD Flash Cache
 - Log and environment
   - E-Series MEL events
   - Failures
@@ -51,7 +60,7 @@ Each collector uses own credentials and may (but doesn't have to) write data to 
   - Hosts
   - Disk groupings (RAID or DDP)
 
-Users may use `--include` to limit the type of data collected and constrain InfluxDB data growth. Only Performance metrics and failures may be exported via Prometheus.
+Users may use `--include` (space-delimited metrics) to limit the type of data collected and constrain InfluxDB data growth. Only Performance metrics and failures may be exported via Prometheus.
 
 Sample screenshots are available [here](./SCREENSHOTS.md).
 
@@ -70,7 +79,7 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 Pick a version, clone and use it.
 
 ```bash
-TAG="v3.5.3"
+TAG="v3.5.4"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa/collector
 # create and activate a venv if you want
@@ -78,10 +87,17 @@ pip install -r requirements.txt
 python3 ./collector.py -h
 ```
 
-Note that you can't do much with just the CLI - you need a DB where data can be sent. What you can do next?
+Note that you can't do much with just the CLI - you need a DB where data can be sent. What can we do next?
 
-- If SANtricity is reachable: try collection with `-n` switch: collect data but don't write to InfluxDB. Try `collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME -u monitor -p p@ss` or similar. You can also try `--output prometheus` without InfluxDB
-- If InfluxDB is reachable: create database first with `--createDB --dbName eseries`. Example: `python3 epa/collector/collector.py --createDb --dbName mydb --dbAddress influxdb:8086` (or `hostname:8086` if executing outside of Docker when eternal InfluxDB port is exposed)
+- If SANtricity is reachable: try collection with `-n` switch: collect data but don't write to InfluxDB. Example:
+  ```sh
+  ./collector.py -n -i -b  --sysid WWN --sysname ARRAY_NAME -u monitor -p p@ss
+  ```
+- Gather volume and Flash Cache metrics and expose only via Prometheus (InfluxDB is not used), save responses to `/tmp/`
+  ```sh
+   PASS="fakePass"
+  ./collector.py -n --api 1.2.3.4 --sysname e4012 --username monitor --password ${PASS} --output prometheus --sysid 6d039ea0009317330000000066f433d1 --max-iterations 3 --capture /tmp/ --showStorageNames --showFlashCache --include flashcache volumes
+  ```
 
 ### Docker Compose users
 
@@ -97,14 +113,15 @@ Collector arguments and switches:
 - `USERNAME` - SANtricity account for collecting API metrics such as `monitor` (read-only access to SANtricity - create it in SANtricity)
 - `PASSWORD` - SANtricity password for the collector account
 - `SYSNAME` - SANtricity array name, such as `R26U25-EF600`. Get this from the SANtricity Web UI, but you can use your own. If you want to make the name identical to actual E-Series array name, [this mage](/images/sysname-in-santricity-manager.png) shows where to look it up
-- `SYSID` - SANtricity WWN for the array, such as `600A098000F63714000000005E79C888`. See [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI.
-- `API` - SANtricity controller's IP address such as 6.6.6.6. Port number (`:8443`) is automatically set in Collector, and `https://` is not necessary either.
+- `SYSID` - SANtricity WWN for the array, such as `600A098000F63714000000005E79C888`. See [this image](/images/sysid-in-santricity-manager.png) on where to find it in the SANtricity Web UI
+- `API` - SANtricity controller's IP address such as 6.6.6.6. Do not include `https://`
+- `API_PORT` - SANtricity port number is automatically set to default (`8443`) if not specified
 - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
 - `DB_ADDRESS`
   - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
   - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
-- `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries`. Collector creates database if it doesn't exist.
-- `DB_PORT` - 8086 is the standard port for InfluxDB v1
+- `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries`. Collector creates database if it doesn't exist
+- `DB_PORT` - `8086` is the default port for InfluxDB v1 used by Collector if not specified
 - `OUTPUT` - send to `influxdb`, `prometheus`, or (default) `both`
 - `PROMETHEUS_PORT` - used if `OUTPUT` isn't `influxdb` and default is 8080. Make sure Collector exposes with with open external port if you need to access it externally
 
@@ -115,7 +132,7 @@ services:
 
   collector-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.5.3 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.5.4 # it exists, but best build your own
     container_name: collector-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -157,7 +174,7 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 Download and decompress latest release and enter the `epa` sub-directory:
 
 ```sh
-TAG="v3.5.3"
+TAG="v3.5.4"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
@@ -200,7 +217,7 @@ If you want to run containerized collector as a CLI program rather than Docker s
 Mind the project/container name and version!
 
 ```sh
-DOCKER_TAG="3.5.3"
+DOCKER_TAG="3.5.4"
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
   epa/collector:${DOCKER_TAG} collector.py -h
@@ -211,7 +228,7 @@ docker run --rm --network eseries_perf_analyzer \
 Example run for limited database population:
 
 ```sh
-DOCKER_TAG="3.5.3"
+DOCKER_TAG="3.5.4"
 docker run -e INCLUDE="power temp" epa/collector:${DOCKER_TAG}
 ```
 
@@ -284,6 +301,11 @@ Example alert rule:
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
+
+- 3.5.4 (March 20, 2026)
+  - Add SSD Flash Cache metrics 
+  - Make Prometheus service port configurable
+  - Minor bug fixes and improvements (including better handling of unavailable metrics)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces
