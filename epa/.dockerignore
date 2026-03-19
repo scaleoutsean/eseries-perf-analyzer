@@ -43,3 +43,6 @@ wheels/
 # Exclude OS files
 .DS_Store
 Thumbs.db
+
+# Exclude archive files
+*.tgz

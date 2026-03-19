@@ -182,7 +182,7 @@ vim docker-compose.yaml  # see collector service sample above; you may use 'DB_N
 ./setup-data-dirs.sh     # (epa subdirectory) creates directories for InfluxDB and Grafana and applies correct ownership
 
 # one shot Hail Mary
-# docker compose -d up # includes 'utils' container
+# docker compose -d up # includes 'utils' container, but not Grafana dashboards
 # or, step by step:
 
 docker compose build
@@ -193,11 +193,11 @@ docker compose logs influxdb
 docker compose up -d grafana
 docker compose logs grafana
 
-docker compose up grafana-init
-
 docker compose up -d collector
 docker compose logs collector
 
+# not required, but if you won't build own dashboards, you may deploy the pre-made ones
+# docker compose --profile init up grafana-init -d
 # not required, best to start it on-demand when you need it
 # docker compose up -d utils
 
@@ -262,7 +262,11 @@ docker compose start collector_ef600_01
 
 As you clone the repository and enter it, they are in `./epa/grafana-init/dashboards`.
 
-You can import them to your own Grafana instance. If you use the included `./epa/docker-compose.yaml`, the dashboards may/should be deployed by the `grafana-init` container automatically.
+You can import them to your own Grafana instance. If you use the included `./epa/docker-compose.yaml`, you may deploy them from the `epa` directory like so:
+
+```sh
+docker compose --profile init up grafana-init -d
+```
 
 ### Prometheus metrics freshness
 
@@ -309,7 +313,7 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
   - Upgrade Grafana from last v8 release to v12.4.1
   - Minor InfluxDB update (1.12.2 to 1.12.3)
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
-  - Minor bug fixes and improvements (including better handling of unavailable metrics)
+  - Minor bug fixes and improvements (better handling of unavailable metrics, drop repos from volume collection, avoid  duplicate upload of dashboards)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces

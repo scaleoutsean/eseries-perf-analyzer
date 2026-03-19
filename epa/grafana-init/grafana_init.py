@@ -229,16 +229,29 @@ class GrafanaInitializer:
                     dashboard_json['tags'].append('NetAppESeries')
                     logger.info(f"Added NetAppESeries tag to {dashboard_title}")
                 
-                # Remove id so Grafana creates a new one if this is the first import
-                if 'id' in dashboard_json:
-                    del dashboard_json['id']
-                
-                # Provide a consistent UID based on the filename so overwrite works correctly
-                # (Without a stable UID, Grafana treats every import as a brand new dashboard)
-                dashboard_uid = f"epa-{dashboard_title.lower()[:35]}"
-                # Make UID URL-safe (no spaces/special chars)
-                dashboard_uid = "".join(c if c.isalnum() else '-' for c in dashboard_uid)
-                dashboard_json['uid'] = dashboard_uid
+                # Search for existing dashboards to ensure overwrites map correctly
+                existing_dashboard = None
+                try:
+                    search_res = self.grafana.search.search_dashboards(query=dashboard_title)
+                    for d in search_res:
+                        if d.get('title') == dashboard_title:
+                            existing_dashboard = d
+                            break
+                except Exception as e:
+                    logger.warning(f"Error checking for existing dashboard: {e}")
+
+                if existing_dashboard:
+                    dashboard_json['id'] = existing_dashboard.get('id')
+                    dashboard_json['uid'] = existing_dashboard.get('uid')
+                    logger.info(f"Targeting existing dashboard {dashboard_title} (ID: {dashboard_json['id']}, UID: {dashboard_json['uid']})")
+                else:
+                    if 'id' in dashboard_json:
+                        del dashboard_json['id']
+                    
+                    # Provide a consistent UID based on the filename for new dashboards
+                    dashboard_uid = f"epa-{dashboard_title.lower()[:35]}"
+                    dashboard_uid = "".join(c if c.isalnum() else '-' for c in dashboard_uid)
+                    dashboard_json['uid'] = dashboard_uid
                 
                 # Fix datasource references - replace template variables and ensure EPA datasource
                 self._fix_datasource_references(dashboard_json)

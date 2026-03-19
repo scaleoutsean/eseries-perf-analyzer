@@ -65,6 +65,7 @@ services:
 
   grafana-init:
     image: epa/grafana-init:${TAG}
+    profiles: ["init"]
     build: 
       context: ./grafana-init
     container_name: grafana-init

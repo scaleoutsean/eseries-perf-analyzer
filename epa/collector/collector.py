@@ -1853,42 +1853,26 @@ def collect_storage_metrics(system_info):
                 minor_vers = int((fw_cv[mod]['versionString']).split(".")[1])
                 break
 
-        # Get SSD wear statistics from the new drive-health-history endpoint
+        # Get SSD wear statistics from the drives endpoint
         ssd_wear_dict = {}
         if minor_vers >= 80:
             try:
-                drive_health_response = session.get(f"{get_controller('sys')}/{sys_id}/drives/drive-health-history",
-                                                    params={"all-history": "false"}).json()
+                drive_response = session.get(f"{get_controller('sys')}/{sys_id}/drives").json()
 
-                # Extract SSD wear data from the response
-                if 'collections' in drive_health_response and len(drive_health_response['collections']) > 0:
-                    latest_collection = drive_health_response['collections'][0]
-                    if 'ssdDriveWearStatistics' in latest_collection:
-                        for ssd_stat in latest_collection['ssdDriveWearStatistics']:
-                            # Use volGroupName as primary key for safe correlation
-                            vol_group_name = ssd_stat.get('volumeGroupName')
-                            drive_wwn = ssd_stat.get('driveWwn')
-                            spare_blocks = ssd_stat.get(
-                                'spareBlockRemainingPercentage')
-                            wearlife_percent = ssd_stat.get(
-                                'wearlifePercentageUsed')
+                for drive in drive_response:
+                    drive_id = drive.get('id') or drive.get('driveRef')
+                    ssd_wear = drive.get('ssdWearLife')
+                    
+                    if drive_id and isinstance(ssd_wear, dict):
+                        wear_data = {}
+                        if 'spareBlocksRemainingPercent' in ssd_wear:
+                            wear_data['spareBlocksRemainingPercent'] = ssd_wear['spareBlocksRemainingPercent']
+                        if 'percentEnduranceUsed' in ssd_wear:
+                            wear_data['percentEnduranceUsed'] = ssd_wear['percentEnduranceUsed']
+                            
+                        if wear_data:  # Only store if we have at least one metric
+                            ssd_wear_dict[drive_id] = wear_data
 
-                            if vol_group_name:
-                                # Create composite key: volGroupName + WWN suffix for uniqueness
-                                if len(drive_wwn) >= 12:
-                                    composite_key = f"{vol_group_name}#{drive_wwn[-12:]}"
-                                    # Store both wear metrics as a dict
-                                    wear_data = {}
-                                    if spare_blocks is not None:
-                                        wear_data['spareBlocksRemainingPercent'] = spare_blocks
-                                    # Handle wearlifePercentageUsed: null means "no wear yet" so use 0
-                                    if wearlife_percent is not None:
-                                        wear_data['percentEnduranceUsed'] = wearlife_percent
-                                    else:
-                                        # null = no wear yet
-                                        wear_data['percentEnduranceUsed'] = 0
-                                    if wear_data:  # Only store if we have at least one metric
-                                        ssd_wear_dict[composite_key] = wear_data
                 LOG.info(
                     f"Found SSD wear data for {len(ssd_wear_dict)} drives")
             except (requests.exceptions.RequestException, KeyError, ValueError) as e:
@@ -1903,26 +1887,22 @@ def collect_storage_metrics(system_info):
             pdict = {}
             disk_location_info = drive_locations.get(stats["diskId"])
 
-            # Try to get SSD wear data using volGroupName as primary correlation
+            # Try to get SSD wear data using diskId
             disk_id = stats.get("diskId")
             vol_group_name = stats.get("volGroupName")
 
-            if disk_id and vol_group_name and ssd_wear_dict:
-                # Create composite key using volGroupName + diskId suffix for safe matching
-                if len(disk_id) >= 12:
-                    composite_key = f"{vol_group_name}#{disk_id[-12:]}"
-                    if composite_key in ssd_wear_dict:
-                        wear_data = ssd_wear_dict[composite_key]
-                        pdict = wear_data.copy()  # Copy the wear metrics dictionary
-                        wear_metrics = []
-                        if 'spareBlocksRemainingPercent' in wear_data:
-                            wear_metrics.append(
-                                f"spareBlocks={wear_data['spareBlocksRemainingPercent']}%")
-                        if 'percentEnduranceUsed' in wear_data:
-                            wear_metrics.append(
-                                f"enduranceUsed={wear_data['percentEnduranceUsed']}%")
-                        LOG.debug(
-                            f"Found SSD wear data for drive {disk_id} in {vol_group_name}: {', '.join(wear_metrics)}")
+            if disk_id and ssd_wear_dict and disk_id in ssd_wear_dict:
+                wear_data = ssd_wear_dict[disk_id]
+                pdict = wear_data.copy()  # Copy the wear metrics dictionary
+                wear_metrics = []
+                if 'spareBlocksRemainingPercent' in wear_data:
+                    wear_metrics.append(
+                        f"spareBlocks={wear_data['spareBlocksRemainingPercent']}%")
+                if 'percentEnduranceUsed' in wear_data:
+                    wear_metrics.append(
+                        f"enduranceUsed={wear_data['percentEnduranceUsed']}%")
+                LOG.debug(
+                    f"Found SSD wear data for drive {disk_id}: {', '.join(wear_metrics)}")
 
             if pdict:
                 fields_dict = dict((metric, stats.get(metric))
