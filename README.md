@@ -66,9 +66,9 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 
 ## Requirements
 
-- NetApp SANtricity OS: >= 11.90 recommended. Older releases may work (for the most part), but are not tested and bugs exclusive to releases years old won't be fixed
+- NetApp SANtricity OS: >= 11.90R5 and <=12.00 recommended. Older releases may work (for the most part), but are not tested and bugs exclusive to releases years old won't be fixed
 - EPA Collector should work on any Linux with recent Python 3.12 or newer - you may run it as a script, systemd service, Docker/Podman/Nomad/K8s container, etc.
-- The rest of EPA "stack" is standard OSS integrated in a stack for reference purposes. Users are encouraged to use own database and Grafana
+- The rest of EPA "stack" is standard OSS integrated in a stack for reference purposes. Users are encouraged to use own database and Grafana (instance and dashboards)
 
 ## Quick start
 
@@ -169,7 +169,7 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 
 #### Deploy
 
-**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes were supposed to make that easier. But it wasn't easier. It was worse. So 3.5.0 reverts to bind-style in the `./epa` directory. You may edit your volume configuration any way you want in `./epa/docker-compose.yaml`.
+**NOTE:** EPA v3.4.0 uses "named" Docker volumes for both Grafana and InfluxDB since they both require a non-root user and Docker's "named" volumes were supposed to make that easier. But it wasn't easier. It was worse. v3.5.0 reverts to bind-style in the `./epa` directory. You may edit your volume configuration any way you want in `./epa/docker-compose.yaml`.
 
 Download and decompress latest release and enter the `epa` sub-directory:
 
@@ -179,11 +179,11 @@ git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here
 vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name
-./setup-data-dirs.sh     # (epa subdirectory) creates directories for InfluxDB and Grafana and applies correct ownership
+./setup-data-dirs.sh     # (in epa subdirectory) creates directories for InfluxDB and Grafana and applies correct ownership
 
-# one shot Hail Mary
+# fast
 # docker compose -d up # includes 'utils' container, but not Grafana dashboards
-# or, step by step:
+# or, slower, step by step:
 
 docker compose build
 
@@ -198,12 +198,12 @@ docker compose logs collector
 
 # not required, but if you won't build own dashboards, you may deploy the pre-made ones
 # docker compose --profile init up grafana-init -d
-# not required, best to start it on-demand when you need it
+# not required, best to start it on-demand when you need it; see README.txt inside container
 # docker compose up -d utils
 
 ```
 
-If you have any problems with Grafana Data Source, add InfluxDB v1 data source `EPA` (use `http://{DB_ADDRESS}:{DB_PORT}` and your DB name). If you have problems with dashboards, import them from `./epa/grafana-init/dashboards/`.
+If you have any problems with Grafana Data Source, add InfluxDB v1 data source `EPA` (use `http://{DB_ADDRESS}:{DB_PORT}` and your DB name). If you have problems with dashboards, import them from `./epa/grafana-init/dashboards/` (see below).
 
 ### Kubernetes
 
@@ -307,13 +307,14 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 ## Changelog
 
-- 3.5.4 (March 20, 2026)
+- 3.5.4 (March 23, 2026)
   - Add SSD Flash Cache metrics 
   - Make Prometheus service port configurable
   - Upgrade Grafana from last v8 release to v12.4.1
   - Minor InfluxDB update (1.12.2 to 1.12.3)
+  - Tested with SANtricity 12.0 and 11.95
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
-  - Minor bug fixes and improvements (better handling of unavailable metrics, drop repos from volume collection, avoid  duplicate upload of dashboards)
+  - Bug fixes and improvements (better handling of unavailable metrics, drop repos from volume collection, avoid  duplicate upload of reference dashboards, fix SSD wear level stats)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces
