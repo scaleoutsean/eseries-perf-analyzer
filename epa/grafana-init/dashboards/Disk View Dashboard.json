@@ -185,19 +185,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -231,19 +231,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -264,7 +264,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -278,7 +278,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -298,19 +298,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -419,19 +419,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -465,19 +465,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -498,7 +498,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -512,7 +512,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -532,19 +532,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -653,19 +653,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -699,19 +699,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -732,7 +732,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -746,7 +746,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_combinedIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_combinedIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -766,19 +766,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -887,19 +887,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -933,19 +933,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -966,7 +966,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -980,7 +980,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_readResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_readResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -1000,19 +1000,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1121,19 +1121,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -1167,19 +1167,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1200,7 +1200,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -1214,7 +1214,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_readThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_readThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -1234,19 +1234,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1355,19 +1355,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -1401,19 +1401,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1434,7 +1434,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -1448,7 +1448,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_readIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_readIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -1468,19 +1468,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1589,19 +1589,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -1635,19 +1635,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1668,7 +1668,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -1682,7 +1682,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_writeResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_writeResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -1702,19 +1702,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1823,19 +1823,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -1867,19 +1867,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -1900,7 +1900,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -1914,7 +1914,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"writeThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"writeThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -1934,19 +1934,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -2055,19 +2055,19 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray"
+                "sys_tray::tag"
               ],
               "type": "tag"
             },
             {
               "params": [
-                "sys_tray_slot"
+                "sys_tray_slot::tag"
               ],
               "type": "tag"
             },
@@ -2099,19 +2099,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -2132,7 +2132,7 @@
             },
             {
               "params": [
-                "sys_name"
+                "sys_name::tag"
               ],
               "type": "tag"
             },
@@ -2146,7 +2146,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "downsample_retention",
-          "query": "SELECT mean(\"ds_writeIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT mean(\"ds_writeIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
@@ -2166,19 +2166,19 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$System$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray",
+              "key": "sys_tray::tag",
               "operator": "=~",
               "value": "/^$Tray$/"
             },
             {
               "condition": "AND",
-              "key": "sys_tray_slot",
+              "key": "sys_tray_slot::tag",
               "operator": "=~",
               "value": "/^$Slot$/"
             }
@@ -2294,7 +2294,7 @@
           "measurement": "disks",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"spareBlocksRemainingPercent\") FROM \"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter GROUP BY \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
+          "query": "SELECT last(\"spareBlocksRemainingPercent\") FROM \"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\"::tag =~ /^$Tray$/ AND \"sys_tray_slot\"::tag =~ /^$Slot$/) AND $timeFilter GROUP BY \"sys_name\"::tag, \"sys_tray\"::tag, \"sys_tray_slot\"::tag fill(none)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",

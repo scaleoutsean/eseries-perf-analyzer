@@ -187,19 +187,19 @@
             "groupBy": [
               {
                 "params": [
-                  "sys_tray_slot"
+                  "sys_tray_slot::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "sys_tray"
+                  "sys_tray::tag"
                 ],
                 "type": "tag"
               }
@@ -225,7 +225,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -289,7 +289,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -323,7 +323,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -340,7 +340,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -354,7 +354,7 @@
             "measurement": "disks",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -374,7 +374,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -473,7 +473,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -505,7 +505,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -522,7 +522,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -536,7 +536,7 @@
             "measurement": "disks",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -556,7 +556,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -655,7 +655,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -687,7 +687,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -704,7 +704,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -718,7 +718,7 @@
             "measurement": "disks",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"disks\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -738,7 +738,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -893,13 +893,13 @@
             "groupBy": [
               {
                 "params": [
-                  "vol_name"
+                  "vol_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               }
@@ -925,7 +925,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -989,7 +989,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1021,7 +1021,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1038,7 +1038,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1052,7 +1052,7 @@
             "measurement": "volumes",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1072,7 +1072,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1171,7 +1171,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1203,7 +1203,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1220,7 +1220,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1234,7 +1234,7 @@
             "measurement": "volumes",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1254,7 +1254,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1353,7 +1353,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1387,7 +1387,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1404,7 +1404,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1418,7 +1418,7 @@
             "measurement": "volumes",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"volumes\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1438,7 +1438,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1554,7 +1554,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1588,7 +1588,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1605,7 +1605,7 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -1619,7 +1619,7 @@
             "measurement": "systems",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT last(\"ds_cpuAvgUtilization\") FROM \"downsample_retention\".\"systems\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\" fill(none)",
+            "query": "SELECT last(\"ds_cpuAvgUtilization\") FROM \"downsample_retention\".\"systems\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1639,7 +1639,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1759,7 +1759,7 @@
             "groupBy": [
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               }
@@ -1785,7 +1785,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -1914,7 +1914,7 @@
             "groupBy": [
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               }
@@ -1954,7 +1954,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -2100,7 +2100,7 @@
             "groupBy": [
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
@@ -2120,7 +2120,7 @@
             "measurement": "failures",
             "orderByTime": "ASC",
             "policy": "default",
-            "query": "SELECT * FROM (SELECT last(\"name_of\"),active FROM \"failures\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter GROUP BY \"sys_name\", \"failure_type\", \"object_type\") WHERE (\"active\" = 'True')",
+            "query": "SELECT * FROM (SELECT last(\"name_of\"),active FROM \"failures\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter GROUP BY \"sys_name\"::tag, \"failure_type\", \"object_type\") WHERE (\"active\"::tag = 'True')",
             "rawQuery": true,
             "refId": "A",
             "resultFormat": "table",
@@ -2140,13 +2140,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "active",
+                "key": "active::tag",
                 "operator": "=",
                 "value": "True"
               }

@@ -15,6 +15,7 @@ docker run -d --name influxdb-utils-test --entrypoint tail ntap-grafana/utils:la
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'SHOW DATABASES'
 
 # create database (this helps avoid running dbmanager container) - change the DB name in command and no dashes in DB names!
+# NOTE: this is already done for "eseries", but in case you want additional databases...
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -execute 'CREATE DATABASE eseries'
 
 # drop / DELETE database 
@@ -35,7 +36,7 @@ curl "http://${INFLUX_HOST:-influxdb}:${INFLUX_PORT:-8086}/query?db=${DB:-eserie
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT sys_name, sys_tray, sys_tray_slot, spareBlocksRemainingPercent FROM disks ORDER BY time DESC LIMIT 2'
 
 # See what actual values are being stored
-influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT spareBlocksRemainingPercent FROM disks LIMIT 2'
+influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT percentEnduranceUsed FROM disks LIMIT 2'
 
 # Check the interface measurement
 influx -host "${INFLUX_HOST:-influxdb}" -port "${INFLUX_PORT:-8086}" -database "eseries" -execute 'SELECT * FROM interface LIMIT 3'
@@ -57,3 +58,26 @@ docker exec utils influxd backup -portable -host influxdb:8088 -database eseries
 influxd restore -host influxdb:8088 -db eseries -portable /dump/
 # From the outside using the utils container, prefix the above with "docker exec utils"
 
+# HTTP queries 
+# 
+# SHOW MEASUREMENTS 
+# curl "http://localhost:8086/query?db=eseries&q=SHOW%20MEASUREMENTS"
+# SELECT percentEnduranceUsed FROM disks LIMIT 2
+# curl "http://localhost:8086/query?db=eseries&q=SELECT%20percentEnduranceUsed%20FROM%20disks%20LIMIT%203"
+# SELECT * FROM config_hosts LIMIT 2
+# curl "http://localhost:8086/query?db=eseries&q=SELECT%20%2AFROM%20config_hosts%20LIMIT%202"
+# SELECT hostSidePorts_first_id FROM config_hosts LIMIT 1
+# curl "http://localhost:8086/query?db=eseries&q=SELECT%20%2AhostSidePorts_first_id20FROM%20config_hosts%20LIMIT%201"
+# 
+# Also: 
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW DATABASES"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW MEASUREMENTS ON eseries"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW FIELD KEYS ON eseries"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW FIELD KEY CARDINALITY ON eseries"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW MEASUREMENT CARDINALITY ON eseries"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW SERIES CARDINALITY ON eseries"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEY CARDINALITY ON eseries"
+# SELECT * FROM config_hosts LIMIT 2
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_hosts LIMIT 2"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_volumes LIMIT 2"
+#  curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_volumes WHERE sys_name='E80' LIMIT 1"

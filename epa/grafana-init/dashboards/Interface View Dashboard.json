@@ -97,7 +97,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -129,7 +129,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -146,7 +146,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -160,7 +160,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"channel_type\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"channel_type\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -180,7 +180,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -281,7 +281,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -313,7 +313,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -330,7 +330,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -344,7 +344,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -364,7 +364,7 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               }
@@ -465,7 +465,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -497,13 +497,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -520,7 +520,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -534,7 +534,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\" fill(none)",
+            "query": "SELECT sum(\"ds_combinedIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -554,13 +554,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -661,7 +661,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -693,13 +693,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -716,7 +716,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -730,7 +730,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT sum(\"ds_queueDepthTotal\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\" fill(none)",
+            "query": "SELECT sum(\"ds_queueDepthTotal\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time(5s), \"channel_type\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -750,13 +750,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -858,7 +858,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -890,13 +890,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -913,7 +913,7 @@
               },
               {
                 "params": [
-                  "channel_type"
+                  "channel_type::tag"
                 ],
                 "type": "tag"
               },
@@ -927,7 +927,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT max(\"ds_queueDepthMax\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"channel_type\" fill(none)",
+            "query": "SELECT max(\"ds_queueDepthMax\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"channel_type\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -947,13 +947,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1067,13 +1067,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1105,13 +1105,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1128,13 +1128,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1148,7 +1148,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1168,13 +1168,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1275,13 +1275,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1313,13 +1313,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1336,13 +1336,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1356,7 +1356,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1376,13 +1376,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1483,13 +1483,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1521,13 +1521,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1544,13 +1544,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1564,7 +1564,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_combinedIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_combinedIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1584,13 +1584,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1691,13 +1691,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1729,13 +1729,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1752,13 +1752,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1772,7 +1772,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_readResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_readResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -1792,13 +1792,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1899,13 +1899,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1937,13 +1937,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -1960,13 +1960,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -1980,7 +1980,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_readThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_readThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -2000,13 +2000,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2107,13 +2107,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2145,13 +2145,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2168,13 +2168,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2188,7 +2188,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_readIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_readIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -2208,13 +2208,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2315,13 +2315,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2353,13 +2353,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2376,13 +2376,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2396,7 +2396,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_writeResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_writeResponseTime\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -2416,13 +2416,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2523,13 +2523,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2561,13 +2561,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2584,13 +2584,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2604,7 +2604,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_writeThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_writeThroughput\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -2624,13 +2624,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2731,13 +2731,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2769,13 +2769,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2792,13 +2792,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2812,7 +2812,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT mean(\"ds_writeIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT mean(\"ds_writeIOps\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -2832,13 +2832,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -2939,13 +2939,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -2977,13 +2977,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -3000,13 +3000,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -3020,7 +3020,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT last(\"ds_queueDepthTotal\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT last(\"ds_queueDepthTotal\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -3040,13 +3040,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -3148,13 +3148,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -3186,13 +3186,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }
@@ -3209,13 +3209,13 @@
               },
               {
                 "params": [
-                  "sys_name"
+                  "sys_name::tag"
                 ],
                 "type": "tag"
               },
               {
                 "params": [
-                  "interface_id"
+                  "interface_id::tag"
                 ],
                 "type": "tag"
               },
@@ -3229,7 +3229,7 @@
             "measurement": "interface",
             "orderByTime": "ASC",
             "policy": "downsample_retention",
-            "query": "SELECT last(\"ds_queueDepthMax\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\" =~ /^$System$/ AND \"interface_id\" =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\", \"interface_id\" fill(none)",
+            "query": "SELECT last(\"ds_queueDepthMax\") FROM \"downsample_retention\".\"interface\" WHERE (\"sys_name\"::tag =~ /^$System$/ AND \"interface_id\"::tag =~ /^$Interface$/) AND $timeFilter AND time < now() - 1w GROUP BY time($__interval), \"sys_name\"::tag, \"interface_id\"::tag fill(none)",
             "rawQuery": true,
             "refId": "B",
             "resultFormat": "time_series",
@@ -3249,13 +3249,13 @@
             ],
             "tags": [
               {
-                "key": "sys_name",
+                "key": "sys_name::tag",
                 "operator": "=~",
                 "value": "/^$System$/"
               },
               {
                 "condition": "AND",
-                "key": "interface_id",
+                "key": "interface_id::tag",
                 "operator": "=~",
                 "value": "/^$Interface$/"
               }

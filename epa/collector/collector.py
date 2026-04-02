@@ -3052,11 +3052,39 @@ def collect_config_hosts(system_info):
                         elif param == 'initiators_first_id':
                             config_fields[param] = first_initiator.get('id', '')
                     else:
-                        # No initiators present - set appropriate defaults
-                        if param == 'initiators_first_initiatorInactive':
-                            config_fields[param] = False
+                        # Fallback for Fibre Channel hosts which use 'ports' instead of 'initiators'
+                        ports = host.get('ports', [])
+                        if ports and len(ports) > 0:
+                            first_port = ports[0]
+                            port_id = first_port.get('portId', {})
+                            if param == 'initiators_first_initiatorRef':
+                                config_fields[param] = first_port.get('hostPortRef', '')
+                            elif param == 'initiators_first_nodeName_ioInterfaceType':
+                                config_fields[param] = port_id.get('ioInterfaceType') or ''
+                            elif param == 'initiators_first_nodeName_iscsiNodeName':
+                                config_fields[param] = port_id.get('iscsiPortName') or ''
+                            elif param == 'initiators_first_nodeName_remoteNodeWWN':
+                                config_fields[param] = port_id.get('portName') or ''
+                            elif param == 'initiators_first_nodeName_nvmeNodeName':
+                                config_fields[param] = port_id.get('nvmeInitiatorPortId') or ''
+                            elif param == 'initiators_first_label':
+                                config_fields[param] = first_port.get('label', '')
+                            elif param == 'initiators_first_hostRef':
+                                config_fields[param] = first_port.get('hostRef', '')
+                            elif param == 'initiators_first_initiatorInactive':
+                                config_fields[param] = first_port.get('portInactive', False)
+                            elif param == 'initiators_first_initiatorNodeName_interfaceType':
+                                config_fields[param] = ''
+                            elif param == 'initiators_first_id':
+                                config_fields[param] = first_port.get('id', '')
+                            else:
+                                config_fields[param] = ''
                         else:
-                            config_fields[param] = ''
+                            # No initiators or ports present
+                            if param == 'initiators_first_initiatorInactive':
+                                config_fields[param] = False
+                            else:
+                                config_fields[param] = ''
 
                 elif param.startswith('hostSidePorts_first_'):
                     # Handle flattened host-side port fields
@@ -3074,9 +3102,10 @@ def collect_config_hosts(system_info):
                         config_fields[param] = ''
 
                 elif param == 'initiatorCount':
-                    # Count of initiators
+                    # Count of initiators & ports (to cover FC/SAS hosts with 'ports' instead of 'initiators')
                     initiators = host.get('initiators', [])
-                    config_fields[param] = len(initiators)
+                    ports = host.get('ports', [])
+                    config_fields[param] = len(initiators) + len(ports)
 
                 elif param == 'hostSidePortCount':
                     # Count of host-side ports

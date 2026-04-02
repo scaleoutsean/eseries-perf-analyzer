@@ -54,7 +54,10 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_EPA}"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -94,7 +97,9 @@
           "alias": "$tag_host_name",
           "groupBy": [
             {
-              "params": ["hostRef"],
+              "params": [
+                "hostRef"
+              ],
               "type": "tag"
             }
           ],
@@ -106,7 +111,9 @@
           "select": [
             [
               {
-                "params": ["host_name_field"],
+                "params": [
+                  "host_name_field"
+                ],
                 "type": "field"
               },
               {
@@ -114,13 +121,17 @@
                 "type": "last"
               },
               {
-                "params": ["Host Name"],
+                "params": [
+                  "Host Name"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["initiators_first_nodeName_ioInterfaceType"],
+                "params": [
+                  "initiators_first_nodeName_ioInterfaceType"
+                ],
                 "type": "field"
               },
               {
@@ -128,13 +139,17 @@
                 "type": "last"
               },
               {
-                "params": ["Interface"],
+                "params": [
+                  "Interface"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["hostSidePortCount"],
+                "params": [
+                  "hostSidePortCount"
+                ],
                 "type": "field"
               },
               {
@@ -142,13 +157,17 @@
                 "type": "last"
               },
               {
-                "params": ["Host Ports"],
+                "params": [
+                  "Host Ports"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["isSAControlled"],
+                "params": [
+                  "isSAControlled"
+                ],
                 "type": "field"
               },
               {
@@ -156,13 +175,17 @@
                 "type": "last"
               },
               {
-                "params": ["SA Controlled"],
+                "params": [
+                  "SA Controlled"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["initiators_first_nodeName_remoteNodeWWN"],
+                "params": [
+                  "initiators_first_nodeName_remoteNodeWWN"
+                ],
                 "type": "field"
               },
               {
@@ -170,13 +193,17 @@
                 "type": "last"
               },
               {
-                "params": ["FC_WWN"],
+                "params": [
+                  "FC_WWN"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["initiators_first_nodeName_iscsiNodeName"],
+                "params": [
+                  "initiators_first_nodeName_iscsiNodeName"
+                ],
                 "type": "field"
               },
               {
@@ -184,13 +211,17 @@
                 "type": "last"
               },
               {
-                "params": ["iSCSI_IQN"],
+                "params": [
+                  "iSCSI_IQN"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["initiators_first_nodeName_nvmeNodeName"],
+                "params": [
+                  "initiators_first_nodeName_nvmeNodeName"
+                ],
                 "type": "field"
               },
               {
@@ -198,14 +229,16 @@
                 "type": "last"
               },
               {
-                "params": ["NVMe_NQN"],
+                "params": [
+                  "NVMe_NQN"
+                ],
                 "type": "alias"
               }
             ]
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -215,20 +248,22 @@
           "alias": "$tag_host_name",
           "groupBy": [
             {
-              "params": ["hostRef"],
+              "params": [
+                "hostRef"
+              ],
               "type": "tag"
             }
           ],
           "measurement": "config_hosts",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT last(\"host_name_field\") AS \"Host Name\", last(\"initiators_first_nodeName_ioInterfaceType\") AS \"Interface\", last(\"hostSidePortCount\") AS \"Host Ports\", last(\"isSAControlled\") AS \"SA Controlled\", last(\"initiators_first_nodeName_remoteNodeWWN\") AS \"FC_WWN\", last(\"initiators_first_nodeName_iscsiNodeName\") AS \"iSCSI_IQN\", last(\"initiators_first_nodeName_nvmeNodeName\") AS \"NVMe_NQN\" FROM \"pruned_retention\".\"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"hostRef\"",
+          "query": "SELECT last(\"host_name_field\") AS \"Host Name\", last(\"initiators_first_nodeName_ioInterfaceType\") AS \"Interface\", last(\"hostSidePortCount\") AS \"Host Ports\", last(\"isSAControlled\") AS \"SA Controlled\", last(\"initiators_first_nodeName_remoteNodeWWN\") AS \"FC_WWN\", last(\"initiators_first_nodeName_iscsiNodeName\") AS \"iSCSI_IQN\", last(\"initiators_first_nodeName_nvmeNodeName\") AS \"NVMe_NQN\" FROM \"pruned_retention\".\"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"hostRef\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "table",
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -239,7 +274,10 @@
       "type": "table"
     },
     {
-      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_EPA}"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -325,7 +363,9 @@
         {
           "groupBy": [
             {
-              "params": ["driveRef"],
+              "params": [
+                "driveRef"
+              ],
               "type": "tag"
             }
           ],
@@ -337,37 +377,51 @@
           "select": [
             [
               {
-                "params": ["physicalLocation__trayRef"],
+                "params": [
+                  "physicalLocation__trayRef"
+                ],
                 "type": "tag"
               },
               {
-                "params": ["Tray"],
+                "params": [
+                  "Tray"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["physicalLocation_slot"],
+                "params": [
+                  "physicalLocation_slot"
+                ],
                 "type": "tag"
               },
               {
-                "params": ["Slot"],
+                "params": [
+                  "Slot"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["serialNumber"],
+                "params": [
+                  "serialNumber"
+                ],
                 "type": "tag"
               },
               {
-                "params": ["Serial"],
+                "params": [
+                  "Serial"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["status"],
+                "params": [
+                  "status"
+                ],
                 "type": "field"
               },
               {
@@ -375,24 +429,30 @@
                 "type": "last"
               },
               {
-                "params": ["Status"],
+                "params": [
+                  "Status"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["productID"],
+                "params": [
+                  "productID"
+                ],
                 "type": "tag"
               },
               {
-                "params": ["Model"],
+                "params": [
+                  "Model"
+                ],
                 "type": "alias"
               }
             ]
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -402,13 +462,13 @@
           "measurement": "config_drives",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT \"physicalLocation__trayRef\" AS \"Tray\", \"physicalLocation_slot\" AS \"Slot\", \"serialNumber\" AS \"Serial\", last(\"status\") AS \"Status\", \"productID\" AS \"Model\" FROM \"pruned_retention\".\"config_drives\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"driveRef\"",
+          "query": "SELECT \"physicalLocation__trayRef\" AS \"Tray\", \"physicalLocation_slot\" AS \"Slot\", \"serialNumber\" AS \"Serial\", last(\"status\") AS \"Status\", \"productID\" AS \"Model\" FROM \"pruned_retention\".\"config_drives\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"driveRef\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "table",
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -419,7 +479,10 @@
       "type": "table"
     },
     {
-      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_EPA}"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -510,7 +573,9 @@
         {
           "groupBy": [
             {
-              "params": ["volumeGroupRef"],
+              "params": [
+                "volumeGroupRef"
+              ],
               "type": "tag"
             }
           ],
@@ -522,7 +587,9 @@
           "select": [
             [
               {
-                "params": ["pool_name_field"],
+                "params": [
+                  "pool_name_field"
+                ],
                 "type": "field"
               },
               {
@@ -530,13 +597,17 @@
                 "type": "last"
               },
               {
-                "params": ["Pool Name"],
+                "params": [
+                  "Pool Name"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["raidLevel"],
+                "params": [
+                  "raidLevel"
+                ],
                 "type": "field"
               },
               {
@@ -544,13 +615,17 @@
                 "type": "last"
               },
               {
-                "params": ["RAID Level"],
+                "params": [
+                  "RAID Level"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["state"],
+                "params": [
+                  "state"
+                ],
                 "type": "field"
               },
               {
@@ -558,13 +633,17 @@
                 "type": "last"
               },
               {
-                "params": ["State"],
+                "params": [
+                  "State"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["driveMediaType"],
+                "params": [
+                  "driveMediaType"
+                ],
                 "type": "field"
               },
               {
@@ -572,13 +651,17 @@
                 "type": "last"
               },
               {
-                "params": ["Media Type"],
+                "params": [
+                  "Media Type"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["usedSpace"],
+                "params": [
+                  "usedSpace"
+                ],
                 "type": "field"
               },
               {
@@ -586,13 +669,17 @@
                 "type": "last"
               },
               {
-                "params": ["Used Space"],
+                "params": [
+                  "Used Space"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["freeSpace"],
+                "params": [
+                  "freeSpace"
+                ],
                 "type": "field"
               },
               {
@@ -600,14 +687,16 @@
                 "type": "last"
               },
               {
-                "params": ["Free Space"],
+                "params": [
+                  "Free Space"
+                ],
                 "type": "alias"
               }
             ]
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -617,13 +706,13 @@
           "measurement": "config_storage_pools",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT last(\"pool_name_field\") AS \"Pool Name\", last(\"raidLevel\") AS \"RAID Level\", last(\"state\") AS \"State\", last(\"driveMediaType\") AS \"Media Type\", last(\"usedSpace\") AS \"Used Space\", last(\"freeSpace\") AS \"Free Space\" FROM \"pruned_retention\".\"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeGroupRef\"",
+          "query": "SELECT last(\"pool_name_field\") AS \"Pool Name\", last(\"raidLevel\") AS \"RAID Level\", last(\"state\") AS \"State\", last(\"driveMediaType\") AS \"Media Type\", last(\"usedSpace\") AS \"Used Space\", last(\"freeSpace\") AS \"Free Space\" FROM \"pruned_retention\".\"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeGroupRef\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "table",
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -634,7 +723,10 @@
       "type": "table"
     },
     {
-      "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_EPA}"
+      },
       "fieldConfig": {
         "defaults": {
           "custom": {
@@ -686,7 +778,9 @@
         {
           "groupBy": [
             {
-              "params": ["volumeRef"],
+              "params": [
+                "volumeRef"
+              ],
               "type": "tag"
             }
           ],
@@ -698,7 +792,9 @@
           "select": [
             [
               {
-                "params": ["volume_name_field"],
+                "params": [
+                  "volume_name_field"
+                ],
                 "type": "field"
               },
               {
@@ -706,13 +802,17 @@
                 "type": "last"
               },
               {
-                "params": ["Volume Name"],
+                "params": [
+                  "Volume Name"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["capacity"],
+                "params": [
+                  "capacity"
+                ],
                 "type": "field"
               },
               {
@@ -720,13 +820,17 @@
                 "type": "last"
               },
               {
-                "params": ["Capacity"],
+                "params": [
+                  "Capacity"
+                ],
                 "type": "alias"
               }
             ],
             [
               {
-                "params": ["listOfMappings_lun"],
+                "params": [
+                  "listOfMappings_lun"
+                ],
                 "type": "field"
               },
               {
@@ -734,14 +838,16 @@
                 "type": "last"
               },
               {
-                "params": ["LUN"],
+                "params": [
+                  "LUN"
+                ],
                 "type": "alias"
               }
             ]
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -751,13 +857,13 @@
           "measurement": "config_volumes",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT last(\"volume_name_field\") AS \"Volume Name\", last(\"capacity\") AS \"Capacity\", last(\"listOfMappings_lun\") AS \"LUN\" FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeRef\"",
+          "query": "SELECT last(\"volume_name_field\") AS \"Volume Name\", last(\"capacity\") AS \"Capacity\", last(\"listOfMappings_lun\") AS \"LUN\" FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter AND time < now() - 1h GROUP BY \"volumeRef\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "table",
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -780,7 +886,10 @@
           "text": "All",
           "value": "$__all"
         },
-        "datasource": {"type": "influxdb", "uid": "${DS_EPA}"},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_EPA}"
+        },
         "definition": "SHOW TAG VALUES FROM \"config_drives\" WITH KEY = \"sys_name\"",
         "hide": 0,
         "includeAll": true,

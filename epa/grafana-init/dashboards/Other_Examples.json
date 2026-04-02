@@ -141,7 +141,7 @@
           "groupBy": [
             {
               "params": [
-                "volume_name"
+                "volume_name::tag"
               ],
               "type": "tag"
             }
@@ -149,7 +149,7 @@
           "measurement": "config_volumes",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
+          "query": "SELECT last(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -169,7 +169,7 @@
           ],
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -183,7 +183,7 @@
           "groupBy": [
             {
               "params": [
-                "volume_name"
+                "volume_name::tag"
               ],
               "type": "tag"
             }
@@ -191,13 +191,13 @@
           "measurement": "config_volumes",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT last(\"capacity\") FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name_field\"",
+          "query": "SELECT last(\"capacity\") FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name_field\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
           "tags": [
             {
-              "key": "sys_name",
+              "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -263,7 +263,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_capacity) FROM (SELECT last(\"capacity\") as last_capacity FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY volume_name)",
+          "query": "SELECT sum(last_capacity) FROM (SELECT last(\"capacity\") as last_capacity FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY volume_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -353,7 +353,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h) fill(previous)",
+          "query": "SELECT sum(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -419,7 +419,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"volume_name_field\") as \"Volume Name\", last(\"capacity\") as \"Capacity\", last(\"blkSize\") as \"Block Size\" FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
+          "query": "SELECT last(\"volume_name_field\") as \"Volume Name\", last(\"capacity\") as \"Capacity\", last(\"blkSize\") as \"Block Size\" FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -484,7 +484,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"volume_name_field\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT count(DISTINCT \"volume_name_field\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -574,7 +574,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h), volume_name fill(previous)",
+          "query": "SELECT mean(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h), volume_name fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -645,7 +645,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"",
+          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -711,7 +711,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_used) FROM (SELECT last(\"usedSpace\") as last_used FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT sum(last_used) FROM (SELECT last(\"usedSpace\") as last_used FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -776,7 +776,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_free) FROM (SELECT last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT sum(last_free) FROM (SELECT last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -846,7 +846,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT (sum(last_used) / (sum(last_used) + sum(last_free))) * 100 FROM (SELECT last(\"usedSpace\") as last_used, last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT (sum(last_used) / (sum(last_used) + sum(last_free))) * 100 FROM (SELECT last(\"usedSpace\") as last_used, last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -911,7 +911,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT \"pool_name_field\" as \"Pool Name\", \"raidLevel\" as \"RAID Level\", \"state\" as \"State\", \"usedSpace\" as \"Used Space\", \"freeSpace\" as \"Free Space\" FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT \"pool_name_field\" as \"Pool Name\", \"raidLevel\" as \"RAID Level\", \"state\" as \"State\", \"usedSpace\" as \"Used Space\", \"freeSpace\" as \"Free Space\" FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -976,7 +976,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1041,10 +1041,10 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT sum(\"initiatorCount\") FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(15m)",
           "rawQuery": true,
           "refId": "A",
-          "resultFormat": "table"
+          "resultFormat": "time_series"
         }
       ],
       "title": "Total Initiator Count",
@@ -1106,7 +1106,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"initiatorCount\") as \"Initiators\", last(\"hostSidePortCount\") as \"Host Ports\" FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"host_name\"",
+          "query": "SELECT last(\"initiatorCount\") as \"Initiators\", last(\"hostSidePortCount\") as \"Host Ports\" FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"host_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1208,7 +1208,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Host Names\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"",
+          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Host Names\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1308,7 +1308,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"capacity\")/1073741824000 as \"Capacity (TB)\", last(\"status\") as \"Status\", last(\"mapped_host_count\") as \"Host Count\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"raidLevel\") as \"RAID\" FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
+          "query": "SELECT last(\"capacity\")/1073741824000 as \"Capacity (TB)\", last(\"status\") as \"Status\", last(\"mapped_host_count\") as \"Host Count\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"raidLevel\") as \"RAID\" FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
