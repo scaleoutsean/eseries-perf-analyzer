@@ -97,6 +97,12 @@ else
         echo "DEBUG environment variable set: enabling debug logging"
         CMD="${CMD} --debug"
     fi
+
+    # Disable TLS certificate verification if requested (lab/dev use only)
+    if [ -n "${TLS_VERIFY}" ] && [ "${TLS_VERIFY}" = "false" ]; then
+        echo "WARNING: TLS_VERIFY=false - SSL certificate verification is DISABLED"
+        CMD="${CMD} --no-verify-ssl"
+    fi
     
     # Add default flags for normal operation
     CMD="${CMD} -i -s"

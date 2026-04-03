@@ -2,6 +2,7 @@
 
 - [NetApp E-Series Performance Analyzer ("EPA")](#netapp-e-series-performance-analyzer-epa)
   - [What is EPA](#what-is-epa)
+    - [Should you use EPA, ESC or NetApp Harvest?](#should-you-use-epa-esc-or-netapp-harvest)
   - [Collected data](#collected-data)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
@@ -243,7 +244,7 @@ InfluxDB is accessible to external clients at 8086/tcp. The idea is to be able t
 
 Add another collector service (e.g. `collector-ef300c`) to `docker-compose.yaml`, build it and start it. You may use the same (existing) or own (new) InfluxDB database instance. Enter the `utils` container or use Collector to create it in advance. You may also just run collector with `--dbName` to have it created automatically.
 
-**NOTE:** pay attetion to Prometheus ports if you use them. Multiple collectors in same Docker Compose need different external ports for Prometheus exporter.
+**NOTE:** pay attention to Prometheus ports if you use them. Multiple collectors in same Docker Compose need different external ports for Prometheus exporter.
 
 To remove a collector that monitors an array, run `docker compose down <collector-name>`, enter the `utils` container to drop the database - if it's not shared with other collectors.
 
@@ -307,14 +308,15 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 ## Changelog
 
-- 3.5.4 (March 23, 2026)
-  - Add SSD Flash Cache metrics 
+- 3.5.4 (April 5, 2026)
+  - Add SSD Flash Cache metrics
   - Make Prometheus service port configurable
-  - Upgrade Grafana from last v8 release to v12.4.1
-  - Minor InfluxDB update (1.12.2 to 1.12.3)
-  - Tested with SANtricity 12.0 and 11.95
+  - Upgrade Grafana from last v8 release to v12.4.1 and update dashboards to work with v12
+  - Minor update to InfluxDB (1.12.2 to 1.12.3) and requests library (2.33.1)
+  - Test with SANtricity 12.0 and 11.95
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
-  - Bug fixes and improvements (better handling of unavailable metrics, drop repos from volume collection, avoid  duplicate upload of reference dashboards, fix SSD wear level stats)
+  - Add `TLS_VERIFY` option to EPA collector and Docker Compose environment variables
+  - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats, initiator count, volume capacity)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces

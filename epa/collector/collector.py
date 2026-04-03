@@ -4,7 +4,7 @@ Retrieves and collects data from the the NetApp E-Series API server
 and sends the data to an InfluxDB server and/or exports via Prometheus
 
 -----------------------------------------------------------------------------
-Copyright (c) 2025 E-Series Perf Analyzer (scaleoutSean@Github (post-v3.0.0
+Copyright (c) 2026 E-Series Perf Analyzer (scaleoutSean@Github (post-v3.0.0
 commits) and NetApp, Inc (pre-v3.1.0 commits))
 Licensed under the MIT License. See LICENSE in the project root for details.
 -----------------------------------------------------------------------------
@@ -910,12 +910,6 @@ CONFIG_COLLECTION_INTERVAL_MINUTES = 15  # Collect config data every 15th minute
 # LOGGING
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# Disable urllib3 warnings (SSL verification disabled)
-try:
-    requests.packages.urllib3.disable_warnings()
-except AttributeError:
-    # urllib3 warnings suppression failed, continuing without it
-    pass
 LOG = logging.getLogger("collector")
 
 # Disables reset connection warning message if the connection time is too long
@@ -1027,7 +1021,19 @@ PARSER.add_argument('--realtime', action='store_true', default=False,
 PARSER.add_argument('--capture', nargs='?', const='', default=None, metavar='DIR',
                     help='Capture SANtricity API request/response payloads to disk for replay or debugging. '
                          'Optionally specify a directory; if omitted, files are stored under ./captures/<timestamp>.')
+PARSER.add_argument('--no-verify-ssl', action='store_true', default=False,
+                    help='Disable TLS/SSL certificate verification for SANtricity API connections. '
+                         'Use only in lab/dev environments with self-signed certificates. '
+                         'Default: False (verification enabled).')
 CMD = PARSER.parse_args()
+
+if CMD.no_verify_ssl:
+    try:
+        requests.packages.urllib3.disable_warnings()
+    except AttributeError:
+        pass
+    import warnings
+    warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
 if CMD.capture is not None:
     initialize_capture(CMD.capture)
@@ -1596,7 +1602,7 @@ def get_session():
                                "Content-Type": "application/json",
                                "netapp-client-type": "collector-" + __version__}
 
-    request_session.verify = False
+    request_session.verify = not CMD.no_verify_ssl
     return request_session
 
 
@@ -3244,9 +3250,9 @@ def collect_flashcache_stats(system_info):
             LOG.debug(f"Time delta <= 0 for Flash Cache on {sys_name}, skipping")
             return
             
-        fields = {
-            "cached_volumes_count": cached_volumes,
-            "cache_drive_count": cache_drives
+        fields: dict = {
+            "cached_volumes_count": float(cached_volumes),
+            "cache_drive_count": float(cache_drives)
         }
         
         # Process Gauges
@@ -3291,7 +3297,7 @@ def collect_flashcache_stats(system_info):
         send_to_prometheus("flashcache", tags, fields)
 
         if not CMD.doNotPost and CMD.output in ['influxdb', 'both']:
-            client = get_db_connection()
+            client = InfluxDBClient(host=influxdb_host, port=influxdb_port, database=INFLUXDB_DATABASE)
             client.write_points(json_body)
             LOG.debug(f"Posted flashcache metrics to InfluxDB for {sys_name}")
             

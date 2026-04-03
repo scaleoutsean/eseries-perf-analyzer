@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=influxdb:1.11.8-alpine
+ARG BASE_IMAGE=influxdb:1.12.3-alpine
 FROM ${BASE_IMAGE}
 
 # Install common utilities on Alpine

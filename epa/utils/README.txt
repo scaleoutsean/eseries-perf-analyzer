@@ -77,7 +77,9 @@ influxd restore -host influxdb:8088 -db eseries -portable /dump/
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW MEASUREMENT CARDINALITY ON eseries"
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW SERIES CARDINALITY ON eseries"
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEY CARDINALITY ON eseries"
-# SELECT * FROM config_hosts LIMIT 2
-# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_hosts LIMIT 2"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEYS ON eseries FROM disks LIMIT 1"
+# curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEYS ON eseries config_drives LIMIT 1"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_drives LIMIT 2"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_hosts WHERE host_name='ICTAG28S02H01' LIMIT 1"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_volumes LIMIT 2"
-#  curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_volumes WHERE sys_name='E80' LIMIT 1"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT volume_name,capacity FROM config_volumes WHERE sys_name='E80' LIMIT 2"
