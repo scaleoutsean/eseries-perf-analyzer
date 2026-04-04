@@ -309,13 +309,14 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 ## Changelog
 
 - 3.5.4 (April 5, 2026)
-  - Add SSD Flash Cache metrics
+  - Add SSD Flash Cache metrics and dashboard
   - Make Prometheus service port configurable
-  - Upgrade Grafana from last v8 release to v12.4.1 and update dashboards to work with v12
+  - Upgrade Grafana from last v8 release to v12.4.1 and update existing dashboards to work with v12
   - Minor update to InfluxDB (1.12.2 to 1.12.3) and requests library (2.33.1)
   - Test with SANtricity 12.0 and 11.95
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
   - Add `TLS_VERIFY` option to EPA collector and Docker Compose environment variables
+  - Parse ports from Fibre Channel host objects
   - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats, initiator count, volume capacity)
 
 - 3.5.3 (January 20, 2026)

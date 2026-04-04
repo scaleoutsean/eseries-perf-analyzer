@@ -2288,7 +2288,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": 0
               },
               {
@@ -2480,6 +2480,6 @@
   "timezone": "browser",
   "title": "Disk View Dashboard",
   "uid": "epa-disk-view-dashboard",
-  "version": 10,
+  "version": 2,
   "weekStart": ""
 }

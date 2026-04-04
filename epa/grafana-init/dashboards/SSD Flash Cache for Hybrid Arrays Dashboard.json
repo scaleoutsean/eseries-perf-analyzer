@@ -108,6 +108,10 @@
       "targets": [
         {
           "alias": "drive(s)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -141,11 +145,7 @@
               }
             ]
           ],
-          "tags": [],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          "tags": []
         }
       ],
       "title": "Cache Drive Count",
@@ -202,6 +202,10 @@
       "targets": [
         {
           "alias": "volume(s)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -235,11 +239,7 @@
               }
             ]
           ],
-          "tags": [],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          "tags": []
         }
       ],
       "title": "Cache Volumes Count",
@@ -299,6 +299,10 @@
       "targets": [
         {
           "alias": "volume(s)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -332,11 +336,7 @@
               }
             ]
           ],
-          "tags": [],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          "tags": []
         }
       ],
       "title": "Reads",
@@ -396,6 +396,10 @@
       "targets": [
         {
           "alias": "volume(s)",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -435,11 +439,7 @@
               "operator": "=~",
               "value": "/^$SystemName$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "title": "Writes",
@@ -531,10 +531,13 @@
         }
       },
       "pluginVersion": "12.4.1",
-      "repeatDirection": "h",
       "targets": [
         {
           "alias": "invalidates",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -574,11 +577,7 @@
               "operator": "=~",
               "value": "/^$SystemName$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "reads",
@@ -764,7 +763,6 @@
         }
       },
       "pluginVersion": "12.4.1",
-      "repeatDirection": "h",
       "targets": [
         {
           "alias": "available",
@@ -1731,7 +1729,9 @@
   ],
   "preload": false,
   "schemaVersion": 42,
-  "tags": [],
+  "tags": [
+    "NetAppESeries"
+  ],
   "templating": {
     "list": [
       {
@@ -1765,8 +1765,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SSD Flash Cache (Hybrid E-Series)",
-  "uid": "advzz8w",
-  "version": 55,
+  "title": "SSD Flash Cache for Hybrid Arrays Dashboard",
+  "uid": "epa-ssd-flash-cache-for-hybrid-arrays-d",
+  "version": 1,
   "weekStart": ""
 }

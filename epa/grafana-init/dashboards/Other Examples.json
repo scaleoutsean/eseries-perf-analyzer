@@ -648,6 +648,7 @@
             "inspect": false
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -660,7 +661,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1097,7 +1099,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT sum(\"initiatorCount\") FROM \"config_hosts\"  GROUP BY time(15m)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1404,8 +1406,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Other_Examples",
+  "title": "Other Examples",
   "uid": "epa-other-examples",
-  "version": 5,
+  "version": 3,
   "weekStart": ""
 }

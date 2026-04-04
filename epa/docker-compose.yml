@@ -84,10 +84,10 @@ services:
       - eseries_perf_analyzer
     restart: "no"
 
-  collector:
+  collector12:
     image: epa/collector:${TAG}
     # image: docker.io/scaleoutsean/epa-collector:${TAG} # best build your own
-    container_name: collector
+    container_name: collector12
     build: ./collector
     mem_limit: 256m
     restart: unless-stopped
@@ -100,21 +100,23 @@ services:
       # If port 8080 is in use on the host, map to a different port e.g. 8081:8080 or pass PROMETHEUS_PORT variable
       - 8081:8080  # Prometheus metrics endpoint (comment out if using --output influxdb only)
     environment: 
-      - USERNAME=monitor
-      - PASSWORD=monitor123
-      - SYSNAME=EF600
+      - USERNAME=admin
+      - PASSWORD=infiniti
+      - SYSNAME=EF80
       - SYSID=600A098000F63714000000005E79C888
-      - API=5.5.5.5 7.7.7.7
+      - API=192.168.1.194
       # Optional: To use simulator you can pass the API_PORT
-      # - API_PORT=443
-      - RETENTION_PERIOD=8w
+      - API_PORT=8444
+      - RETENTION_PERIOD=2w
       # If your InfluxDB is running on the same host but not in the same Docker Compose, use host.docker.internal to connect to it from the collector container
       # If your InfluxDB is running in the same Docker Compose, use the service name (influxdb) as the address
       # Below is an example of connecting to an external InfluxDB instance with custom address and port
-      - DB_ADDRESS=6.6.6.6
+      - DB_ADDRESS=influxdb
       - DB_PORT=8086      
       # Optional: verbose logging
       - DEBUG=false
+      # Optional: Disable TLS certificate verification (lab/dev use only - do NOT use in production)
+      - TLS_VERIFY=false
       # Optional: Set output destination (both|influxdb|prometheus). Default: both. Prometheus port should be exposed to enable remote access.
       - OUTPUT=both
       # Optional: Set Prometheus port (default: 8080)
@@ -131,9 +133,9 @@ services:
       - eseries_perf_analyzer
 
   # remove this second collector if you only want to run one instance, or use it to collect from a different system with different configuration
-  collector-e4k:
+  collector11:
     image: epa/collector:${TAG}
-    container_name: collector-e4k
+    container_name: collector11
     build: ./collector
     mem_limit: 256m
     restart: unless-stopped
@@ -145,22 +147,25 @@ services:
     # ports:
       # - 8081:8080  # Different host port for second collector's Prometheus endpoint in the same Docker Compose
     environment: 
-      - USERNAME=monitor
-      - PASSWORD=monitor123
+      - USERNAME=admin
+      - PASSWORD=infiniti
       - SYSNAME=E4012
       - SYSID=600A098000F63714000000005E79C999
-      - API=7.7.7.7
-      - RETENTION_PERIOD=8w
-      - DB_ADDRESS=6.6.6.6
+      - API=192.168.1.194
+      - API_PORT=8443
+      - RETENTION_PERIOD=2w
+      - DB_ADDRESS=influxdb
       - DB_PORT=8086
       # Example: Using custom database name for this collector
       # - DB_NAME=e2824_metrics
+      # Optional: Disable TLS certificate verification (lab/dev use only - do NOT use in production)
+      - TLS_VERIFY=false
       # Optional: Only collect specific measurements (space-separated)
       # - INCLUDE=disks systems volumes
       # - INCLUDE=config_volumes
       # Optional: Different output configuration for this collector
       - OUTPUT=influxdb  # Disable Prometheus
-      # - PROMETHEUS_PORT=8080  # Container port (mapped to host 8081)
+      # - PROMETHEUS_PORT=8081  # Container port (mapped to host 8081)
     networks:
       - eseries_perf_analyzer
 

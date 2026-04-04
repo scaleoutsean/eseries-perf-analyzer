@@ -146,6 +146,10 @@
       "targets": [
         {
           "alias": "cpu_avg_utilization",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -198,11 +202,7 @@
               "operator": "=~",
               "value": "/^$System_Name$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "title": "Controllers CPU Utilization - $System_Name",
@@ -531,6 +531,10 @@
         },
         {
           "alias": "FSW Pct",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -576,11 +580,7 @@
               "operator": "=~",
               "value": "/^$Controller$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
       "title": "Cache Hit Rate, RAID Pct, FSW Pct - $System_Name",
@@ -671,6 +671,10 @@
       "targets": [
         {
           "alias": "write_iops",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -717,11 +721,7 @@
               "operator": "=~",
               "value": "/^$System_Name$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "read_iops",
@@ -1221,7 +1221,9 @@
   ],
   "preload": false,
   "schemaVersion": 42,
-  "tags": [],
+  "tags": [
+    "NetAppESeries"
+  ],
   "templating": {
     "list": [
       {
@@ -1278,8 +1280,8 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "New dashboard",
-  "uid": "ad8mvxj",
-  "version": 42,
+  "title": "Controllers Dashboard",
+  "uid": "epa-controllers-dashboard",
+  "version": 1,
   "weekStart": ""
 }
