@@ -37,11 +37,25 @@ This container is automatically started by docker-compose after Grafana starts. 
 - **User dashboards**: Created/modified through Grafana UI, stored in `grafana_dashboards` volume
 - **Clean separation**: System dashboards vs user dashboards
 
+## Update a dashboard
+
+- Export dashboard for sharing as JSON file. If editing, overwrite the same dashboard in `./epa/grafana-init/dashboards/`
+- To deploy later, rebuild grafana-init container (`docker compose build grafana-init`), delete existing dashboards, and run `up grafana-init` to re-deploy. Or, manually import the saved dashboard
+
+## Add a dashboard
+
+- New dashboards can be created in Grafana. To save it, in dashboard settings
+  - Modify it to use EPA folder if it's not the case
+  - Add `NetAppESeries` tag and save it
+- Export to `./epa/grafana-init/dashboards/` using a new name
+
+Next time you run `up grafana-init`, the new dashboard will be deployed to Grafana together with others.
+
 ## Troubleshooting
 
 View logs with: `docker logs grafana-init`
 
 Common issues:
 - Grafana not ready: Container will retry up to 30 times
-- Dashboard import failures: Check JSON syntax and Grafana version compatibility
-- Datasource creation: Verify InfluxDB is accessible at `http://influxdb:8086`
+- Dashboard import failures: Check JSON syntax and Grafana version compatibility. Dashboards need the tag `NetAppESeries` to be automatically deployed
+- Datasource creation: Verify InfluxDB is accessible at `http://influxdb:8086` or other configured endpoint ("EPA" data source)

@@ -9,7 +9,7 @@
       "pluginName": "InfluxDB"
     }
   ],
-  "__elements": [],
+  "__elements": {},
   "__requires": [
     {
       "type": "panel",
@@ -21,7 +21,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "8.5.27"
+      "version": "12.4.1"
     },
     {
       "type": "datasource",
@@ -79,10 +79,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
-  "iteration": 1756925772865,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
@@ -98,12 +95,10 @@
             "hideFrom": {
               "legend": false,
               "tooltip": false,
-              "vis": false,
               "viz": false
             }
           },
-          "mappings": [],
-          "unit": "bytes"
+          "mappings": []
         },
         "overrides": []
       },
@@ -115,9 +110,13 @@
       },
       "id": 1,
       "options": {
+        "displayLabels": [
+          "percent"
+        ],
         "legend": {
-          "displayMode": "visible",
-          "placement": "bottom"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "pieType": "pie",
         "reduceOptions": {
@@ -127,11 +126,14 @@
           "fields": "",
           "values": false
         },
+        "sort": "desc",
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -141,7 +143,7 @@
           "groupBy": [
             {
               "params": [
-                "volume_name::tag"
+                "volume_name"
               ],
               "type": "tag"
             }
@@ -149,7 +151,7 @@
           "measurement": "config_volumes",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT last(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
+          "query": "SELECT last(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -169,7 +171,7 @@
           ],
           "tags": [
             {
-              "key": "sys_name::tag",
+              "key": "sys_name",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -183,7 +185,7 @@
           "groupBy": [
             {
               "params": [
-                "volume_name::tag"
+                "volume_name"
               ],
               "type": "tag"
             }
@@ -191,13 +193,13 @@
           "measurement": "config_volumes",
           "orderByTime": "ASC",
           "policy": "pruned_retention",
-          "query": "SELECT last(\"capacity\") FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name_field\"",
+          "query": "SELECT last(\"capacity\") FROM \"pruned_retention\".\"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name_field\"",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series",
           "tags": [
             {
-              "key": "sys_name::tag",
+              "key": "sys_name",
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
@@ -205,6 +207,15 @@
         }
       ],
       "title": "Volume Capacity Distribution (Pie Chart)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "config_volumes.last { volume_name: (.*)}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "piechart"
     },
     {
@@ -223,7 +234,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -247,6 +258,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -254,16 +266,18 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_capacity) FROM (SELECT last(\"capacity\") as last_capacity FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY volume_name)",
+          "query": "SELECT sum(last_capacity) FROM (SELECT last(\"capacity\") as last_capacity FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY volume_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -283,9 +297,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -295,6 +313,7 @@
               "vis": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -302,6 +321,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -317,7 +337,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -340,20 +360,24 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.1",
       "targets": [
         {
+          "alias": "total_vol_capacity",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h) fill(previous)",
+          "query": "SELECT sum(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -374,7 +398,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -383,7 +412,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -403,23 +432,17 @@
       },
       "id": 4,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"volume_name_field\") as \"Volume Name\", last(\"capacity\") as \"Capacity\", last(\"blkSize\") as \"Block Size\" FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
+          "query": "SELECT last(\"volume_name_field\") as \"Volume Name\", last(\"capacity\") as \"Capacity\", last(\"blkSize\") as \"Block Size\" FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -444,7 +467,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -468,6 +491,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -475,16 +499,18 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"volume_name_field\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT count(DISTINCT \"volume_name_field\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -504,9 +530,13 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "points",
             "fillOpacity": 100,
             "gradientMode": "none",
@@ -516,6 +546,7 @@
               "vis": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -523,6 +554,7 @@
               "type": "linear"
             },
             "showPoints": "always",
+            "showValues": false,
             "spanNulls": true,
             "stacking": {
               "group": "A",
@@ -538,7 +570,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -561,26 +593,38 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h), volume_name fill(previous)",
+          "query": "SELECT mean(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h), volume_name fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
         }
       ],
       "title": "Individual Volume Capacities (Time Series)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "config_volumes.mean { volume_name: (.*)}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "timeseries"
     },
     {
@@ -595,7 +639,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -604,7 +653,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -623,13 +672,7 @@
       },
       "id": 15,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true,
         "sortBy": [
           {
@@ -638,21 +681,20 @@
           }
         ]
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"::tag",
+          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
         }
       ],
       "title": "Combined Volume Performance & Host Names",
-      "transformations": [],
       "type": "table"
     },
     {
@@ -671,7 +713,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -695,6 +737,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -702,16 +745,18 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_used) FROM (SELECT last(\"usedSpace\") as last_used FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT sum(last_used) FROM (SELECT last(\"usedSpace\") as last_used FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -736,7 +781,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -760,6 +805,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -767,16 +813,18 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(last_free) FROM (SELECT last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT sum(last_free) FROM (SELECT last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -803,7 +851,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "yellow",
@@ -827,6 +875,8 @@
       },
       "id": 9,
       "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -837,16 +887,17 @@
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true,
+        "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT (sum(last_used) / (sum(last_used) + sum(last_free))) * 100 FROM (SELECT last(\"usedSpace\") as last_used, last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
+          "query": "SELECT (sum(last_used) / (sum(last_used) + sum(last_free))) * 100 FROM (SELECT last(\"usedSpace\") as last_used, last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -867,7 +918,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -876,7 +932,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -895,23 +951,17 @@
       },
       "id": 10,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT \"pool_name_field\" as \"Pool Name\", \"raidLevel\" as \"RAID Level\", \"state\" as \"State\", \"usedSpace\" as \"Used Space\", \"freeSpace\" as \"Free Space\" FROM \"config_storage_pools\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT \"pool_name_field\" as \"Pool Name\", \"raidLevel\" as \"RAID Level\", \"state\" as \"State\", \"usedSpace\" as \"Used Space\", \"freeSpace\" as \"Free Space\" FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -936,7 +986,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -960,6 +1010,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -967,16 +1018,18 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter",
+          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1001,7 +1054,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1025,6 +1078,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1032,19 +1086,21 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(\"initiatorCount\") FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY time(15m)",
+          "query": "SELECT count(DISTINCT \"host_name_field\") FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
           "rawQuery": true,
           "refId": "A",
-          "resultFormat": "time_series"
+          "resultFormat": "table"
         }
       ],
       "title": "Total Initiator Count",
@@ -1062,7 +1118,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1071,7 +1132,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1090,23 +1151,17 @@
       },
       "id": 13,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"initiatorCount\") as \"Initiators\", last(\"hostSidePortCount\") as \"Host Ports\" FROM \"config_hosts\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"host_name\"::tag",
+          "query": "SELECT last(\"initiatorCount\") as \"Initiators\", last(\"hostSidePortCount\") as \"Host Ports\" FROM \"config_hosts\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"host_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1139,7 +1194,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1148,7 +1208,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1192,23 +1252,17 @@
       },
       "id": 16,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Host Names\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"::tag",
+          "query": "SELECT mean(\"combinedIOps\") as \"IOPS\", mean(\"readCacheUtilization\") as \"Read Cache %\", mean(\"combinedResponseTime\") as \"Response Time (ms)\", mean(\"combinedThroughput\")/1048576 as \"Throughput (MB/s)\", last(\"mapped_host_names\") as \"Host Names\", last(\"mapped_host_count\") as \"Host Count\" FROM \"volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"vol_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1251,7 +1305,12 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1260,7 +1319,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -1290,25 +1349,19 @@
         "x": 12,
         "y": 64
       },
-      "id": 15,
+      "id": 17,
       "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "cellHeight": "sm",
         "showHeader": true
       },
-      "pluginVersion": "8.5.27",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT last(\"capacity\")/1073741824000 as \"Capacity (TB)\", last(\"status\") as \"Status\", last(\"mapped_host_count\") as \"Host Count\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"raidLevel\") as \"RAID\" FROM \"config_volumes\" WHERE (\"sys_name\"::tag =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"::tag",
+          "query": "SELECT last(\"capacity\")/1073741824000 as \"Capacity (TB)\", last(\"status\") as \"Status\", last(\"mapped_host_count\") as \"Host Count\", last(\"mapped_host_names\") as \"Mapped Hosts\", last(\"raidLevel\") as \"RAID\" FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"
@@ -1318,9 +1371,9 @@
       "type": "table"
     }
   ],
+  "preload": false,
   "refresh": "30s",
-  "schemaVersion": 36,
-  "style": "dark",
+  "schemaVersion": 42,
   "tags": [
     "NetAppESeries"
   ],
@@ -1333,21 +1386,15 @@
           "uid": "${DS_EPA}"
         },
         "definition": "SHOW TAG VALUES FROM \"config_volumes\" WITH KEY = \"sys_name\"",
-        "hide": 0,
         "includeAll": true,
         "label": "Storage System",
-        "multi": false,
         "name": "storage_system",
         "options": [],
         "query": "SHOW TAG VALUES FROM \"config_volumes\" WITH KEY = \"sys_name\"",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "regexApplyTo": "value",
+        "type": "query"
       }
     ]
   },
@@ -1356,9 +1403,9 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
-  "title": "Other Examples - Config Data Showcase",
-  "uid": "other_examples",
-  "version": 1,
+  "timezone": "browser",
+  "title": "Other_Examples",
+  "uid": "epa-other-examples",
+  "version": 5,
   "weekStart": ""
 }
