@@ -1099,7 +1099,7 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
-          "query": "SELECT sum(\"initiatorCount\") FROM \"config_hosts\"  GROUP BY time(15m)",
+          "query": "SELECT sum(\"current_count\") FROM (SELECT last(\"initiatorCount\") AS \"current_count\" FROM \"config_hosts\" WHERE $timeFilter GROUP BY time($__interval), \"host_name\") GROUP BY time($__interval)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "table"

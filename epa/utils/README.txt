@@ -58,7 +58,7 @@ docker exec utils influxd backup -portable -host influxdb:8088 -database eseries
 influxd restore -host influxdb:8088 -db eseries -portable /dump/
 # From the outside using the utils container, prefix the above with "docker exec utils"
 
-# HTTP queries 
+# HTTP queries (use http://influxdb:8086 if InfluxDB DB is in the same Docker Compose; http://localhost:8086 from the host)
 # 
 # SHOW MEASUREMENTS 
 # curl "http://localhost:8086/query?db=eseries&q=SHOW%20MEASUREMENTS"
@@ -79,9 +79,11 @@ influxd restore -host influxdb:8088 -db eseries -portable /dump/
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEY CARDINALITY ON eseries"
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEYS ON eseries FROM disks LIMIT 1"
 # curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "q=SHOW TAG KEYS ON eseries config_drives LIMIT 1"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SHOW TAG VALUES WITH KEY=sys_name"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SHOW TAG KEYS FROM flashcache"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_drives LIMIT 2"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_hosts WHERE host_name='ICTAG28S02H01' LIMIT 1"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM config_volumes LIMIT 2"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT volume_name,capacity FROM config_volumes WHERE sys_name='EF80' LIMIT 2"
 # curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT * FROM flashcache WHERE sys_name::tag='E4012' LIMIT 1"
+# curl -G 'http://localhost:8086/query?pretty=true&db=eseries' --data-urlencode "q=SELECT cached_volume_count FROM flashcache"

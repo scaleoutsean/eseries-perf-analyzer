@@ -884,6 +884,11 @@ FIELD_COERCIONS = {
     'listOfMappings_lun': int,
     'listOfMappings_ssid': int,
 
+    # Config volume summary stats
+    'volume_count': int,
+    'snapshot_count': int,
+    'repository_capacity': float,
+
     # Large capacity fields - should be floats for InfluxDB compatibility
     'capacity': float,
     'totalSizeInBytes': float,
@@ -1115,7 +1120,7 @@ FUNCTION_MEASUREMENTS = {
     'collect_major_event_log': ['major_event_log'],
     'collect_system_state': ['failures', 'interface_alerts'],
     'collect_config_storage_pools': ['config_storage_pools'],
-    'collect_config_volumes': ['config_volumes'],
+    'collect_config_volumes': ['config_volumes', 'config_volumes_summary'],
     'collect_config_hosts': ['config_hosts'],
     'collect_config_drives': ['config_drives'],
     'collect_flashcache_stats': ['flashcache']
@@ -1853,15 +1858,19 @@ def collect_storage_metrics(system_info):
         fw_resp = session.get(
             f"{get_controller('fw')}/{sys_id}/versions").json()
         fw_cv = fw_resp['codeVersions']
+        major_vers = 0
         minor_vers = 0
         for mod in (range(len(fw_cv))):
             if fw_cv[mod]['codeModule'] == 'management':
-                minor_vers = int((fw_cv[mod]['versionString']).split(".")[1])
+                parts = (fw_cv[mod]['versionString']).split(".")
+                if len(parts) >= 2:
+                    major_vers = int(parts[0])
+                    minor_vers = int(parts[1])
                 break
 
         # Get SSD wear statistics from the drives endpoint
         ssd_wear_dict = {}
-        if minor_vers >= 80:
+        if major_vers >= 12 or (major_vers == 11 and minor_vers >= 80):
             try:
                 drive_response = session.get(f"{get_controller('sys')}/{sys_id}/drives").json()
 
@@ -2352,9 +2361,9 @@ def collect_major_event_log(system_info):
                 json_body, database=INFLUXDB_DATABASE, time_precision="s")
             LOG.info("LOG: MEL payload sent")
         except InfluxDBClientError as e:
-            if "beyond retention policy" in str(e):
+            if "retention policy" in str(e):
                 LOG.debug(
-                    "Some MEL events were beyond retention policy and dropped by InfluxDB: %s",
+                    "Some MEL events were outside retention policy and dropped by InfluxDB: %s",
                     e
                 )
                 LOG.info("LOG: MEL payload sent (some events outside retention dropped)")
@@ -2771,11 +2780,19 @@ def collect_config_volumes(system_info):
         LOG.debug(f"Retrieved {len(volumes_response)} volume configurations")
         LOG.debug(f"Using cached data: {len(_HOSTS_CACHE)} hosts, {len(_MAPPABLE_OBJECTS_CACHE)} mappable objects")
 
+        volume_count = 0
+        snapshot_count = 0
+        repository_capacity = 0.0
+
         for volume in volumes_response:
             # Skip snapshot repository volumes
             if volume.get('name', '').startswith('repos_'):
                 LOG.debug(f"Skipping repository volume config {volume.get('name')}")
+                snapshot_count += 1
+                repository_capacity += float(volume.get('capacity', 0))
                 continue
+
+            volume_count += 1
 
             # Add computed host mapping fields to the volume object
             volume_ref = volume.get('volumeRef')
@@ -2841,6 +2858,23 @@ def collect_config_volumes(system_info):
                 LOG.debug(f"Added config_volumes measurement for volume {volume.get('name', 'unknown')}")
             else:
                 LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
+
+        # Add aggregate summary metric
+        if not CMD.include or "config_volumes_summary" in CMD.include:
+            summary_item = {
+                "measurement": "config_volumes_summary",
+                "tags": {
+                    "sys_id": sys_id,
+                    "sys_name": sys_name
+                },
+                "fields": {
+                    "volume_count": volume_count,
+                    "snapshot_count": snapshot_count,
+                    "repository_capacity": float(repository_capacity)
+                }
+            }
+            json_body.append(summary_item)
+            LOG.debug(f"Added config_volumes_summary measurement")
 
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for InfluxDB")
         if INFLUX_WRITE_ENABLED:

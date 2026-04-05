@@ -25,11 +25,12 @@
 
 EPA 3 is fork of the now-archived [E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. This fork's objectives:
 
-- Continue development of an OSS monitoring solution for NetApp E-Series
-- Disentangle E-Series Collector from the rest of EPA stack and make it easy to run it stand-alone and anywhere
+- Continue development of an open monitoring solution for NetApp E-Series
+- Disentangle E-Series Collector from the rest of EPA stack and make it easy to run it stand-alone, anywhere
 - Remove SANtricity Web Services Proxy (WSP) dependency from Collector and remove WSP from EPA, so that one collector container or script captures data for one and only one E-Series array
 
 EPA Collector collects metrics from E-Series and sends them to InfluxDB.
+
 Each collector uses own credentials and may (but doesn't have to) write data to the same InfluxDB database or database instance.
 
 ### Should you use EPA, ESC or NetApp Harvest?
@@ -49,7 +50,7 @@ You can use all three at the same time, any of them, or none.
   - Volumes
   - Disks
   - Interfaces
-  - SSD Flash Cache
+  - SSD Flash Cache (on hybrid E-Series with SSD Cache enabled)
 - Log and environment
   - E-Series MEL events
   - Failures
@@ -120,10 +121,11 @@ Collector arguments and switches:
 - `RETENTION_PERIOD` - data retention in InfluxDB, such as 52w (52 weeks)
 - `DB_ADDRESS`
   - Use external IPv4 or FQDN of the InfluxDB host if InfluxDB is running in a different location
-  - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in the same Docker Compose as the Collector
+  - Use Docker's internal DNS name (`influxdb`) if InfluxDB is in same Docker Compose as Collector
 - `DB_NAME` - database name, can be one per E-Series system, for Collector to use. Default (if not set): `eseries`. Collector creates database if it doesn't exist
 - `DB_PORT` - `8086` is the default port for InfluxDB v1 used by Collector if not specified
 - `OUTPUT` - send to `influxdb`, `prometheus`, or (default) `both`
+- `TLS_VERIFY` - verifies SANtricity API server's TLS certificate; `true` is recommended, but won't work if container can't verify; it will work from CLI/bare metal if OS truststore has the CA TLS
 - `PROMETHEUS_PORT` - used if `OUTPUT` isn't `influxdb` and default is 8080. Make sure Collector exposes with with open external port if you need to access it externally
 
 Example of a collector service entry in`docker-compose.yml`:
@@ -154,6 +156,7 @@ services:
       - RETENTION_PERIOD=8w
       - DB_ADDRESS=7.7.7.7  # use 'influxdb' instead of IPv4/FQDN when running in same Compose or K8s namespace
       - DB_PORT=8086
+      - TLS_VERIFY=false # true is recommended
       # Optional: Override default database name (eseries) on a per-collector basis
       # - DB_NAME=eseries
       # Optional: Create database and exit (true/1 = enable); remember to revert to 'false' after successful run
@@ -178,8 +181,8 @@ Download and decompress latest release and enter the `epa` sub-directory:
 TAG="v3.5.4"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
-vim .env                 # you probably don't need to change anything here
-vim docker-compose.yaml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name
+vim .env                 # you probably don't need to change anything here unless you prefer .env over docker-compose.yml
+vim docker-compose.yml  # see collector service sample above; you may use 'DB_NAME' to set a different DB name
 ./setup-data-dirs.sh     # (in epa subdirectory) creates directories for InfluxDB and Grafana and applies correct ownership
 
 # fast
@@ -198,7 +201,9 @@ docker compose up -d collector
 docker compose logs collector
 
 # not required, but if you won't build own dashboards, you may deploy the pre-made ones
-# docker compose --profile init up grafana-init -d
+# docker compose --profile init up grafana-init
+# sample dashboards can also be imported from disk in Grafana UI (see the FAQs)
+
 # not required, best to start it on-demand when you need it; see README.txt inside container
 # docker compose up -d utils
 
@@ -208,7 +213,7 @@ If you have any problems with Grafana Data Source, add InfluxDB v1 data source `
 
 ### Kubernetes
 
-Kubernetes users should skim through this page to get the idea how EPA works, and then follow [Kubernetes README](kubernetes/README.md).
+Kubernetes users should skim through this page to get the idea how EPA works, and then follow the [Kubernetes README](kubernetes/README.md).
 
 ## Other procedures
 
@@ -309,15 +314,16 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 ## Changelog
 
 - 3.5.4 (April 5, 2026)
-  - Add SSD Flash Cache metrics and dashboard
-  - Make Prometheus service port configurable
-  - Upgrade Grafana from last v8 release to v12.4.1 and update existing dashboards to work with v12
-  - Minor update to InfluxDB (1.12.2 to 1.12.3) and requests library (2.33.1)
-  - Test with SANtricity 12.0 and 11.95
+  - Upgrade Grafana from last v8 release to v12.4.1, update existing dashboards to work with v12
+  - Minor update to InfluxDB (from 1.12.2 to 1.12.3) and requests library (2.33.1)
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
+  - Test stack with SANtricity 12.00 and 11.95
   - Add `TLS_VERIFY` option to EPA collector and Docker Compose environment variables
+  - Make Prometheus service port configurable
   - Parse ports from Fibre Channel host objects
-  - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats, initiator count, volume capacity)
+  - Add SSD Flash Cache metrics and example dashboard
+  - Collect snapshot count and repository volumes' capacity
+  - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats (11.90 and 12.00, SAS and NVMe), initiator count, volume capacity)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces
