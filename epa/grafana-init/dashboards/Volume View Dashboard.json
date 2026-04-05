@@ -2194,6 +2194,10 @@
       "repeatDirection": "h",
       "targets": [
         {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -2238,15 +2242,17 @@
               "key": "vol_name::tag",
               "operator": "=~",
               "value": "/^$Volume$/"
+            },
+            {
+              "condition": "AND",
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$System$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         }
       ],
-      "title": "Volume SSD Flash Cache Hit Rate",
+      "title": "Volume SSD Cache Hit Rate",
       "transformations": [
         {
           "id": "renameByRegex",
@@ -2309,6 +2315,6 @@
   "timezone": "browser",
   "title": "Volume View Dashboard",
   "uid": "epa-volume-view-dashboard",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }
