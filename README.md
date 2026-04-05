@@ -313,7 +313,7 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
 
 ## Changelog
 
-- 3.5.4 (April 5, 2026)
+- 3.5.4 (April 6, 2026)
   - Upgrade Grafana from last v8 release to v12.4.1, update existing dashboards to work with v12
   - Minor update to InfluxDB (from 1.12.2 to 1.12.3) and requests library (2.33.1)
   - Collector Python base image update to `python:3.15.0a7-alpine3.23` (fewer base image vulnerabilities)
@@ -322,7 +322,7 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
   - Make Prometheus service port configurable
   - Parse ports from Fibre Channel host objects
   - Add SSD Flash Cache metrics and example dashboard
-  - Collect snapshot count and repository volumes' capacity
+  - Collect snapshot and volume count, and repository volumes' total capacity
   - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats (11.90 and 12.00, SAS and NVMe), initiator count, volume capacity)
 
 - 3.5.3 (January 20, 2026)
