@@ -3679,6 +3679,10 @@
       "targets": [
         {
           "alias": "driveside",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -3717,12 +3721,14 @@
               "key": "channel_type::tag",
               "operator": "=",
               "value": "driveside"
+            },
+            {
+              "condition": "AND",
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$System$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "hostide",
@@ -3826,6 +3832,6 @@
   "timezone": "browser",
   "title": "Interface View Dashboard",
   "uid": "epa-interface-view-dashboard",
-  "version": 7,
+  "version": 2,
   "weekStart": ""
 }

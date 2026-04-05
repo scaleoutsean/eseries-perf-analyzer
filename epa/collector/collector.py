@@ -1672,7 +1672,7 @@ def get_drive_location(sys_id, session):
         tray_id = tray_ids.get(drive_tray)
         if tray_id != "none":
             drive_location[drive["driveRef"]] = [
-                tray_id, drive["physicalLocation"]["slot"]]
+                tray_id, drive["physicalLocation"]["slot"], str(drive.get("driveMediaType", "unknown"))]
         else:
             LOG.error("Error matching drive to a tray in the storage system")
     return drive_location
@@ -1930,9 +1930,12 @@ def collect_storage_metrics(system_info):
             fields_dict = coerce_fields_dict(fields_dict)
 
             # Safely handle disk location info with fallbacks
+            drive_media_type = "unknown"
             if disk_location_info is not None and len(disk_location_info) >= 2:
                 tray_id = disk_location_info[0]
                 slot_id = disk_location_info[1]
+                if len(disk_location_info) > 2:
+                    drive_media_type = disk_location_info[2]
             else:
                 # Fallback to trayRef and driveSlot from stats if location info is unavailable
                 tray_id = stats.get('trayRef', 99)
@@ -1944,7 +1947,8 @@ def collect_storage_metrics(system_info):
                     "sys_id": sys_id,
                     "sys_name": sys_name,
                     "sys_tray": f"{tray_id:02.0f}",
-                    "sys_tray_slot": f"{slot_id:03.0f}"
+                    "sys_tray_slot": f"{slot_id:03.0f}",
+                    "driveMediaType": drive_media_type
                 },
                 "fields": fields_dict
             }
@@ -3560,6 +3564,7 @@ def create_continuous_query(client, params_list, database):
             "power",                   # Power readings - preserve last reading per hour
             "major_event_log",         # Event logs can't be averaged
             "failures",                # Failure events can't be averaged
+            "flashcache",              # Cache state metrics are light and shouldn't be averaged
         ]
 
         # Handle config measurements with temporal pruning

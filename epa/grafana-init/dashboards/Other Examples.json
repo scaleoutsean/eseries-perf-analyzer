@@ -152,7 +152,7 @@
           "orderByTime": "ASC",
           "policy": "default",
           "query": "SELECT last(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY \"volume_name\"",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -223,6 +223,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "These may not include \"system\" volumes, so depending where you look and how, you may want to create another query or panel for \"system\" volumes. Some folks don't include snapshot reserve in user volumes, others do.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -233,12 +234,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -255,7 +252,7 @@
       "id": 2,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
+        "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
         "percentChangeColorMode": "standard",
@@ -267,6 +264,7 @@
           "values": false
         },
         "showPercentChange": false,
+        "text": {},
         "textMode": "auto",
         "wideLayout": true
       },
@@ -277,10 +275,48 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT sum(last_capacity) FROM (SELECT last(\"capacity\") as last_capacity FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY volume_name)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "table"
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "capacity"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Total Volume Capacity (Stat)",
@@ -377,10 +413,48 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT sum(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h) fill(previous)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "time_series"
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "capacity"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "sum"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Total Volume Capacity Over Time (Time Series)",
@@ -456,11 +530,55 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "Refer to NetApp TR for particular system's limit. Separately consider system volumes (repository volumes for snapshots, Linked Clones)",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": 3600000,
+            "lineInterpolation": "stepBefore",
+            "lineStyle": {
+              "dash": [
+                10,
+                10
+              ],
+              "fill": "dash"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": 3600000,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 0,
+          "fieldMinMax": true,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -470,12 +588,20 @@
                 "value": 0
               },
               {
+                "color": "#EAB839",
+                "value": 250
+              },
+              {
+                "color": "orange",
+                "value": 500
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 1000
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -487,37 +613,94 @@
       },
       "id": 5,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
-            "lastNotNull"
+            "logmin"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.4.1",
       "targets": [
         {
+          "alias": "volume_count",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "volumeGroupRef::tag"
+              ],
+              "type": "tag"
+            }
+          ],
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT count(DISTINCT \"volume_name_field\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "table"
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume_name_field"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "count"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Total Volume Count",
-      "type": "stat"
+      "transformations": [
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "greater",
+                  "options": {
+                    "value": "0"
+                  }
+                },
+                "fieldName": "volume_count"
+              }
+            ],
+            "match": "any",
+            "type": "include"
+          }
+        }
+      ],
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -609,10 +792,54 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "volume_name::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "config_volumes",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT mean(\"capacity\") FROM \"config_volumes\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY time(1h), volume_name fill(previous)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "time_series"
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "capacity"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Individual Volume Capacities (Time Series)",
@@ -704,22 +931,19 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "Used pool space may be larger than sum of standard volumes' capacity due to coarser allocation/rounding on DDP storage pools. Traditional RAID pools reflect capacity of user volumes more precisely than DDP pools.",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -758,10 +982,48 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "config_storage_pools",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT sum(last_used) FROM (SELECT last(\"usedSpace\") as last_used FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "table"
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "usedSpace"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Total Used Pool Space",
@@ -775,19 +1037,15 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed"
           },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -826,10 +1084,48 @@
             "type": "influxdb",
             "uid": "${DS_EPA}"
           },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "config_storage_pools",
+          "orderByTime": "ASC",
+          "policy": "default",
           "query": "SELECT sum(last_free) FROM (SELECT last(\"freeSpace\") as last_free FROM \"config_storage_pools\" WHERE (\"sys_name\" =~ /^$storage_system$/) AND $timeFilter GROUP BY pool_name)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
-          "resultFormat": "table"
+          "resultFormat": "table",
+          "select": [
+            [
+              {
+                "params": [
+                  "freeSpace"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$storage_system$/"
+            }
+          ]
         }
       ],
       "title": "Total Free Pool Space",
@@ -1518,10 +1814,6 @@
       "targets": [
         {
           "alias": "volume_count",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          },
           "groupBy": [
             {
               "params": [
@@ -1561,7 +1853,11 @@
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          }
         },
         {
           "alias": "snapshot_count",
@@ -1660,354 +1956,6 @@
       ],
       "title": "Volume and Snapshot Count, Repos Capacity",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_EPA}"
-      },
-      "description": "- Enc: 128=OK, !128=NG\n- Inlet: warn at 25C+  \nDisclaimer: these are for reference only; check the manufacturer's recommendations for safe operating temperature range",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "128": {
-                  "color": "green",
-                  "index": 0,
-                  "text": "OK"
-                }
-              },
-              "type": "value"
-            },
-            {
-              "options": {
-                "pattern": "[^128]",
-                "result": {
-                  "color": "orange",
-                  "index": 1,
-                  "text": "NG"
-                }
-              },
-              "type": "regex"
-            }
-          ],
-          "thresholds": {
-            "mode": "percentage",
-            "steps": [
-              {
-                "color": "text",
-                "value": 0
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "B"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": 0
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 25
-                    },
-                    {
-                      "color": "red",
-                      "value": 30
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "unit",
-                "value": "celsius"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 72
-      },
-      "id": 19,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "sensor::tag"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "measurement": "temp",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "query": "SELECT mean(\"temp\") FROM \"temp\" WHERE $timeFilter GROUP BY time($__interval), \"sensor\"::tag fill(null)",
-          "rawQuery": false,
-          "refId": "A",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "temp"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "mean"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "sensor::tag",
-              "operator": "=",
-              "value": "0B00000000000000000001000000000000000000"
-            }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
-        },
-        {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          },
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "sensor::tag"
-              ],
-              "type": "tag"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "measurement": "temp",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "query": "SELECT mean(\"temp\") FROM \"temp\" WHERE $timeFilter GROUP BY time($__interval), \"sensor\"::tag fill(null)",
-          "rawQuery": false,
-          "refId": "B",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "temp"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "mean"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "sensor::tag",
-              "operator": "=",
-              "value": "0B00000000000000000002000000000000000000"
-            }
-          ]
-        }
-      ],
-      "title": "Enclosure and Inlet Temperature",
-      "transformations": [
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "temp.mean { sensor: 0B00000000000000000001000000000000000000 }",
-            "renamePattern": "enclosure"
-          }
-        },
-        {
-          "id": "renameByRegex",
-          "options": {
-            "regex": "temp.mean { sensor: 0B00000000000000000002000000000000000000 }",
-            "renamePattern": "inlet"
-          }
-        }
-      ],
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "influxdb",
-        "uid": "${DS_EPA}"
-      },
-      "description": "- Total (system) PSU consumption\n- Per-shelf breakdown isn't collected due to complexity and poor API structs",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "#EAB839",
-                "value": 1000
-              },
-              {
-                "color": "orange",
-                "value": 1500
-              }
-            ]
-          },
-          "unit": "watt"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 80
-      },
-      "id": 20,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "groupBy": [
-            {
-              "params": [
-                "$__interval"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "null"
-              ],
-              "type": "fill"
-            }
-          ],
-          "measurement": "power",
-          "orderByTime": "ASC",
-          "policy": "default",
-          "refId": "A",
-          "resultFormat": "time_series",
-          "select": [
-            [
-              {
-                "params": [
-                  "totalPower"
-                ],
-                "type": "field"
-              },
-              {
-                "params": [],
-                "type": "mean"
-              }
-            ]
-          ],
-          "tags": [
-            {
-              "key": "sys_name::tag",
-              "operator": "=~",
-              "value": "/^$storage_system$/"
-            }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
-        }
-      ],
-      "title": "Total Power Supply Consumption",
-      "type": "stat"
     }
   ],
   "preload": false,
@@ -2038,13 +1986,13 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Other Examples",
   "uid": "epa-other-examples",
-  "version": 10,
+  "version": 23,
   "weekStart": ""
 }

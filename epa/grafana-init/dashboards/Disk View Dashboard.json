@@ -2353,6 +2353,18 @@
             },
             {
               "params": [
+                "sys_tray::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "sys_tray_slot::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
                 "null"
               ],
               "type": "fill"
@@ -2362,7 +2374,7 @@
           "orderByTime": "ASC",
           "policy": "default",
           "query": "SELECT last(\"spareBlocksRemainingPercent\") FROM \"disks\" WHERE (\"sys_name\" =~ /^$System$/ AND \"vol_group_name\" =~ /^$VolumeGroup$/ AND \"sys_tray\" =~ /^$Tray$/ AND \"sys_tray_slot\" =~ /^$Slot$/) AND $timeFilter GROUP BY \"sys_name\", \"sys_tray\", \"sys_tray_slot\" fill(none)",
-          "rawQuery": true,
+          "rawQuery": false,
           "refId": "A",
           "resultFormat": "time_series",
           "select": [
@@ -2375,11 +2387,23 @@
               },
               {
                 "params": [],
-                "type": "mean"
+                "type": "last"
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$System$/"
+            },
+            {
+              "condition": "AND",
+              "key": "driveMediaType::tag",
+              "operator": "=",
+              "value": "ssd"
+            }
+          ]
         }
       ],
       "title": "SSD spare blocks remaining %",
@@ -2387,8 +2411,15 @@
         {
           "id": "renameByRegex",
           "options": {
-            "regex": "disks.last { sys_name: E4012, sys_tray: 98, sys_tray_slot: 019 }",
-            "renamePattern": "$1"
+            "regex": "disks.last { sys_tray_slot: (\\d+), sys_tray: (\\d+) }",
+            "renamePattern": "Tray $2 Slot $1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "disks.last { sys_tray: (\\d+), sys_tray_slot: (\\d+) }",
+            "renamePattern": "Tray $1 Slot $2"
           }
         }
       ],
@@ -2486,13 +2517,13 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Disk View Dashboard",
   "uid": "epa-disk-view-dashboard",
-  "version": 3,
+  "version": 7,
   "weekStart": ""
 }

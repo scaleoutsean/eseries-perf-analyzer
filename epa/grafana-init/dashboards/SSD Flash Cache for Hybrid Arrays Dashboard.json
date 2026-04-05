@@ -574,6 +574,10 @@
       "targets": [
         {
           "alias": "populate_on_reads",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -607,11 +611,7 @@
               "operator": "=",
               "value": "3233343536373839303134323200000000000000"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "populate_on_writes",
@@ -718,7 +718,53 @@
           },
           "unit": "none"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "writes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reads"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "invalidates"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -1053,6 +1099,10 @@
       "targets": [
         {
           "alias": "invalidates",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1086,11 +1136,7 @@
               "operator": "=",
               "value": "3233343536373839303134323200000000000000"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "reads",
@@ -1996,9 +2042,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 45
+        "w": 24,
+        "x": 0,
+        "y": 53
       },
       "id": 13,
       "options": {
@@ -2298,6 +2344,28 @@
         "regex": "",
         "regexApplyTo": "value",
         "type": "query"
+      },
+      {
+        "allowCustomValue": true,
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_EPA}"
+        },
+        "definition": "SELECT volume_name FROM config_volumes LIMIT 50",
+        "description": "",
+        "label": "VolumeName",
+        "multi": true,
+        "name": "VolumeName",
+        "options": [],
+        "query": {
+          "query": "SELECT volume_name FROM config_volumes LIMIT 50",
+          "refId": "InfluxVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
       }
     ]
   },
@@ -2309,6 +2377,6 @@
   "timezone": "browser",
   "title": "SSD Flash Cache for Hybrid Arrays Dashboard",
   "uid": "epa-ssd-flash-cache-for-hybrid-arrays-d",
-  "version": 12,
+  "version": 3,
   "weekStart": ""
 }
