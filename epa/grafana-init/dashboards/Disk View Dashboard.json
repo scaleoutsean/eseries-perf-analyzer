@@ -2296,8 +2296,12 @@
                 "value": 40
               },
               {
-                "color": "#EAB839",
+                "color": "semi-dark-orange",
                 "value": 50
+              },
+              {
+                "color": "yellow",
+                "value": 75
               },
               {
                 "color": "dark-green",
@@ -2379,6 +2383,15 @@
         }
       ],
       "title": "SSD spare blocks remaining %",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "disks.last { sys_name: E4012, sys_tray: 98, sys_tray_slot: 019 }",
+            "renamePattern": "$1"
+          }
+        }
+      ],
       "type": "stat"
     }
   ],
@@ -2480,6 +2493,6 @@
   "timezone": "browser",
   "title": "Disk View Dashboard",
   "uid": "epa-disk-view-dashboard",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

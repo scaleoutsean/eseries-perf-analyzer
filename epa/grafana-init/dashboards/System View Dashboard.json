@@ -1194,6 +1194,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns nonsensical values (outliers)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1392,6 +1393,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns nonsensical values (outliers)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1590,6 +1592,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns nonsensical values (outliers)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2736,6 +2739,6 @@
   "timezone": "browser",
   "title": "System View Dashboard",
   "uid": "epa-system-view-dashboard",
-  "version": 8,
+  "version": 4,
   "weekStart": ""
 }

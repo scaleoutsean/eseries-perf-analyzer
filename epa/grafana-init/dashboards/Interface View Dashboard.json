@@ -684,6 +684,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns extreme values",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3117,6 +3118,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns extreme values",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3343,6 +3345,7 @@
         "type": "influxdb",
         "uid": "${DS_EPA}"
       },
+      "description": "SANtricity API sometimes returns extreme values",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -3563,6 +3566,214 @@
       ],
       "title": "Maximum Queue Depth",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "influxdb",
+        "uid": "${DS_EPA}"
+      },
+      "description": "With controller caching, volume caching and read-prefetch all disabled, we'd expect mirrored values",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": true,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 11,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "MBs"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "custom.transform",
+                "value": "negative-Y"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "id": 22,
+      "maxPerRow": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "repeat": "System",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "alias": "driveside",
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "interface",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "combinedThroughput"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "channel_type::tag",
+              "operator": "=",
+              "value": "driveside"
+            }
+          ],
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          }
+        },
+        {
+          "alias": "hostide",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "interface",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "combinedThroughput"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "key": "channel_type::tag",
+              "operator": "=",
+              "value": "hostside"
+            }
+          ]
+        }
+      ],
+      "title": "Combined Throughput Hostside vs Driveside",
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -3608,13 +3819,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Interface View Dashboard",
   "uid": "epa-interface-view-dashboard",
-  "version": 17,
+  "version": 7,
   "weekStart": ""
 }
