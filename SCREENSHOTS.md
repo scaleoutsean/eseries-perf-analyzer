@@ -1,6 +1,6 @@
 # EPA Screenshots
 
-As you can see in `./epa/grafana-init/dashboards/`, there are four dashboards. The last one shown was created at some point but I didn't keep it, so you'd have to add a panel or dashboard to visualize those measurements. Configuration dashboard is new in 3.5.0 and is supposed to use higher time granularity because configuration data is collected on a 15 minute schedule (by default).
+As you can see in `./epa/grafana-init/dashboards/`, there are several sample dashboards which may be manually imported or uploaded to the included Grafana instance with `grafana-init`.
 
 - **System**
 
@@ -26,7 +26,7 @@ As you can see in `./epa/grafana-init/dashboards/`, there are four dashboards. T
 
 ![EPA Configuration dashboard](./images/sample-screenshot-config-collectors.png)
 
-- **Environmental** (not included)
+- **Environmental** (a version of this panel is included in one of the dashboard files)
 
 ![EPA Volumes panel](./images/sample-screenshot-epa-collector-environmental.png)
 
