@@ -2098,6 +2098,9 @@ def collect_volume_stats_realtime(system_info):
     if len(CMD.api) > 1:
         set_current_controller_index(random.randrange(0, 2))
 
+    sys_id = system_info.get('wwn', system_info.get('id', 'unknown'))
+    sys_name = system_info.get('name', 'unknown')
+
     try:
         session = get_session()
         json_body = []

@@ -94,6 +94,7 @@ def run_tests(capture_dir):
     collector.sys_name = "test_sys_name"
     collector.CMD = MagicMock()
     collector.CMD.api = ['1.2.3.4']  # Set API IP for get_controller
+    collector.CMD.api_port = '8443'  # Set API port for get_controller
     collector.CMD.include = None # Include all
     collector.CMD.realtime = True # Enable realtime testing
     collector.CMD.showVolumeMetrics = True
