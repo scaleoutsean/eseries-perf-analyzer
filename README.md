@@ -323,7 +323,7 @@ Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsea
   - Parse ports from Fibre Channel host objects
   - Add SSD Flash Cache metrics and example dashboard
   - Collect snapshot and volume count, and repository volumes' total capacity
-  - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats (11.90 and 12.00, SAS and NVMe), initiator count, volume capacity)
+  - Bug fixes and improvements (better handling of unavailable metrics, drop repository volumes from volume collection, avoid duplicate upload of reference dashboards, re-fix SSD wear level stats (11.90 and 12.00, SAS and NVMe SSDs), initiator count, volume capacity)
 
 - 3.5.3 (January 20, 2026)
   - Add Prometheus alerts for downed interfaces

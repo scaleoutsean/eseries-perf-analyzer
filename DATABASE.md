@@ -1,4 +1,4 @@
-# InfluxDB v1 in EPA 3.5
+# InfluxDB v1 Schema for E-Series Perf Analyzer v3.5.4
 
 - `DISTINCT` only works on **tags**, not fields. Use `SHOW TAG VALUES` for tags, `GROUP BY` for field de-duplication in query results
 - Use `GROUP BY` for uniqueness. When you want unique records, group by a unique identifier (like `volumeRef` below)
@@ -55,137 +55,240 @@ time Pool_Name      Total_TB           Used_TB            Available_TB      Util
 
 You may also try the Bash script in the `scripts` directory. Pass E-Series system name to it when you run the script: `./storage_pool_analysis.sh <sys_name>`.
 
-## Schema
+## Measurements
 
-For convenience, a list of measurements, fields and keys that v3.5.2 collects are given below. These aren't expected to change, but you can view your own with `SHOW MEASUREMENTS`, `SHOW FIELD KEYS`, `SHOW TAG KEYS`. `"SHOW FIELD KEYS FROM config_volumes"` shows fields from specific measurement. (v3.5.3 adds optional "point-in-time" volume statistics that disabled by default and not shown below.)
+Using default options, you should expect to see the following measurements (real-time collection isn't on by default):
 
-```raw
-EPA Database Schema Dump
-========================
-Host: influxdb:8086
-Database: eseries
-Generated: Wed Sep  3 05:01:38 PM UTC 2025
+- `config_drives`
+- `config_hosts`
+- `config_storage_pools`
+- `config_volumes`
+- `config_volumes_summary`
+- `controllers`
+- `disks`
+- `flashcache`
+- `interface`
+- `major_event_log`
+- `systems`
+- `volumes`
 
-Found measurement: disks
-=================================
-Field Keys:
-name: disks
-fieldKey                    fieldType
---------                    ---------
-averageReadOpSize           float
-averageWriteOpSize          float
-combinedIOps                float
-combinedResponseTime        float
-combinedThroughput          float
-otherIOps                   float
-percentEnduranceUsed        integer
-readIOps                    float
-readOps                     float
-readPhysicalIOps            float
-readResponseTime            float
-readThroughput              float
-spareBlocksRemainingPercent integer
-writeIOps                   float
-writeOps                    float
-writePhysicalIOps           float
-writeResponseTime           float
-writeThroughput             float
+## Measurement: `config_drives`
 
-Tag Keys:
-name: disks
+### Tags
+```text
+name: config_drives
+tagKey
+------
+driveMediaType
+driveRef
+physicalLocation__trayRef
+physicalLocation_slot
+productID
+serialNumber
+sys_id
+sys_name
+```
+
+### Fields
+```text
+name: config_drives
+fieldKey                     fieldType
+--------                     ---------
+available                    boolean
+cause                        string
+currentVolumeGroupRef        string
+hasDegradedChannel           boolean
+hotSpare                     boolean
+id                           string
+interfaceType_sas_deviceName string
+invalidDriveData             boolean
+manufacturer                 string
+offline                      string
+pfa                          boolean
+pfaReason                    string
+rawCapacity                  string
+removed                      boolean
+sparedForDriveRef            string
+status                       string
+uncertified                  boolean
+usableCapacity               integer
+volumeGroupIndex             float
+worldWideName                string
+```
+
+## Measurement: `config_hosts`
+
+### Tags
+```text
+name: config_hosts
+tagKey
+------
+clusterRef
+hostRef
+hostTypeIndex
+host_name
+id
+label
+sys_id
+sys_name
+```
+
+### Fields
+```text
+name: config_hosts
+fieldKey                                         fieldType
+--------                                         ---------
+confirmLUNMappingCreation                        string
+hostSidePortCount                                integer
+hostSidePorts_first_id                           string
+hostSidePorts_first_mtpIoInterfaceType           string
+hostSidePorts_first_type                         string
+host_name_field                                  string
+initiatorCount                                   integer
+initiators_first_hostRef                         string
+initiators_first_id                              string
+initiators_first_initiatorInactive               string
+initiators_first_initiatorNodeName_interfaceType string
+initiators_first_initiatorRef                    string
+initiators_first_label                           string
+initiators_first_nodeName_ioInterfaceType        string
+initiators_first_nodeName_iscsiNodeName          string
+initiators_first_nodeName_nvmeNodeName           string
+initiators_first_nodeName_remoteNodeWWN          string
+isLargeBlockFormatHost                           string
+isLun0Restricted                                 string
+isSAControlled                                   string
+protectionInformationCapableAccessMethod         string
+```
+
+## Measurement: `config_storage_pools`
+
+### Tags
+```text
+name: config_storage_pools
+tagKey
+------
+driveMediaType
+id
+label
+pool_name
+raidLevel
+state
+sys_id
+sys_name
+volumeGroupRef
+```
+
+### Fields
+```text
+name: config_storage_pools
+fieldKey                     fieldType
+--------                     ---------
+blkSizeRecommended           integer
+blkSizeSupported_4096        string
+blkSizeSupported_512         string
+diskPool                     string
+drawerLossProtection         string
+driveMediaType               string
+drivePhysicalType            string
+extents_raidLevel            string
+extents_rawCapacity          integer
+freeSpace                    integer
+isInaccessible               string
+offline                      string
+pool_name_field              string
+protectionInformationCapable string
+raidLevel                    string
+raidStatus                   string
+reservedSpaceAllocated       string
+sequenceNum                  integer
+spindleSpeedMatch            string
+state                        string
+totalRaidedSpace             integer
+usedSpace                    integer
+volumeGroupData_type         string
+```
+
+## Measurement: `config_volumes`
+
+### Tags
+```text
+name: config_volumes
+tagKey
+------
+id
+label
+sys_id
+sys_name
+volumeGroupRef
+volumeHandle
+volumeRef
+volume_name
+worldWideName
+wwn
+```
+
+### Fields
+```text
+name: config_volumes
+fieldKey                      fieldType
+--------                      ---------
+blkSize                       integer
+capacity                      float
+currentControllerId           string
+dssMaxSegmentSize             integer
+flashCached                   string
+listOfMappings_lun            integer
+listOfMappings_lunMappingRef  string
+listOfMappings_ssid           integer
+mapped_host_count             integer
+mapped_host_names             string
+preReadRedundancyCheckEnabled string
+preferredControllerId         string
+protectionInformationCapable  string
+protectionType                string
+raidLevel                     string
+segmentSize                   integer
+status                        string
+totalSizeInBytes              float
+volume_name_field             string
+```
+
+## Measurement: `config_volumes_summary`
+
+### Tags
+```text
+name: config_volumes_summary
 tagKey
 ------
 sys_id
 sys_name
-sys_tray
-sys_tray_slot
-vol_group_name
+```
 
+### Fields
+```text
+name: config_volumes_summary
+fieldKey            fieldType
+--------            ---------
+repository_capacity float
+snapshot_count      integer
+volume_count        integer
+```
 
-Found measurement: volumes
-=================================
-Field Keys:
-name: volumes
-fieldKey                   fieldType
---------                   ---------
-averageReadOpSize          float
-averageWriteOpSize         float
-combinedIOps               float
-combinedResponseTime       float
-combinedThroughput         float
-flashCacheHitPct           float
-flashCacheReadHitBytes     float
-flashCacheReadHitOps       float
-flashCacheReadResponseTime float
-flashCacheReadThroughput   float
-mapped_host_count          integer
-mapped_host_names          string
-otherIOps                  float
-queueDepthMax              float
-queueDepthTotal            float
-readCacheUtilization       float
-readHitBytes               float
-readHitOps                 float
-readIOps                   float
-readOps                    float
-readPhysicalIOps           float
-readResponseTime           float
-readThroughput             float
-writeCacheUtilization      float
-writeHitBytes              float
-writeHitOps                float
-writeIOps                  float
-writeOps                   float
-writePhysicalIOps          float
-writeResponseTime          float
-writeThroughput            float
+## Measurement: `controllers`
 
-Tag Keys:
-name: volumes
+### Tags
+```text
+name: controllers
 tagKey
 ------
+controller_id
 sys_id
 sys_name
-vol_name
+```
 
-
-Found measurement: interface
-=================================
-Field Keys:
-name: interface
-fieldKey             fieldType
---------             ---------
-averageReadOpSize    float
-averageWriteOpSize   float
-channelErrorCounts   float
-combinedIOps         float
-combinedResponseTime float
-combinedThroughput   float
-otherIOps            float
-queueDepthMax        float
-queueDepthTotal      float
-readIOps             float
-readOps              float
-readResponseTime     float
-readThroughput       float
-writeIOps            float
-writeOps             float
-writeResponseTime    float
-writeThroughput      float
-
-Tag Keys:
-name: interface
-tagKey
-------
-channel_type
-interface_id
-sys_id
-sys_name
-
-
-Found measurement: controllers
-=================================
-Field Keys:
+### Fields
+```text
 name: controllers
 fieldKey                           fieldType
 --------                           ---------
@@ -231,78 +334,131 @@ writePhysicalIOps                  float
 writeResponseTime                  float
 writeResponseTimeStdDev            float
 writeThroughput                    float
+```
 
-Tag Keys:
-name: controllers
+## Measurement: `disks`
+
+### Tags
+```text
+name: disks
 tagKey
 ------
-controller_id
+driveMediaType
 sys_id
 sys_name
+sys_tray
+sys_tray_slot
+vol_group_name
+```
 
+### Fields
+```text
+name: disks
+fieldKey                    fieldType
+--------                    ---------
+averageReadOpSize           float
+averageWriteOpSize          float
+combinedIOps                float
+combinedResponseTime        float
+combinedThroughput          float
+otherIOps                   float
+percentEnduranceUsed        integer
+readIOps                    float
+readOps                     float
+readPhysicalIOps            float
+readResponseTime            float
+readThroughput              float
+spareBlocksRemainingPercent integer
+writeIOps                   float
+writeOps                    float
+writePhysicalIOps           float
+writeResponseTime           float
+writeThroughput             float
+```
 
-Found measurement: systems
-=================================
-Field Keys:
-name: systems
-fieldKey          fieldType
---------          ---------
-cpuAvgUtilization float
-maxCpuUtilization float
+## Measurement: `flashcache`
 
-Tag Keys:
-name: systems
+### Tags
+```text
+name: flashcache
 tagKey
 ------
+flash_cache_id
+flash_cache_name
 sys_id
 sys_name
+```
 
+### Fields
+```text
+name: flashcache
+fieldKey                fieldType
+--------                ---------
+allocatedBytes          integer
+availableBytes          integer
+cache_drive_count       integer
+cached_volumes_count    integer
+completeCacheMiss       integer
+completeCacheMissBlocks integer
+fullCacheHitBlocks      integer
+fullCacheHits           integer
+invalidates             integer
+partialCacheHitBlocks   integer
+partialCacheHits        integer
+populateOnReadBlocks    integer
+populateOnReads         integer
+populateOnWriteBlocks   integer
+populateOnWrites        integer
+populatedCleanBytes     integer
+populatedDirtyBytes     integer
+readBlocks              integer
+reads                   integer
+recycles                integer
+writeBlocks             integer
+writes                  integer
+```
 
-Found measurement: power
-=================================
-Field Keys:
-name: power
-fieldKey   fieldType
---------   ---------
-totalPower integer
+## Measurement: `interface`
 
-Tag Keys:
-name: power
+### Tags
+```text
+name: interface
 tagKey
 ------
+channel_type
+interface_id
 sys_id
 sys_name
+```
 
+### Fields
+```text
+name: interface
+fieldKey             fieldType
+--------             ---------
+averageReadOpSize    float
+averageWriteOpSize   float
+channelErrorCounts   float
+combinedIOps         float
+combinedResponseTime float
+combinedThroughput   float
+otherIOps            float
+queueDepthMax        float
+queueDepthTotal      float
+readIOps             float
+readOps              float
+readResponseTime     float
+readThroughput       float
+writeIOps            float
+writeOps             float
+writeResponseTime    float
+writeThroughput      float
+```
 
-Found measurement: temp
-=================================
-Field Keys:
-name: temp
-fieldKey fieldType
--------- ---------
-temp     integer
+## Measurement: `major_event_log`
 
-Tag Keys:
-name: temp
-tagKey
-------
-sensor
-sensor_seq
-sys_id
-sys_name
-
-
-Found measurement: major_event_log
-=================================
-Field Keys:
-name: major_event_log
-fieldKey    fieldType
---------    ---------
-description string
-id          string
-location    string
-
-Tag Keys:
+### Tags
+```text
 name: major_event_log
 tagKey
 ------
@@ -315,197 +471,85 @@ priority
 sys_id
 sys_name
 time_stamp
+```
 
+### Fields
+```text
+name: major_event_log
+fieldKey    fieldType
+--------    ---------
+description string
+id          string
+location    string
+```
 
-Found measurement: failures
-=================================
-Field Keys:
-name: failures
-fieldKey fieldType
--------- ---------
-name_of  string
-type_of  string
+## Measurement: `systems`
 
-Tag Keys:
-name: failures
+### Tags
+```text
+name: systems
 tagKey
 ------
-active
-failure_type
-object_ref
-object_type
-sys_id
-sys_name
-
-
-Found measurement: config_hosts
-=================================
-Field Keys:
-name: config_hosts
-fieldKey                                         fieldType
---------                                         ---------
-confirmLUNMappingCreation                        string
-hostSidePortCount                                integer
-hostSidePorts_first_id                           string
-hostSidePorts_first_mtpIoInterfaceType           string
-hostSidePorts_first_type                         string
-host_name_field                                  string
-initiatorCount                                   integer
-initiators_first_hostRef                         string
-initiators_first_id                              string
-initiators_first_initiatorInactive               string
-initiators_first_initiatorNodeName_interfaceType string
-initiators_first_initiatorRef                    string
-initiators_first_label                           string
-initiators_first_nodeName_ioInterfaceType        string
-initiators_first_nodeName_iscsiNodeName          string
-initiators_first_nodeName_nvmeNodeName           string
-initiators_first_nodeName_remoteNodeWWN          string
-isLargeBlockFormatHost                           string
-isLun0Restricted                                 string
-isSAControlled                                   string
-protectionInformationCapableAccessMethod         string
-
-Tag Keys:
-name: config_hosts
-tagKey
-------
-clusterRef
-hostRef
-hostTypeIndex
-host_name
-id
-label
-sys_id
-sys_name
-
-
-Found measurement: config_volumes
-=================================
-Field Keys:
-name: config_volumes
-fieldKey                      fieldType
---------                      ---------
-blkSize                       integer
-capacity                      float
-currentControllerId           string
-dssMaxSegmentSize             integer
-flashCached                   string
-listOfMappings_lun            integer
-listOfMappings_lunMappingRef  string
-listOfMappings_ssid           integer
-mapped_host_count             integer
-mapped_host_names             string
-preReadRedundancyCheckEnabled string
-preferredControllerId         string
-protectionInformationCapable  string
-protectionType                string
-raidLevel                     string
-segmentSize                   integer
-status                        string
-totalSizeInBytes              float
-volume_name_field             string
-
-Tag Keys:
-name: config_volumes
-tagKey
-------
-extendedUniqueIdentifier
-id
-label
-sys_id
-sys_name
-volumeGroupRef
-volumeHandle
-volumeRef
-volume_name
-worldWideName
-wwn
-
-
-Found measurement: config_storage_pools
-=================================
-Field Keys:
-name: config_storage_pools
-fieldKey                     fieldType
---------                     ---------
-blkSizeRecommended           integer
-blkSizeSupported_4096        string
-blkSizeSupported_512         string
-diskPool                     string
-drawerLossProtection         string
-driveMediaType               string
-drivePhysicalType            string
-extents_raidLevel            string
-extents_rawCapacity          integer
-freeSpace                    integer
-isInaccessible               string
-offline                      string
-pool_name_field              string
-protectionInformationCapable string
-raidLevel                    string
-raidStatus                   string
-reservedSpaceAllocated       string
-sequenceNum                  integer
-spindleSpeedMatch            string
-state                        string
-totalRaidedSpace             integer
-usedSpace                    integer
-volumeGroupData_type         string
-
-Tag Keys:
-name: config_storage_pools
-tagKey
-------
-driveMediaType
-id
-label
-pool_name
-raidLevel
-state
-sys_id
-sys_name
-volumeGroupRef
-
-
-Found measurement: config_drives
-=================================
-Field Keys:
-name: config_drives
-fieldKey                      fieldType
---------                      ---------
-available                     boolean
-cause                         string
-currentVolumeGroupRef         string
-hasDegradedChannel            boolean
-hotSpare                      boolean
-id                            string
-interfaceType_nvme_deviceName string
-interfaceType_sas_deviceName  string
-invalidDriveData              boolean
-manufacturer                  string
-offline                       string
-pfa                           boolean
-pfaReason                     string
-rawCapacity                   string
-removed                       boolean
-sparedForDriveRef             string
-status                        string
-uncertified                   boolean
-usableCapacity                integer
-volumeGroupIndex              float
-worldWideName                 string
-
-Tag Keys:
-name: config_drives
-tagKey
-------
-driveMediaType
-driveRef
-physicalLocation__trayRef
-physicalLocation_slot
-productID
-serialNumber
 sys_id
 sys_name
 ```
+
+### Fields
+```text
+name: systems
+fieldKey          fieldType
+--------          ---------
+cpuAvgUtilization float
+maxCpuUtilization float
+```
+
+## Measurement: `volumes`
+
+### Tags
+```text
+name: volumes
+tagKey
+------
+sys_id
+sys_name
+vol_name
+```
+
+### Fields
+```text
+name: volumes
+fieldKey                   fieldType
+--------                   ---------
+averageReadOpSize          float
+averageWriteOpSize         float
+combinedIOps               float
+combinedResponseTime       float
+combinedThroughput         float
+flashCacheHitPct           float
+flashCacheReadHitBytes     float
+flashCacheReadHitOps       float
+flashCacheReadResponseTime float
+flashCacheReadThroughput   float
+mapped_host_count          integer
+mapped_host_names          string
+otherIOps                  float
+queueDepthMax              float
+queueDepthTotal            float
+readCacheUtilization       float
+readHitBytes               float
+readHitOps                 float
+readIOps                   float
+readOps                    float
+readPhysicalIOps           float
+readResponseTime           float
+readThroughput             float
+writeCacheUtilization      float
+writeHitBytes              float
+writeHitOps                float
+writeIOps                  float
+writeOps                   float
+writePhysicalIOps          float
+writeResponseTime          float
+writeThroughput            float
+```
+

@@ -11,7 +11,7 @@ Below details are mostly related to this fork. For upstream details please check
   - [Where's my InfluxDB data?](#wheres-my-influxdb-data)
   - [Where's my Grafana data? I see nothing when I look at the dashboards!](#wheres-my-grafana-data-i-see-nothing-when-i-look-at-the-dashboards)
   - [What do temperature sensors measure?](#what-do-temperature-sensors-measure)
-  - [Why there's six environmental sensor readings, but one PSU figure?](#why-theres-six-environmental-sensor-readings-but-one-psu-figure)
+  - [Why there's just one PSU figure when there are two (or more) power supply units?](#why-theres-just-one-psu-figure-when-there-are-two-or-more-power-supply-units)
   - [How to get more details about Major Event Log entries?](#how-to-get-more-details-about-major-event-log-entries)
   - [How to get interface error metrics?](#how-to-get-interface-error-metrics)
   - [If I use my own Grafana, do I need to recreate EPA dashboards from scratch?](#if-i-use-my-own-grafana-do-i-need-to-recreate-epa-dashboards-from-scratch)
@@ -75,20 +75,21 @@ Use the Explore feature in Grafana, and if that doesn't let you see anything, ch
 
 The ones we have seen represent the following:
 
-- CPU temperature in degrees C - usually >50C
+- CPU temperature in degrees C - usually >50C (not all systems expose it)
 - Controller shelf's inlet temperature in degrees C - usually between 20-30C
-- "Overall" temperature status as binary indicator - 128 if OK, and not 128 if not OK, so this one probably doesn't need a chart but some indicator that alerts if the value is *not* 128
+- "Overall" temperature status as binary indicator - decimal 128 if OK, and not 128 if not OK, so this one probably doesn't need a chart but some indicator that alerts if the value is *not* 128
 
-## Why there's six environmental sensor readings, but one PSU figure?
+One of the sample dashboards has an example panel that demonstrates the approach.
 
-Sensors: I suppose it's 2 per each controller, as per the list above, one per each controller gives you six. These can't be averaged or "merged", so collector keeps them separate.
+On EF600, there appears to be just two (inlet and overall status) sensors.
 
-PSU: the API indeed provides two readings, but I decided to add them up because there's little value in looking per-PSU power consumption (especially since auto-rebalancing may move volumes around, causing visible changes in power consumption that have nothing to do with the PSU itself). Feel free to change the code if you want to watch them separately. Personally I couldn't imagine a scenario in which retaining both wouldn't be waste of space.
+## Why there's just one PSU figure when there are two (or more) power supply units?
 
-Important detail about limitations:
+There's little value in looking per-PSU power consumption (especially since controllers' auto-rebalancing may move volumes around, causing visible changes in power consumption that have nothing to do with the PSU itself). Feel free to change the code if you want to watch them separately. Personally I couldn't imagine a scenario in which retaining both wouldn't be waste of space.
 
-- Sensors: I've no idea if all E-Series models have 3 sensors per controller, and in what order (which is why I gave approximate values that you may expect from each kind). I also don't know if their names (e.g. 0B00000000000000000002000000000000000000) are consistent across E- and EF-Series models
-- Expansion shelves: I don't have access to E-Series with expansion enclosures and have no idea what the API returns for those, so in v3.3.0 collector does not collect total power consumption of the entire *array*. Later releases may collect everything they find
+Power consumption by expansion shelves would be somewhat interesting,. but I don't have access to E-Series with expansion enclosures and have no idea what the API returns for those.
+
+Therefore, Collector collects total power consumption of the entire *array*, regardless of whether there are any expansion shelves.
 
 ## How to get more details about Major Event Log entries?
 
@@ -124,15 +125,17 @@ docker exec utils influx -host influxdb -port 8086 -database eseries -execute "S
 
 ### What are those `repos_<three-digits>` volumes in my `config_volumes` table?
 
-You may see them if you have snapshot reserves and such.
+You may see them if you have snapshots and clones.
 
 See [this](https://scaleoutsean.github.io/2023/10/05/snapshots-and-consistency-groups-with-netapp-e-series.html#appendix-c---repository-utilization) and similar content for related information.
 
+In 3.5.4 those `repos_` volumes were removed from dashboards which show "named volumes" (where one expects to see names of "user volumes") because there can be many of them. But in storage pool consumption and other panels and stats where total consumption is shown, those have to, and do count.
+
 ## How much memory does each collector container need?
 
-It my testing, much less than 32 MiB (average, 21 MiB). It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
+It my testing, much less than 32 MiB (average, 21 MiB), but peaks can go to 200 MiB. It'd take 32 arrays to use 1GiB of RAM (with 32 collector containers).
 
-However, EPA's RAM utilization may spike when it processes very large JSON objects, so if you need set a maximum upper RAM resource limit, you may set it to 256 MiB. That should handle any short-lived spikes.
+However, EPA's RAM utilization may spike when it processes very large JSON objects, so if you need set a maximum upper RAM resource limit, you may set it to 256 MiB. That should handle any short-lived spikes. Sustained RAM use is around 32 MiB per collector.
 
 ## How to upgrade?
 
@@ -141,6 +144,8 @@ From 3.[1,2,3] to 3.4 or newer version 3, I wouldn't try since there aren't new 
 EPA 3.4.0's `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
 EPA 3.5.0, 3.5.1, 3.5.2, 3.5.4 don't have changes compared to 3.4, but it has new "tables". Upgrade should be possible.
+
+EPA 3.5.4: due to significant upgrades (including Grafana), you will have to re-touch some of your Grafana dashboards. If you want to keep them, you could probably upgrade just the Collector and keep everything else the same, but I haven't tried that.
 
 ## If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
@@ -190,17 +195,21 @@ WWN is required because E-Series array names change more frequently and can even
 
 ## How to backup and restore EPA or InfluxDB?
 
-- Mount a backup volume to the `utils` container
-- Use `influxdb` native backup command to dump DB to that volume
-- To restore, do the same with `inflxudb` container: mount the same volume, restore from that path
+- Mount a backup volume to the `utils` container (i.e. start that container with a volume)
+- Use `influxdb` native backup command in `utils` container to dump DB to that volume
+- To restore, do the same with `inflxudb` container: mount the same volume, restore from that path to InfluxDB container
 
 ## How do temperature alarms work?
 
-For the inlet sensor a warning message should be sent at 35C, and a critical message should be sent at 40C. I don't know about the CPU temperature sensor.
+For the inlet sensor a warning message should be sent at 35C, and a critical message should be sent at 40C.
+
+EPA 3.5.4 has a sample temperature visualization panel that shows "red" at 30C, which is seemingly inconsistent, but feel free to adjust that threshold. Furthermore, alerts are separate from visualizations.
+
+I don't know about the CPU temperature sensor (it's not even available on some systems, probably to (again) undocumented SANtricity API or hardware changes).
 
 ## InfluxDB capacity and performance requirements
 
-Performance requirements should be modest even for several arrays. If InfluxDB is on flash storage, any will do. 
+Performance requirements should be modest even for several arrays. If InfluxDB is on flash storage, any will do.
 
 Capacity requirements depend on the number of arrays, disks and volumes (LUNs). With a small EF570 (24 disks, 10 volumes) collected every 60s, you may need up to several GB/month.
 
