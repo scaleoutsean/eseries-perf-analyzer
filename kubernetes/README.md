@@ -38,7 +38,7 @@ Examples and YAML files use the `epa` namespace. Many how-to's seem to standardi
 kubectl create namespace epa
 ```
 
-### Deploy InfluxDB version 1 and Grafana version 8
+### Deploy InfluxDB version 1 and Grafana version 12 
 
 You may deploy InfluxDB v1 (v1.12, for example) and Grafana version 12 any way you want. Just make sure that:
 
