@@ -4,7 +4,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: grafana-data-pvc
 spec:
-  # storageClassName: csi-hostpath-sc
+  # storageClassName: santricity-csi-sc
   storageClassName: standard
   accessModes:
     - ReadWriteOnce

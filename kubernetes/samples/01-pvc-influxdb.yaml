@@ -7,7 +7,7 @@ metadata:
     app: influxdb
   name: influxdb-data-pvc
 spec:
-  # storageClassName: csi-hostpath-sc
+  # storageClassName: santricity-csi-sc
   storageClassName: standard
   accessModes:
   - ReadWriteOnce
@@ -23,7 +23,7 @@ metadata:
     app: influxdb
   name: influxdb-wal-pvc
 spec:
-  # storageClassName: csi-hostpath-sc
+  # storageClassName: santricity-csi-sc
   storageClassName: standard
   accessModes:
   - ReadWriteOnce
@@ -39,7 +39,7 @@ metadata:
     app: influxdb
   name: influxdb-meta-pvc
 spec:
-  # storageClassName: csi-hostpath-sc
+  # storageClassName: santricity-csi-sc
   storageClassName: standard
   accessModes:
   - ReadWriteOnce

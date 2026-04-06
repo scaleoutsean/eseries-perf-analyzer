@@ -16,7 +16,7 @@ If you'd prefer to watch a 3 minute deployment video rather than read a lot of t
 ## Assumptions
 
 - Recent Kubernetes 
-- EPA v3.5.4 (InfluxDB v1, Grafana v8, SANtricity OS 11.90)
+- EPA v3.5.4 (InfluxDB v1, Grafana v12, SANtricity OS 12.00)
 - CSI plugin for persistent volumes
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
@@ -40,7 +40,7 @@ kubectl create namespace epa
 
 ### Deploy InfluxDB version 1 and Grafana version 8
 
-You may deploy InfluxDB v1 (v1.8, for example) and Grafana version 8 any way you want. Just make sure that:
+You may deploy InfluxDB v1 (v1.12, for example) and Grafana version 12 any way you want. Just make sure that:
 
 - InfluxDB is reachable by Collector and by Grafana 
 - Grafana is reachable from your browser

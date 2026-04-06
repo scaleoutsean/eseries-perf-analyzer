@@ -21,7 +21,7 @@ spec:
       - envFrom:
         - secretRef:
             name: influxdb-creds
-        image: docker.io/influxdb:1.11.8
+        image: docker.io/influxdb:1.12.3-alpine
         name: influxdb
         volumeMounts:
         - mountPath: /var/lib/influxdb/data

@@ -13,14 +13,15 @@
     - [Manually import Grafana dashboards](#manually-import-grafana-dashboards)
   - [Wrap-up](#wrap-up)
 
-
 ## Assumptions
 
 - Recent Kubernetes 
-- EPA v3.5.4 (InfluxDB v1, Grafana v8, SANtricity OS 11.8)
+- EPA v3.5.4 (InfluxDB v1, Grafana v12.4.1, SANtricity OS 11.8)
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 
-## Sample configuration files 
+If you want to try Kubernetes with E-Series, see [here](https://scaleoutsean.github.io/2026/01/19/netapp-eseries-santricity-csi.html) for some CSI choices.
+
+## Sample configuration files
 
 These are for reference only. Please use own files and best practices in production and remember to adjust the namespace if necessary.
 
@@ -46,7 +47,7 @@ kubectl create namespace epa
 
 EPA v3 uses InvluxDB v1.
 
-Port 8086/tcp is used for client connections and should be open to all *external* collector clients as well as Grafana (if Grafana runs externally). 
+Port 8086/tcp is used for client connections and should be open to all *external* collector clients as well as Grafana (if Grafana runs externally).
 
 Collector does not use DB authentication, so either create firewall rules to allow only external collector by IP address, or run collector in the same namespace as InfluxDB to eliminate the need for external access to InfluxDB.
 
@@ -79,8 +80,7 @@ Permissions:
 .../influxdb/wal/   700
 ```
 
-
-I because WAL and Meta aren't large, there isn't much disadvantage to using three separate PVCs, which is the approach taken by the sample YAML files. 
+Because WAL and Meta aren't large, there isn't much disadvantage to using three separate PVCs, which is the approach taken by the sample YAML files.
 
 If you need reliable InfluxDB backups and plan to snapshot PVs to get that, it's safer to use one larger volume for everything, unless you have a way to take multi-PV snapshots (aka "group snapshots", "consistency group snapshots").
 
@@ -90,9 +90,7 @@ If you need reliable InfluxDB backups and plan to snapshot PVs to get that, it's
 
 Various configuration options for InfluxDB may be viewed [here](https://docs.influxdata.com/influxdb/v1.8/introduction/install/).
 
-InfluxDB secrets can be complex or simple depending on needs. EPA collector has never used authentication (because it used to runs on the same network as InfluxDB), so we cannot simply create INFLUXDB_USER (that's why it's marked-out) without modifying collector scripts to add authentication. 
-
-If you will run collector and dbmanger as they are, create proper firewall rules for the InfluxDB external IP (to allow only external collectors to connect to it), or run collector(s) and dbmanger in the same namespace.
+InfluxDB secrets can be complex or simple depending on needs. EPA collector has never used authentication (because it used to runs on the same network as InfluxDB), so we cannot simply create INFLUXDB_USER (that's why it's marked-out) without modifying collector scripts to add authentication.
 
 `influxdb.yaml` contains service configuration that listens on port 8086/tcp.
 
@@ -142,10 +140,10 @@ stringData:
   # INFLUXDB_USER_PASSWORD: grafana
 ```
 
-**NOTE** 
+**NOTE**
 
 - Collector can create specified (or if not, the default) database name in InfluxDB. You may set a different DB for each collector instance.
-- EPA v3.5.4 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work. 
+- EPA v3.5.4 does not use database authentication for Collector and Grafana, because they used to run in the same docker-compose deployment. This is how the NetApp EPA used to work.
 - For Grafana, is possible to create a read-only InfluxDB user account here, but if automated deployment of InfluxDB data source is used, authentication won't be set up. To work around that create a read-only account for Grafana here
 
 With `influxdb-creds` ready, next we create PVCs, service and finally deployment:
@@ -166,7 +164,7 @@ kubectl -n epa get services
 # influxdb   LoadBalancer   10.109.24.223   <pending>     8086:32328/TCP   37s
 ```
 
-As you can see there's no `EXTERNAL-IP` which means InfluxDB is not exposed to LAN or the Internet. This is fine if the rest of containers will run in the `epa` namespace. 
+As you can see there's no `EXTERNAL-IP` which means InfluxDB is not exposed to LAN or the Internet. This is fine if the rest of containers will run in the `epa` namespace.
 
 If you need to use InfluxDB from outside of Kubernetes (if either Grafana, or collector will run externally), [add `EXTERNAL-IP`](https://kubernetes.io/docs/tutorials/stateless-application/expose-external-ip-address/) depending on your environment.
 
@@ -230,4 +228,3 @@ Visit `http://${GRAFANA_IP}:3000/dashboard/import` to import them.
 Now the correct functioning of Grafana and InfluxDB can be checked.
 
 In this section InfluxDB and Grafana were deployed to the same namespace (`epa`), exposed as services, and configured so that Grafana has access to InfluxDB databases and EPA dashboards.
-
