@@ -145,7 +145,14 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "condition": "AND",
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            }
+          ]
         }
       ],
       "title": "Cache Drive Count",
@@ -239,7 +246,13 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            }
+          ]
         }
       ],
       "title": "Cache Volumes Count",
@@ -336,7 +349,13 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            }
+          ]
         }
       ],
       "title": "Reads",
@@ -607,9 +626,10 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "condition": "AND",
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         },
@@ -648,9 +668,10 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "condition": "AND",
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         }
@@ -1132,9 +1153,9 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         },
@@ -1173,9 +1194,9 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         },
@@ -1214,9 +1235,9 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         },
@@ -1255,9 +1276,9 @@
           ],
           "tags": [
             {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
             }
           ]
         }
@@ -1326,7 +1347,68 @@
           },
           "unit": "bytes"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "populated_dirty"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "available"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "allocated"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "populated_clean"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -2344,39 +2426,17 @@
         "regex": "",
         "regexApplyTo": "value",
         "type": "query"
-      },
-      {
-        "allowCustomValue": true,
-        "current": {},
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_EPA}"
-        },
-        "definition": "SELECT volume_name FROM config_volumes LIMIT 50",
-        "description": "",
-        "label": "VolumeName",
-        "multi": true,
-        "name": "VolumeName",
-        "options": [],
-        "query": {
-          "query": "SELECT volume_name FROM config_volumes LIMIT 50",
-          "refId": "InfluxVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "regexApplyTo": "value",
-        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "SSD Flash Cache for Hybrid Arrays Dashboard",
   "uid": "epa-ssd-flash-cache-for-hybrid-arrays-d",
-  "version": 3,
+  "version": 40,
   "weekStart": ""
 }
