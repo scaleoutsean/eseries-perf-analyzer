@@ -1,0 +1,3 @@
+requests==2.33.1
+prometheus_client>=0.19.0
+git+https://github.com/scaleoutsean/santricity-client.git@0.2.4#egg=santricity_client

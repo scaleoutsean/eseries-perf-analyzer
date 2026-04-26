@@ -1,13 +1,17 @@
 # ignore the graphite database
 .idea/*
-# ignore all array files except the example
-influx-database/*
 # ignore the web services working directory
 .venv
 epa/data
 epa/collector/__pycache__
+epa/__pycache__
 epa/tests/*.sh
 .capture/
 # other
 release.sh
 workspace.code-workspace
+capture
+tmp
+TODO.md
+_REL.md
+tests

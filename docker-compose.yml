@@ -1,0 +1,84 @@
+services:
+
+  collector:
+    image: epa/collector:${TAG}
+    container_name: collector
+    build: ./epa/
+    mem_limit: 256m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    ports:
+      - "9080:9080"
+    environment: 
+      - USERNAME=monitor
+      - PASSWORD=__________
+      - API=192.168.1.194
+      - API_PORT=8443
+      - DEBUG=false
+      - TLS_VERIFY=false
+      - COLLECTION_INTERVAL=120
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9080}
+      - REQUESTS_CA_BUNDLE=/certs/ca.crt
+      - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
+    volumes:
+      - ./certs/_master/ca.crt:/certs/ca.crt:ro
+    networks:
+      - eseries_perf_analyzer
+
+  grafana:
+    image: docker.io/grafana/grafana:${CONTAINER_GRAFANA_TAG}
+    container_name: grafana
+    build:
+      context: ./grafana/
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3443}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
+      GF_SERVER_CERT_KEY: /etc/grafana/certs/grafana.key
+      GF_SERVER_ROOT_URL: https://localhost:${GRAFANA_PORT:-3443}
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "false"
+      GF_INSTALL_PLUGINS: victoriametrics-metrics-datasource
+      GF_DATABASE_SSL_MODE: "enable"
+      GF_PLUGIN_ENABLE_ALPHA: "true"
+    volumes:
+      - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
+      - ./certs/grafana:/etc/grafana/certs:ro
+      - ./data/grafana:/var/lib/grafana
+    depends_on:
+      - vm
+    networks:
+      eseries_perf_analyzer:
+        aliases:
+          - grafana
+
+  vm:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: vm
+    # ports:  # Grafana users will just use Grafana and not VM, but if you require access to VM, uncomment this section
+    #  - "8428:8428"
+    volumes:
+      - ./certs/vm:/etc/victoria-metrics:ro
+      - ./vm/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/vm:/storage
+    command:
+      - "-storageDataPath=/storage"
+      - "-promscrape.config=/etc/prometheus/prometheus.yml"
+      - "-retentionPeriod=3" # 3 months retention
+      - '-tls'
+      - '-tlsCertFile=/etc/victoria-metrics/vm.crt'
+      - '-tlsKeyFile=/etc/victoria-metrics/vm.key'
+    networks:
+      - eseries_perf_analyzer
+    restart: unless-stopped
+
+networks:
+  eseries_perf_analyzer:
+    driver: bridge

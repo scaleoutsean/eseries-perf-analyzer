@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: 'eseries_collector'
+    static_configs:
+      - targets: ['collector:9080']
