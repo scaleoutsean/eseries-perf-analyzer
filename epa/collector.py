@@ -657,7 +657,11 @@ if CMD.debug:
 # Conditional validation for database creation mode
 # For normal operation, SANtricity API parameters are required
 if not CMD.username:
-    PARSER.error("--username is required for normal operation")
+    # Fall back to environment variable and finally DEFAULT_USERNAME if not provided
+    CMD.username = os.getenv('USERNAME', DEFAULT_USERNAME)
+    # If still not set, raise error
+    if not CMD.username:
+        PARSER.error("--username is required for normal operation")
 if not CMD.password:
     PARSER.error("--password is required for normal operation")
 if not CMD.api:
@@ -2093,14 +2097,29 @@ def collect_config_controllers(system_info):
         sys_name = system_info.get("name", "unknown")
 
         class EPCClient:
-            def request(self, method, url):
+            def request(self, method, url, **kwargs):
                 if url.startswith("/"):
                     url = url[1:]
-                return session.get(f"{get_controller('sys')}/{sys_id}/{url}").json()
+                req_kwargs = {}
+                if "params" in kwargs:
+                    req_kwargs["params"] = kwargs["params"]
+                if "json_payload" in kwargs:
+                    req_kwargs["json"] = kwargs["json_payload"]
+                if "data_payload" in kwargs:
+                    req_kwargs["data"] = kwargs["data_payload"]
+                
+                full_url = f"{get_controller('sys')}/{sys_id}/{url}"
+                if method.upper() == "GET":
+                    return session.get(full_url, **req_kwargs).json()
+                elif method.upper() == "POST":
+                    return session.post(full_url, **req_kwargs).json()
+                else:
+                    return session.request(method, full_url, **req_kwargs).json()
 
         try:
             from santricity_client.reports.controllers import controllers_report
             from santricity_client.exceptions import RequestError
+            from santricity_client.resources.interfaces import InterfacesResource
         except ImportError:
             # Fallback if santricity_client is not copied exactly
             import sys
@@ -2108,8 +2127,12 @@ def collect_config_controllers(system_info):
             sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
             from santricity_client.reports.controllers import controllers_report
             from santricity_client.exceptions import RequestError
+            from santricity_client.resources.interfaces import InterfacesResource
 
-        results = controllers_report(EPCClient())
+        client = EPCClient()
+        client.interfaces = InterfacesResource(client)
+
+        results = controllers_report(client)
         for row in results:
             tags = {
                 "sys_id": sys_id,
@@ -2143,20 +2166,39 @@ def collect_config_interfaces(system_info):
         sys_name = system_info.get("name", "unknown")
 
         class EPCClient:
-            def request(self, method, url):
+            def request(self, method, url, **kwargs):
                 if url.startswith("/"):
                     url = url[1:]
-                return session.get(f"{get_controller('sys')}/{sys_id}/{url}").json()
+                req_kwargs = {}
+                if "params" in kwargs:
+                    req_kwargs["params"] = kwargs["params"]
+                if "json_payload" in kwargs:
+                    req_kwargs["json"] = kwargs["json_payload"]
+                if "data_payload" in kwargs:
+                    req_kwargs["data"] = kwargs["data_payload"]
+                
+                full_url = f"{get_controller('sys')}/{sys_id}/{url}"
+                if method.upper() == "GET":
+                    return session.get(full_url, **req_kwargs).json()
+                elif method.upper() == "POST":
+                    return session.post(full_url, **req_kwargs).json()
+                else:
+                    return session.request(method, full_url, **req_kwargs).json()
 
         try:
             from santricity_client.reports.interfaces_report import hostside_interfaces_report
+            from santricity_client.resources.interfaces import InterfacesResource
         except ImportError:
             import sys
             import os
             sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
             from santricity_client.reports.interfaces_report import hostside_interfaces_report
+            from santricity_client.resources.interfaces import InterfacesResource
 
-        results = hostside_interfaces_report(EPCClient())
+        client = EPCClient()
+        client.interfaces = InterfacesResource(client)
+
+        results = hostside_interfaces_report(client)
         for row in results:
             tags = {
                 "sys_id": sys_id,

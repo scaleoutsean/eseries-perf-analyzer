@@ -82,17 +82,21 @@ Note that the optional steps (`make`, TLS generator and data directories scripts
 
 ### Pre-created Collector container
 
-If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0` for example) and use the same for both `collector` and `grafana-init`:
+If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0`, for example) and use the same for both `collector` and `grafana-init` image version:
 
 - [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads read-made dashboards to Grafana
-- [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector) 
+- [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
+
+You should just change these two images to use GHCR, provide password for your `monitor` user on SANtricity and set your E-Series management IP address. The rest (not shown) should be able to remain as-is.
 
 ```yaml
 services:
 
   collector: 
     image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta1
-
+    environment: 
+      - PASSWORD=monitor123  # non-production pass, thank you very much
+      - API=2.2.2.2          # your E-Series 
   grafana-init:
     image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta1
 ```
