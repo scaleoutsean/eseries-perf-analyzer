@@ -2038,9 +2038,8 @@ def collect_config_workloads(system_info):
 def collect_config_volume_mappings(system_info):
     '''Collect volume to host mappings and expose as metrics'''
     try:
-        global sys_id
-        
-        system_id_val = sys_id if sys_id else system_info.get('id', 'unknown') if isinstance(system_info, dict) else str(system_info)
+        sys_id = system_info.get('wwn', system_info.get('id', 'unknown')) if isinstance(system_info, dict) else str(system_info)
+        system_id_val = sys_id
         
         url = f"{get_controller('sys')}/{system_id_val}/volume-mappings"
         session = get_session()
