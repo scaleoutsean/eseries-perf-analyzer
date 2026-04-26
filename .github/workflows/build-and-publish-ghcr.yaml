@@ -2,7 +2,10 @@ name: build-and-publish-ghcr
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -16,18 +19,31 @@ jobs:
       matrix:
         include:
           - image_name: collector
-            context: ./epa/collector
-            dockerfile: ./epa/collector/Dockerfile
+            context: ./epa
+            dockerfile: ./epa/Dockerfile
           - image_name: grafana-init
-            context: ./epa/grafana-init
-            dockerfile: ./epa/grafana-init/Dockerfile
-          - image_name: utils
-            context: ./epa/utils
-            dockerfile: ./epa/utils/Dockerfile
+            context: ./grafana-init
+            dockerfile: ./grafana-init/Dockerfile
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Vendor dependencies
+        run: |
+          make vendor
+        if: matrix.image_name == 'collector'
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}
+          # Strip the 'v' prefix from the git tag (e.g., v4.0.0beta1 -> 4.0.0beta1)
+          # disable latest tag
+          tags: |
+            type=match,pattern=v(.*),group=1
+            type=raw,value={{date 'YYYYMMDD'}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -49,12 +65,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:latest
-            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Output pushed image name
         run: |
-          echo "Image pushed: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}"
+          echo "Pushed ${{ steps.meta.outputs.tags }}"

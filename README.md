@@ -4,7 +4,10 @@
   - [What is EPA](#what-is-epa)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
-  - [Containerized EPA 4](#containerized-epa-4)
+  - [Containerized EPA](#containerized-epa)
+    - [Build own Collector container](#build-own-collector-container)
+    - [Pre-created Collector container](#pre-created-collector-container)
+    - [Docker Compose service ports](#docker-compose-service-ports)
   - [Configuration](#configuration)
   - [Change log](#change-log)
 
@@ -34,15 +37,17 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 | 4       | stay here   |
 | 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.4) |
 
-To install version **4**, pick an **EPA 4 release**.
+To install version **4**, pick an **EPA 4 release** tag.
 
 ```bash
 TAG="v4.0.0beta1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
-./scripts/gen_ca_tls_certs.py -h # optional, for Docker Compose users who want instant self-signed TLS
+cat ./scripts/SCRIPTS.md         # Read how to use these scripts
+./scripts/gen_ca_tls_certs.py -h # optional, for Docker Compose users who want to create self-signed TLS
 ./scripts/setup-data-dirs.sh     # optional, for Docker Compose users; creates data directories
-pip install -r ./epa/requirements.txt  # REQUIRED
+make vendor                      # REQUIRED for Docker; downloads SANtricity client to epa/santricity_client directory
+pip install -r ./epa/requirements.txt  # REQUIRED for CLI execution (requests library, Prometheus client), not for Docker
 vim .env                         # optional, for Docker Compose Grafana version or non-default initial credentials
 python3 ./epa/collector.py -h 
 ```
@@ -59,18 +64,40 @@ curl -v http://localhost:9080/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HT
 
 If you run multiple instances of Collector on the system, VM or Compose stack, make sure each is exposed at a different external Prometheus port.
 
-## Containerized EPA 4
+## Containerized EPA
 
 Users are encouraged to run own Prometheus scraper and Grafana.
+
+### Build own Collector container
 
 You **must** prepare the environment for this to work. See the CLI steps above.
 
 ```sh
-# vim docker-compose.yaml # at least SANtricity API IP(s), USERNAME and PASSWORD
+# ./scripts/gen_ca_tls_certs.py; ./scripts/setup-data-dirs.sh; make vendor # need to run these
+# vim docker-compose.yaml # at least SANtricity API IP(s), USERNAME (if not "monitor") and PASSWORD
 docker compose up -d
 ```
 
-Note that the optional steps (TLS, data directories from above) are mandatory for Docker Compose users without own infrastructure.
+Note that the optional steps (`make`, TLS generator and data directories scripts) are mandatory for Docker Compose users without own infrastructure.
+
+### Pre-created Collector container
+
+If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0` for example) and use the same for both `collector` and `grafana-init`:
+
+- [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads read-made dashboards to Grafana
+- [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector) 
+
+```yaml
+services:
+
+  collector: 
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta1
+
+  grafana-init:
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta1
+```
+
+### Docker Compose service ports
 
 Service URLs (assuming access from `localhost`):
 
@@ -82,13 +109,14 @@ For multiple E-Series, create multiple collector-only Docker Compose files. You'
 
 ## Configuration
 
-- [CONFIGURATION](./CONFIGURATION.md) will have more details about configuration
-- [SCREEENSHOTS](./SCREENSHOTS.md) has example screenshots and some details about installing reference dashboards
-- [FAQs](./FAQ.md) is mostly EPA 3-focused at the moment
+- [SCRIPTS](./scripts/SCRIPTS.md) has more details on running the helper scripts
+- [CONFIGURATION](./CONFIGURATION.md) has extra details about configuration workflow
+- [SCREEENSHOTS](./SCREENSHOTS.md) has example screenshots and details about installing reference dashboards
+- [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, it has some basic EPA 4-related content
 
 ## Change log
 
-- 4.0.0beta1 (April 25, 2026)
+- 4.0.0beta1 (April 26, 2026)
   - **Breaking changes**: EPA now provides Prometheus-only output with breaking changes compared to Prometheus output from EPA 3. Use any Prometheus-compatible scraper to scrape. EPA 3 users who want to keep data and dashboards from EPA 3 should not "upgrade". EPA 3 will be maintained for months and bugs fixed.
   - Collector's direct dependencies are down to three (Requests, Prometheus Client, SANtricity Client)
   - New feature: detailed collection of snapshots-related configuration and metrics

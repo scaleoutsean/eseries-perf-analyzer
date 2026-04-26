@@ -22,6 +22,10 @@ This step is required if you plan to run Victoria Metrics or Grafana as these re
 
 ## Configure and test Collector's Prometheus service port
 
+It is recommended to just leave Prometheus port at 9080 as it is in `.env` and `collector.py`. Then you don't have to do anything.
+
+But, if you must, here's how you can:
+
 - Set it in `.env` (default: `9080`), Compose, or with `python3 ./epa/collector.py --prometheus-port 9080` when running from the CLI
 - Use `curl http://COLLECTOR:<PROM_PORT>/metrics` to verify it's working
 - If you change Prometheus port to another value *and* want to use Victoria Metrics, set the same port in `./vm/prometheus.yml` before starting Victoria Metrics service
@@ -31,16 +35,17 @@ This step is required if you plan to run Victoria Metrics or Grafana as these re
 These arguments and switches are available in Compose as well.
 
 ```sh
+# 
+pip install -r ./epa/requirements.txt
 python3 ./epa/collector.py -h
 usage: collector.py [-h] [-u USERNAME] [-p PASSWORD] [--api API [API ...]] 
     [--api-port API_PORT] [-t {60,120,300,600}] [-s] [-v] [--showFlashCache] [-f] [-a] [-d]
     [-b] [-ct] [-c] [-m] [-e] [-g] [-pw] [-en] [-i] [--debug] [--debug-force-config] 
     [--include INCLUDE [INCLUDE ...]] [--prometheus-port PROMETHEUS_PORT] 
     [--max-iterations MAX_ITERATIONS] [--capture [DIR]] [--no-verify-ssl]
-
 ```
 
-Some of the more important ones:
+Some of the more impactful ones:
 
 ```sh
 options:
@@ -49,8 +54,8 @@ options:
                         Username to connect to the SANtricity API. Required. Default: 'monitor'. <String>
   -p PASSWORD, --password PASSWORD
                         Password for this user to connect to the SANtricity API. Required. Default: ''. <String>
-  --api API [API ...]   The IPv4 address for the SANtricity API endpoint. Required. Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to: '8443'. May be
-                        provided twice (for two controllers). <IPv4 Address>
+  --api API [API ...]   The IPv4 address for the SANtricity API endpoint. Required. Example: --api 5.5.5.5 6.6.6.6. Port number is auto-set to:
+                       '8443'. May be provided twice (for two controllers). <IPv4 Address>
   --api-port API_PORT   The port for the SANtricity API endpoint. Default: '8443'.
   -t {60,120,300,600}, --intervalTime {60,120,300,600}
                         Interval (seconds) to poll and export data from the SANtricity API. Default: 60. <Integer>
@@ -61,15 +66,15 @@ options:
                         Port for Prometheus metrics HTTP server. Default: 8080. Only used when --output includes prometheus.
   --max-iterations MAX_ITERATIONS
                         Maximum number of collection iterations to run (0 = unlimited). Useful for testing. Default: 0.
-  --capture [DIR]       Capture SANtricity API request/response payloads to disk for replay or debugging. Optionally specify a directory; if omitted, files are
-                        stored under ./captures/<timestamp>.
+  --capture [DIR]       Capture SANtricity API request/response payloads to disk for replay or debugging. Optionally specify a directory; if omitted,              files are stored under ./captures/<timestamp>.
   --no-verify-ssl       Disable TLS/SSL certificate verification for SANtricity API connections. Use only in lab/dev environments with self-signed certificates.
                         Default: False (verification enabled).
 ```
 
-Simplest run using default `monitor` account:
+The simplest way to run using default `monitor` account:
 
 ```sh
+pip install -r ./epa/requirements.txt
 python3 ./epa/collector.py --api 1.2.3.4  --password monitor123 --no-verify-ssl 
 ```
 
@@ -77,9 +82,11 @@ Add `--debug --max-iterations 20 --capture /tmp/epa` to get debug logs for a 20 
 
 ## Configure Grafana data source in Victoria Metrics
 
-Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics. My EPA reference stack uses Victoria Metrics.
+Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics. The EPA reference stack uses Victoria Metrics.
 
-If you run use reference stack (Collector, Grafana, Victoria Metrics), Grafana's data source will be done automatically when you run the above two steps and `grafana-init` container.
+If you run use reference stack (Collector, Grafana, Victoria Metrics), Grafana's data source will be created automatically when you run `docker compose up` after the above two steps and `grafana-init` container.
+
+If you do it manually elsewhere:
 
 ![Configure Victoria Metrics Data Source](./images/epa_configuration_data_source_example_vm_01.png)
 
@@ -92,7 +99,7 @@ If you use own Grafana **and** choose to use Victoria Metrics from EPA stack:
 
 If you use own Grafana and own Prometheus scraper and database, just make sure Collector's Prometheus Port is exposed to your scraper.
 
-## Downsampling and retention for scraped data in Victoria Metrics
+## Down-sampling and retention for Victoria Metrics data
 
 It's all done automatically by Victoria Metrics. Data retention is set to 90 days in the Compose YAML.
 

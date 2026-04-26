@@ -2,9 +2,12 @@
 
 These exist to demonstrate that metrics as well as basic configuration details are available.
 
-Install them with `docker compose up grafana-init` or manually by importing dashboard files from Grafana.
+How to install dashboards:
 
-The Overview dashboard shows an example of a config table, with top-down time series, gauges and so on.
+- Default EPA stack (with Victoria Metrics): run `docker compose up grafana-init` or manually import dashboard files from `./grafana-init/dashboards/`
+- Grafana set up for a Prometheus-compatible data source: manually import dashboards from `./grafana-init/dashboards/`, they should work with standard Prometheus data sources. If you notice any Victoria Metrics-specific issues, try creating a similar panel using generic Prometheus source
+
+The Overview dashboard shows an example of a configuration table, with top-down time series, gauges and so on.
 
 ![Overview](/images/dashboard_overview.png)
 
@@ -30,7 +33,7 @@ Disks have similar metrics (performance) and various configuration details. You 
 
 Unlike the SANtricity UI, EPA Collector lets you get all Snapshot and Linked Clone-related details in one place.
 
-Repo group size, snapshot "group" (not really a group), snapshot count, linked clone count, repo group utilization, and more.
+Repository group size, snapshot "group" (not really a group), snapshot count, linked clone count, repository group utilization, and more.
 
 ![Repo groups, snapshots, linked clones](./images/dashboard_snapshots.png)
 
@@ -41,4 +44,3 @@ If - and only if - you have a hybrid SANtricity box with two media types **and**
 These are just for checking if EPA is working. They're basic now, but may improve in the future.
 
 ![EPA metrics](./images/dashboard_epa_metrics.png)
-

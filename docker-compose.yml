@@ -15,7 +15,7 @@ services:
       - "9080:9080"
     environment: 
       - USERNAME=monitor
-      - PASSWORD=__________
+      - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=192.168.1.194
       - API_PORT=8443
       - DEBUG=false
@@ -52,12 +52,36 @@ services:
       - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
       - ./certs/grafana:/etc/grafana/certs:ro
       - ./data/grafana:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - vm
     networks:
       eseries_perf_analyzer:
         aliases:
           - grafana
+
+  grafana-init:
+    image: epa/grafana-init:${TAG}
+    profiles: ["init"]
+    build: 
+      context: ./grafana-init
+    container_name: grafana-init
+    mem_limit: 128M
+    depends_on:
+      - grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GRAFANA_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GRAFANA_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GRAFANA_URL=https://grafana:3000
+      - REQUESTS_CA_BUNDLE=/certs/ca.crt
+      - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
+    volumes:
+      - ./certs/_master/ca.crt:/certs/ca.crt:ro
+    networks:
+      - eseries_perf_analyzer
+    restart: "no"
 
   vm:
     image: victoriametrics/victoria-metrics:latest

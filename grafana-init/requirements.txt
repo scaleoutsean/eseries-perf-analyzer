@@ -1,1 +1,1 @@
-grafana-client
+grafana-client>=5.1.0
