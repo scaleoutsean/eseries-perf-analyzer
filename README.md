@@ -20,11 +20,6 @@ Each EPA Collector monitors one and only one SANtricity system using the lowest-
 
 You can find more about its positioning and direction in my [post about EPA 4](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html).
 
-EPA 3 is a fork of the now-archived [NetApp E-Series Performance Analyzer](https://github.com/NetApp/eseries-perf-analyzer) v3.0.0. EPA 3 collects metrics from E-Series and sends them to InfluxDB 1 and/or exports via Prometheus. InfluxDB is the primary output, so the reference Grafana dashboards use InfluxQL data source.
-
-- EPA 4 is recommended to existing and new EPA users
-- EPA 3 is up to date, works and bug reports and/or pull requests are welcome. Access EPA 3 documentation, FAQs and more at [this link](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.4)
-
 ## Requirements
 
 - NetApp E-Series SANtricity >=11.90
@@ -52,7 +47,7 @@ vim .env                         # optional, for Docker Compose Grafana version 
 python3 ./epa/collector.py -h 
 ```
 
-EPA Collector defaults to using SANtricity `monitor` account if username is not specified. Simply set a password for it, and avoid using `admin` or other accounts.
+EPA Collector defaults to using SANtricity's built-in `monitor` account if the username is not specified. Simply set a password for that account and let Collector use the default account (`monitor`).
 
 Start Collector and check Prometheus exporter on your EPA 4 host (`localhost` or other, with firewall allowing access):
 
