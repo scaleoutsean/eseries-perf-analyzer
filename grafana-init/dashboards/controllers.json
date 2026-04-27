@@ -2,9 +2,9 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "ad5rctp",
-    "generation": 34,
-    "creationTimestamp": "2026-04-25T16:29:09Z",
+    "name": "epa-controllers",
+    "generation": 2,
+    "creationTimestamp": "2026-04-27T05:40:53Z",
     "labels": {},
     "annotations": {}
   },
@@ -17,10 +17,7 @@
             "kind": "DataQuery",
             "group": "grafana",
             "version": "v0",
-            "spec": {},
-            "labels": {
-              "grafana.app/export-label": "grafana-1"
-            }
+            "spec": {}
           },
           "enable": true,
           "hide": true,
@@ -54,14 +51,11 @@
                       "spec": {
                         "editorMode": "builder",
                         "exemplar": false,
-                        "expr": "eseries_controller_info{sys_name=~\"EF80\"}",
+                        "expr": "eseries_controller_info{sys_name=~\"$SystemName\"}",
                         "format": "table",
                         "instant": true,
                         "legendFormat": "__auto",
                         "range": false
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -173,9 +167,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -264,9 +255,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -384,9 +372,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -504,9 +489,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -624,9 +606,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -743,9 +722,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -862,9 +838,6 @@
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -1117,9 +1090,6 @@
               "qryType": 1,
               "query": "label_values(sys_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",
@@ -1152,9 +1122,6 @@
               "qryType": 1,
               "query": "label_values(controller_id)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",

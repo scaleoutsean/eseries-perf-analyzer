@@ -149,7 +149,9 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
 - 4.0.0beta2 (April 27, 2026)
   - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4
   - Fix automated Grafana dashboard upload in `grafana-init`, update `graphana-client` dependency, which now supports Grafana 13
-  - Add Victoria Metrics "EPA" data source creation in Grafana container
+  - Set Grafana version to 13 in `./grafana/Dockerfile`
+  - Exclude HDDs from SSD wear level metrics
+  - Add Victoria Metrics "EPA" data source configuration to Grafana container
   - Add `Makefile` for easy SANtricity client library download and use newer SANtricity client library to work around bad SANtricty API response
   - Add missing, but required install steps to README, add SCRIPTS document
   - Add installation instructions for Docker Compose with pre-made GHCR images

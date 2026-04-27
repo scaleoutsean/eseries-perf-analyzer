@@ -1,2 +1,1 @@
-ARG CONTAINER_GRAFANA_TAG=latest
-FROM grafana/grafana:${CONTAINER_GRAFANA_TAG}
+FROM grafana/grafana:13.0-ubuntu

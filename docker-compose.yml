@@ -30,7 +30,7 @@ services:
       - eseries_perf_analyzer
 
   grafana:
-    image: docker.io/grafana/grafana:${CONTAINER_GRAFANA_TAG}
+    image: epa/grafana:13.0-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
