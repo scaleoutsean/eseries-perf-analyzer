@@ -5,6 +5,8 @@
     - [What's the main difference compared to EPA 3?](#whats-the-main-difference-compared-to-epa-3)
     - [What's recommended - EPA 4 or EPA 3?](#whats-recommended---epa-4-or-epa-3)
     - [Where can I see list of supported metrics?](#where-can-i-see-list-of-supported-metrics)
+    - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
+    - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
   - [EPA 3](#epa-3)
     - [Is EPA 3 still maintained?](#is-epa-3-still-maintained)
     - [Why do I need to fill in so many details in Collector's YAML file?](#why-do-i-need-to-fill-in-so-many-details-in-collectors-yaml-file)
@@ -135,11 +137,19 @@ Example from 4.0.0beta1:
 # HELP eseries_snapshot_schedule_schedule_start_date Snapshot schedule info - schedule_start_date
 ```
 
+### How to scrape multiple Collector instances from Victoria Metrics?
+
+Update `./vm/prometheus.yml`, rebuild, and restart `vm` service. You should also be able to do it in the UI or using their API/CLI.
+
+### I've generated TLS certificates but my client still says it's untrusted
+
+The browser does not trust self-created CA certificates. You need to import it or - even better - use own CA to generate TLS certificates for EPA containers.
+
 ## EPA 3
 
 ### Is EPA 3 still maintained?
 
-Yes. Bug reports are accepted and issues will be worked on, although it's really maintenance-free. Just update 3rd party dependencies in ./epa/collector/requirements.txt and rebuild. EPA 3 seems to work fine with SANtricity 12, but if anyone notices a bug related to SANtricty 12 differences, it will be fixed.
+Yes. Bug reports are accepted and issues will be worked on, although it's really maintenance-free. Just update 3rd party dependencies in `./epa/collector/requirements.txt` and rebuild. EPA 3 seems to work fine with SANtricity 12, but if anyone notices and reports a bug related to SANtricty 12 differences, it will be fixed.
 
 ### Why do I need to fill in so many details in Collector's YAML file?
 

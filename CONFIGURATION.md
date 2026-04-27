@@ -10,7 +10,7 @@ This step is needed if you plan to run Compose stack, which requires data direct
 
 `./data/[grafana,grafana-dashboards,vm]` will be created with correct permissions as a result.
 
-I'm not even sure the second sub-directory is required, but it may be if you want to upload own dashboards or something along those lines. They don't take up any space so it doesn't really matter.
+I'm not even sure the second sub-directory (grafana-dashboards) is still required, but it may be if you want to upload own dashboards or something along those lines. They don't take up any space so it doesn't really matter.
 
 ## Prepare TLS certificates
 
@@ -75,10 +75,10 @@ The simplest way to run using default `monitor` account:
 
 ```sh
 pip install -r ./epa/requirements.txt
-python3 ./epa/collector.py --api 1.2.3.4  --password monitor123 --no-verify-ssl 
+python3 ./epa/collector.py --api 1.2.3.4 --password monitor123 --no-verify-ssl 
 ```
 
-Add `--debug --max-iterations 20 --capture /tmp/epa` to get debug logs for a 20 minute period (as some metrics are collected on a slow schedule).
+Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 minute period (as some metrics are collected on a slow schedule).
 
 ## Configure Grafana data source in Victoria Metrics
 

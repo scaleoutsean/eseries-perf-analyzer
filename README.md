@@ -4,11 +4,14 @@
   - [What is EPA](#what-is-epa)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
+    - [Use SANtricity `monitor` account](#use-santricity-monitor-account)
+    - [Prometheus port](#prometheus-port)
   - [Containerized EPA](#containerized-epa)
     - [Build own Collector container](#build-own-collector-container)
     - [Pre-created Collector container](#pre-created-collector-container)
     - [Docker Compose service ports](#docker-compose-service-ports)
-  - [Configuration](#configuration)
+    - [CLI](#cli)
+  - [Other documents](#other-documents)
   - [Change log](#change-log)
 
 ## What is EPA
@@ -37,32 +40,23 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 | 4       | stay here   |
 | 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.4) |
 
-To install version **4**, pick an **EPA 4 release** tag.
+### Use SANtricity `monitor` account
 
-```bash
-TAG="v4.0.0beta1"
-git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
-cd eseries-perf-analyzer
-cat ./scripts/SCRIPTS.md         # Read how to use these scripts
-./scripts/gen_ca_tls_certs.py -h # optional, for Docker Compose users who want to create self-signed TLS
-./scripts/setup-data-dirs.sh     # optional, for Docker Compose users; creates data directories
-make vendor                      # REQUIRED for Docker; downloads SANtricity client to epa/santricity_client directory
-pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Prometheus client), not for Docker
-vim .env                         # optional, for Docker Compose Grafana version or non-default initial credentials
-python3 ./epa/collector.py -h 
-```
+EPA Collector defaults to using SANtricity's built-in `monitor` account unless you override that in arguments or Compose.
 
-EPA Collector defaults to using SANtricity's built-in `monitor` account if the username is not specified. Simply set a password for that account and let Collector use the default account (`monitor`).
+It is suggested to just set a password for SANtricity account.
+
+### Prometheus port
 
 Start Collector and check Prometheus exporter on your EPA 4 host (`localhost` or other, with firewall allowing access).
 
-Note that EPA Collector runs Prometheus exporter service on HTTP port **9080**. That can be changed in Compose or using collector.py's Prometheus port option.
+Note that EPA Collector runs Prometheus exporter service on HTTP port **9080**. That can be changed in Compose or using Collector's Prometheus port option.
 
 ```sh
 curl -v http://localhost:9080/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HTTP)"
 ```
 
-If you run multiple instances of Collector on the system, VM or Compose stack, make sure each is exposed at a different external Prometheus port.
+If you run multiple instances of Collector on same system, VM or Compose stack, make sure each exposes a different external Prometheus port.
 
 ## Containerized EPA
 
@@ -70,15 +64,26 @@ Users are encouraged to run own Prometheus scraper and Grafana.
 
 ### Build own Collector container
 
-You **must** prepare the environment for this to work. See the CLI steps above.
+
+```bash
+TAG="v4.0.0beta2"
+git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
+cd eseries-perf-analyzer
+cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them
+./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates
+./scripts/setup-data-dirs.sh      # REQUIRED; creates data directories for Grafana, VM
+make vendor                       # REQUIRED; downloads SANtricity client to epa/santricity_client
+vim .env                          # optional, for Docker Compose Grafana version or non-default initial credentials
+vim docker-compose.yml            # REQUIRED; you must provide correct SANtricity API IP/FQDN, credentials
+```
+
+Run Compose:
 
 ```sh
-# ./scripts/gen_ca_tls_certs.py; ./scripts/setup-data-dirs.sh; make vendor # need to run these
-# vim docker-compose.yaml # at least SANtricity API IP(s), USERNAME (if not "monitor") and PASSWORD
 docker compose up -d
 ```
 
-Note that the optional steps (`make`, TLS generator and data directories scripts) are mandatory for Docker Compose users without own infrastructure.
+Note that `make`, TLS and data directories-generating scripts are mandatory for Docker Compose users without own Grafana or database.
 
 ### Pre-created Collector container
 
@@ -87,18 +92,18 @@ If you want to use pre-created GHCR containers rather than build own, set the ri
 - [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana
 - [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
 
-You should just change these two images to use GHCR, provide password for your `monitor` user on SANtricity and set your E-Series management IP address. The rest (not shown) should be able to remain as-is.
+You should use the same docker-compose.yml, just change these two images to use GHCR, provide a password for your `monitor` user on SANtricity and your E-Series management IP address. The rest (not shown) should be able to remain as-is.
 
 ```yaml
 services:
 
   collector: 
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta1
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta2
     environment: 
       - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=2.2.2.2          # your E-Series 
   grafana-init:
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta1
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta2
 ```
 
 ### Docker Compose service ports
@@ -107,11 +112,32 @@ Service URLs (assuming access from `localhost`):
 
 - Exposed: EPA Collector's Prometheus metrics at [http://localhost:9080/metrics](http://localhost:9080/metrics) - expose different ports if running multiple Collectors
 - Exposed: Grafana at [https://localhost:3443](https://localhost:3443)
-- **Not** exposed: Victoria Metrics at [https://localhost:8428](https://localhost:8428) (it may be exposed by editing the Compose file)
+- **NOT** exposed: Victoria Metrics at [https://localhost:8428](https://localhost:8428) (it may be exposed by editing the Compose file)
 
-For multiple E-Series, create multiple collector-only Docker Compose files. You'd have to scrape each Prometheus metrics endpoint.
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI.
 
-## Configuration
+### CLI
+
+This only runs EPA Collector which gathers data and shares them over HTTP on Prometheus port
+
+```bash
+TAG="v4.0.0beta2"
+git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
+cd eseries-perf-analyzer
+make vendor                            # REQUIRED for Docker; downloads SANtricity client to epa/santricity_client directory
+pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Prometheus client), not for Docker
+python3 ./epa/collector.py -h 
+```
+
+Using default username `monitor` and SANtricity Web UI at 2.2.2.2:
+
+```sh
+python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
+```
+
+Open the browser and navigate to http://localhost:9080/metrics to see if Collector is working.
+
+## Other documents
 
 - [SCRIPTS](./scripts/SCRIPTS.md) has more details on running the helper scripts
 - [CONFIGURATION](./CONFIGURATION.md) has extra details about configuration workflow
@@ -119,6 +145,14 @@ For multiple E-Series, create multiple collector-only Docker Compose files. You'
 - [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, it has some basic EPA 4-related content
 
 ## Change log
+
+- 4.0.0beta2 (April 27, 2026)
+  - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4
+  - Fix automated Grafana dashboard upload in `grafana-init`, update `graphana-client` dependency, which now supports Grafana 13
+  - Add Victoria Metrics "EPA" data source creation in Grafana container
+  - Add `Makefile` for easy SANtricity client library download and use newer SANtricity client library to work around bad SANtricty API response
+  - Add missing, but required install steps to README, add SCRIPTS document
+  - Add installation instructions for Docker Compose with pre-made GHCR images
 
 - 4.0.0beta1 (April 26, 2026)
   - **Breaking changes**: EPA now provides Prometheus-only output with breaking changes compared to Prometheus output from EPA 3. Use any Prometheus-compatible scraper to scrape. EPA 3 users who want to keep data and dashboards from EPA 3 should not "upgrade". EPA 3 will be maintained for months and bugs fixed.
