@@ -15,3 +15,6 @@ tmp
 TODO.md
 _REL.md
 tests
+certs/
+data/
+epa/santricity_client
