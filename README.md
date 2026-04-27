@@ -38,7 +38,7 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 | EPA version | Where to go |
 | :---:   | :-----------|
 | 4       | stay here   |
-| 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.4) |
+| 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
 
 ### Use SANtricity `monitor` account
 
