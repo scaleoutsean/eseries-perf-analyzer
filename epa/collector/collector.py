@@ -52,7 +52,7 @@ INFLUXDB_PORT = 8086
 INFLUXDB_DATABASE = 'eseries'
 DEFAULT_RETENTION = '52w'  # 1y
 
-__version__ = '3.5.4'
+__version__ = '3.5.5'
 
 #######################
 # LIST OF METRICS #####
@@ -765,7 +765,7 @@ def collect_config_drives(system_info):
                 json_body.append(drive_config_item)
                 LOG.debug(f"Added config_drives measurement for drive {drive.get('driveRef', 'unknown')}")
             else:
-                LOG.debug(f"Skipped config_drives measurement (not in --include filter)")
+                LOG.debug("Skipped config_drives measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_drives: Prepared {len(json_body)} measurements for InfluxDB")
         if INFLUX_WRITE_ENABLED:
@@ -1538,7 +1538,7 @@ def should_collect_config_data():
     # Always collect on first iteration to populate caches immediately
     # This ensures volume name correlation cache is available for performance data
     if _CONFIG_COLLECTION_ITERATION_COUNTER == 1:
-        LOG.debug(f"Config collection: Iteration 1, collecting config data (first iteration cache population)")
+        LOG.debug("Config collection: Iteration 1, collecting config data (first iteration cache population)")
         return True
 
     collector_interval_minutes = CMD.intervalTime / 60.0
@@ -1783,16 +1783,16 @@ def field_coerce(field_name, value):
     if field_name in FIELD_COERCIONS:
         target_type = FIELD_COERCIONS[field_name]
         try:
-            if target_type == bool:
+            if target_type is bool:
                 # For boolean fields, convert to string representation for InfluxDB
                 coerced_value = str(bool(value)).lower()
-                if type(value) != bool and LOG.isEnabledFor(logging.DEBUG):
+                if not isinstance(value, bool) and LOG.isEnabledFor(logging.DEBUG):
                     LOG.debug(
                         f"Coerced field '{field_name}': {type(value).__name__}({value}) -> string({coerced_value})")
                 return coerced_value
             else:
                 coerced_value = target_type(value)
-                if type(value) != target_type and LOG.isEnabledFor(logging.DEBUG):
+                if not isinstance(value, target_type) and LOG.isEnabledFor(logging.DEBUG):
                     LOG.debug(
                         f"Coerced field '{field_name}': {type(value).__name__}({value}) -> {target_type.__name__}({coerced_value})")
                 return coerced_value
@@ -2464,14 +2464,14 @@ def create_prometheus_failure_alerts(sys_id, sys_name, failure_response):
         failure_counts[key] = failure_counts.get(key, 0) + 1
 
     # Set Prometheus metrics for active failures
-    for (failure_type, object_type, object_ref), count in failure_counts.items():
+    for (failure_type, object_type, object_ref), failure_count in failure_counts.items():
         failure_gauge.labels(
             sys_id=sys_id,
             sys_name=sys_name,
             failure_type=failure_type,
             object_type=object_type,
             object_ref=object_ref
-        ).set(count)
+        ).set(failure_count)
 
     # If no failures, ensure we still have a metric with 0
     if not failure_counts:
@@ -2864,7 +2864,7 @@ def collect_config_volumes(system_info):
                 json_body.append(vol_config_item)
                 LOG.debug(f"Added config_volumes measurement for volume {volume.get('name', 'unknown')}")
             else:
-                LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
+                LOG.debug("Skipped config_volumes measurement (not in --include filter)")
 
         # Add aggregate summary metric
         if not CMD.include or "config_volumes_summary" in CMD.include:
@@ -2881,7 +2881,7 @@ def collect_config_volumes(system_info):
                 }
             }
             json_body.append(summary_item)
-            LOG.debug(f"Added config_volumes_summary measurement")
+            LOG.debug("Added config_volumes_summary measurement")
 
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for InfluxDB")
         if INFLUX_WRITE_ENABLED:
@@ -3011,7 +3011,7 @@ def collect_config_storage_pools(system_info):
                 json_body.append(pool_config_item)
                 LOG.debug(f"Added config_storage_pools measurement for pool {pool.get('label', 'unknown')}")
             else:
-                LOG.debug(f"Skipped config_storage_pools measurement (not in --include filter)")
+                LOG.debug("Skipped config_storage_pools measurement (not in --include filter)")
 
         LOG.debug(f"collect_config_storage_pools: Prepared {len(json_body)} measurements for InfluxDB")
         if INFLUX_WRITE_ENABLED:
@@ -3191,7 +3191,7 @@ def collect_config_hosts(system_info):
                 json_body.append(host_config_item)
                 LOG.debug(f"Added config_hosts measurement for host {host.get('name', 'unknown')}")
             else:
-                LOG.debug(f"Skipped config_hosts measurement (not in --include filter)")
+                LOG.debug("Skipped config_hosts measurement (not in --include filter)")
 
         LOG.debug(f"Populated _HOSTS_CACHE with {len(_HOSTS_CACHE)} hosts")
 
@@ -3389,7 +3389,7 @@ def collect_controller_metrics(system_info):
 
             controller_stats_response = controller_response.json()
 
-            LOG.info(f"Retrieved controller statistics from controller API")
+            LOG.info("Retrieved controller statistics from controller API")
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response type: {type(controller_stats_response)}")
             LOG.debug(f"[CONTROLLER_COLLECTOR] Response content: {controller_stats_response}")
 
@@ -3405,7 +3405,7 @@ def collect_controller_metrics(system_info):
                 else:
                     # Single controller response - wrap in list
                     controller_stats_list = [controller_stats_response]
-                    LOG.debug(f"[CONTROLLER_COLLECTOR] Treating dict response as single controller")
+                    LOG.debug("[CONTROLLER_COLLECTOR] Treating dict response as single controller")
             elif isinstance(controller_stats_response, list):
                 # Multiple controllers response (direct list)
                 controller_stats_list = controller_stats_response
@@ -3474,7 +3474,7 @@ def collect_controller_metrics(system_info):
                     send_to_prometheus(controller_item["measurement"], controller_item["tags"], controller_item["fields"])
                     LOG.debug(f"Added controllers measurement for controller {controller_stats.get('controllerId', 'unknown')}")
                 else:
-                    LOG.debug(f"Skipped controllers measurement (not in --include filter)")
+                    LOG.debug("Skipped controllers measurement (not in --include filter)")
 
         except Exception as e:
             LOG.warning(f"Could not retrieve controller statistics: {e}")

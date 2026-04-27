@@ -98,7 +98,8 @@
               "viz": false
             }
           },
-          "mappings": []
+          "mappings": [],
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -1814,6 +1815,10 @@
       "targets": [
         {
           "alias": "volume_count",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
           "groupBy": [
             {
               "params": [
@@ -1853,11 +1858,7 @@
               "operator": "=~",
               "value": "/^$storage_system$/"
             }
-          ],
-          "datasource": {
-            "type": "influxdb",
-            "uid": "${DS_EPA}"
-          }
+          ]
         },
         {
           "alias": "snapshot_count",
@@ -1993,6 +1994,6 @@
   "timezone": "browser",
   "title": "Other Examples",
   "uid": "epa-other-examples",
-  "version": 23,
+  "version": 2,
   "weekStart": ""
 }

@@ -84,10 +84,10 @@ services:
       - eseries_perf_analyzer
     restart: "no"
 
-  collector12:
+  collector:
     image: epa/collector:${TAG}
     # image: docker.io/scaleoutsean/epa-collector:${TAG} # best build your own
-    container_name: collector12
+    container_name: collector
     build: ./collector
     mem_limit: 256m
     restart: unless-stopped
@@ -100,13 +100,13 @@ services:
       # If port 8080 is in use on the host, map to a different port e.g. 8081:8080 or pass PROMETHEUS_PORT variable
       - 8081:8080  # Prometheus metrics endpoint (comment out if using --output influxdb only)
     environment: 
-      - USERNAME=admin
-      - PASSWORD=infiniti
-      - SYSNAME=EF80
+      - USERNAME=monitor
+      - PASSWORD=monitor123  # non-production pass, thank you very much
+      - SYSNAME=EF4012
       - SYSID=600A098000F63714000000005E79C888
       - API=192.168.1.194
       # Optional: To use simulator you can pass the API_PORT
-      - API_PORT=8444
+      - API_PORT=8443
       - RETENTION_PERIOD=2w
       # If your InfluxDB is running on the same host but not in the same Docker Compose, use host.docker.internal to connect to it from the collector container
       # If your InfluxDB is running in the same Docker Compose, use the service name (influxdb) as the address
@@ -133,42 +133,7 @@ services:
       - eseries_perf_analyzer
 
   # remove this second collector if you only want to run one instance, or use it to collect from a different system with different configuration
-  collector11:
-    image: epa/collector:${TAG}
-    container_name: collector11
-    build: ./collector
-    mem_limit: 256m
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "5"
-        max-size: 10m
-    # ports:
-      # - 8081:8080  # Different host port for second collector's Prometheus endpoint in the same Docker Compose
-    environment: 
-      - USERNAME=admin
-      - PASSWORD=infiniti
-      - SYSNAME=E4012
-      - SYSID=600A098000F63714000000005E79C999
-      - API=192.168.1.194
-      - API_PORT=8443
-      - RETENTION_PERIOD=2w
-      - DB_ADDRESS=influxdb
-      - DB_PORT=8086
-      # Example: Using custom database name for this collector
-      # - DB_NAME=e2824_metrics
-      # Optional: Disable TLS certificate verification (lab/dev use only - do NOT use in production)
-      - TLS_VERIFY=false
-      # Optional: Only collect specific measurements (space-separated)
-      # - INCLUDE=disks systems volumes
-      # - INCLUDE=config_volumes
-      # Optional: Different output configuration for this collector
-      - OUTPUT=influxdb  # Disable Prometheus
-      # - PROMETHEUS_PORT=8081  # Container port (mapped to host 8081)
-    networks:
-      - eseries_perf_analyzer
-
+  
 networks:
   eseries_perf_analyzer:
     driver: bridge

@@ -129,7 +129,7 @@ You may see them if you have snapshots and clones.
 
 See [this](https://scaleoutsean.github.io/2023/10/05/snapshots-and-consistency-groups-with-netapp-e-series.html#appendix-c---repository-utilization) and similar content for related information.
 
-In 3.5.4 those `repos_` volumes were removed from dashboards which show "named volumes" (where one expects to see names of "user volumes") because there can be many of them. But in storage pool consumption and other panels and stats where total consumption is shown, those have to, and do count.
+In 3.5.5 those `repos_` volumes were removed from dashboards which show "named volumes" (where one expects to see names of "user volumes") because there can be many of them. But in storage pool consumption and other panels and stats where total consumption is shown, those have to, and do count.
 
 ## How much memory does each collector container need?
 
@@ -143,9 +143,9 @@ From 3.[1,2,3] to 3.4 or newer version 3, I wouldn't try since there aren't new 
 
 EPA 3.4.0's `./epa/docker-compose.yaml` has changes, from versions to volumes and so on, that it's unlikely that older versions can be upgraded in place and without any trouble.
 
-EPA 3.5.0, 3.5.1, 3.5.2, 3.5.4 don't have changes compared to 3.4, but it has new "tables". Upgrade should be possible.
+EPA 3.5.0, 3.5.1, 3.5.2, 3.5.4, 3.5.5 don't have changes compared to 3.4, but it has new "tables". Upgrade should be possible.
 
-EPA 3.5.4: due to significant upgrades (including Grafana), you will have to re-touch some of your Grafana dashboards. If you want to keep them, you could probably upgrade just the Collector and keep everything else the same, but I haven't tried that.
+EPA 3.5.5: due to significant upgrades (including Grafana), you will have to re-touch some of your Grafana dashboards. If you want to keep them, you could probably upgrade just the Collector and keep everything else the same, but I haven't tried that.
 
 ## If InfluxDB is re-installed or migrated, how do I restore InfluxDB and Grafana configuration?
 
@@ -158,7 +158,7 @@ Or you can create the DB before you run.
 ```sh
 docker run --rm --network eseries_perf_analyzer \
   -e CREATE_DB=true -e DB_NAME=eseries -e DB_ADDRESS=influxdb -e DB_PORT=8086 \
-  epa/collector:3.5.4
+  epa/collector:3.5.5
 ```
 
 - Using the `utils` container:
@@ -203,7 +203,7 @@ WWN is required because E-Series array names change more frequently and can even
 
 For the inlet sensor a warning message should be sent at 35C, and a critical message should be sent at 40C.
 
-EPA 3.5.4 has a sample temperature visualization panel that shows "red" at 30C, which is seemingly inconsistent, but feel free to adjust that threshold. Furthermore, alerts are separate from visualizations.
+EPA 3.5.5 has a sample temperature visualization panel that shows "red" at 30C, which is seemingly inconsistent, but feel free to adjust that threshold. Furthermore, alerts are separate from visualizations.
 
 I don't know about the CPU temperature sensor (it's not even available on some systems, probably to (again) undocumented SANtricity API or hardware changes).
 

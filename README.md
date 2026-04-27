@@ -81,7 +81,7 @@ Sample screenshots are available [here](./SCREENSHOTS.md).
 Pick a version, clone and use it.
 
 ```bash
-TAG="v3.5.4"
+TAG="v3.5.5"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa/collector
 # create and activate a venv if you want
@@ -135,7 +135,7 @@ services:
 
   collector-EF600:
     image: epa/collector:${TAG}
-    # image: docker.io/scaleoutsean/epa-collector:3.5.4 # it exists, but best build your own
+    # image: docker.io/scaleoutsean/epa-collector:3.5.5 # it exists, but best build your own
     container_name: collector-EF600
     mem_limit: 256m
     restart: unless-stopped
@@ -178,7 +178,7 @@ You can also create additional database instances in InfluxDB from the CLI (inst
 Download and decompress latest release and enter the `epa` sub-directory:
 
 ```sh
-TAG="v3.5.4"
+TAG="v3.5.5"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer/epa
 vim .env                 # you probably don't need to change anything here unless you prefer .env over docker-compose.yml
@@ -224,7 +224,7 @@ If you want to run containerized collector as a CLI program rather than Docker s
 Mind the project/container name and version!
 
 ```sh
-DOCKER_TAG="3.5.4"
+DOCKER_TAG="3.5.5"
 docker run --rm --network eseries_perf_analyzer \
   --entrypoint python3 \
   epa/collector:${DOCKER_TAG} collector.py -h
@@ -235,7 +235,7 @@ docker run --rm --network eseries_perf_analyzer \
 Example run for limited database population:
 
 ```sh
-DOCKER_TAG="3.5.4"
+DOCKER_TAG="3.5.5"
 docker run -e INCLUDE="power temp" epa/collector:${DOCKER_TAG}
 ```
 
@@ -312,6 +312,14 @@ Example alert rule:
 Find them [here](./FAQ.md) or check [Discussions](https://github.com/scaleoutsean/eseries-perf-analyzer/discussions) for questions that aren't in the FAQ document.
 
 ## Changelog
+
+- 3.5.5 (April 27, 2026)
+  - Address Grafana dashboard initialization issues in `grafana-init`, fix mappings
+  - Address various linting errors in the python collector
+  - Update InfluxDB to 1.12.4-alpine
+  - Fix minor aesthetic issues in several dashboards (Controllers, Other, SSD Flash Cache)
+  - EPA 3 GHCR container image releases now tagged with version (e.g. `:3.5.5`) since version 4 is also available
+  - Existing EPA 3 users probably shouldn't upgrade
 
 - 3.5.4 (April 6, 2026)
   - Upgrade Grafana from last v8 release to v12.4.1, update existing dashboards to work with v12

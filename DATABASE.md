@@ -1,4 +1,4 @@
-# InfluxDB v1 Schema for E-Series Perf Analyzer v3.5.4
+# InfluxDB v1 Schema for E-Series Perf Analyzer v3.5.5
 
 - `DISTINCT` only works on **tags**, not fields. Use `SHOW TAG VALUES` for tags, `GROUP BY` for field de-duplication in query results
 - Use `GROUP BY` for uniqueness. When you want unique records, group by a unique identifier (like `volumeRef` below)

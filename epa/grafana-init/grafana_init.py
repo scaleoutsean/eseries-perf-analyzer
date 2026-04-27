@@ -140,7 +140,7 @@ class GrafanaInitializer:
                     folder_id = folder.get('id')
                     folder_uid = folder.get('uid')
                     logger.info(f"EPA folder already exists with ID: {folder_id}, UID: {folder_uid}")
-                    return folder_id
+                    return folder_uid
             
             # Create EPA folder
             folder_config = {
@@ -152,7 +152,7 @@ class GrafanaInitializer:
             folder_id = result.get('id')
             folder_uid = result.get('uid')
             logger.info(f"Created EPA folder with ID: {folder_id}, UID: {folder_uid}")
-            return folder_id
+            return folder_uid
             
         except GrafanaClientError as e:
             logger.error(f"Failed to create EPA folder: {e}")
@@ -266,7 +266,7 @@ class GrafanaInitializer:
                 
                 # Add folder ID if provided
                 if folder_id:
-                    dashboard_payload['folderId'] = folder_id
+                    dashboard_payload['folderUid'] = folder_id
                 
                 result = self.grafana.dashboard.update_dashboard(dashboard_payload)
                 logger.info(f"Successfully imported {dashboard_file.name}: {result.get('slug', 'unknown')}")

@@ -84,7 +84,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepBefore",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -153,7 +153,7 @@
       "repeatDirection": "h",
       "targets": [
         {
-          "alias": "cpu_avg_utilization",
+          "alias": "avg_cpu_A",
           "datasource": {
             "type": "influxdb",
             "uid": "${DS_EPA}"
@@ -201,8 +201,68 @@
             {
               "condition": "AND",
               "key": "controller_id::tag",
+              "operator": "=",
+              "value": "070000000000000000000001"
+            },
+            {
+              "condition": "AND",
+              "key": "sys_name::tag",
               "operator": "=~",
-              "value": "/^$Controller$/"
+              "value": "/^$System_Name$/"
+            }
+          ]
+        },
+        {
+          "alias": "avg_cpu_B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "${DS_EPA}"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "controller_id::tag"
+              ],
+              "type": "tag"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "measurement": "controllers",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "cpuAvgUtilization"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "last"
+              }
+            ]
+          ],
+          "tags": [
+            {
+              "condition": "AND",
+              "key": "controller_id::tag",
+              "operator": "=",
+              "value": "070000000000000000000002"
             },
             {
               "condition": "AND",
@@ -243,7 +303,7 @@
               "viz": false
             },
             "insertNulls": false,
-            "lineInterpolation": "stepBefore",
+            "lineInterpolation": "smooth",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -1399,35 +1459,13 @@
     }
   ],
   "preload": false,
+  "refresh": "1m",
   "schemaVersion": 42,
   "tags": [
     "NetAppESeries"
   ],
   "templating": {
     "list": [
-      {
-        "allowCustomValue": false,
-        "current": {},
-        "datasource": {
-          "type": "influxdb",
-          "uid": "${DS_EPA}"
-        },
-        "definition": "SELECT controllerId FROM controllers LIMIT 10",
-        "description": "070000000000000000000001 - A or 070000000000000000000002 - B",
-        "includeAll": true,
-        "label": "Controller",
-        "multi": true,
-        "name": "Controller",
-        "options": [],
-        "query": {
-          "query": "SELECT controllerId FROM controllers LIMIT 10",
-          "refId": "InfluxVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "regexApplyTo": "value",
-        "type": "query"
-      },
       {
         "allowCustomValue": false,
         "current": {},
@@ -1450,17 +1488,40 @@
         "regex": "",
         "regexApplyTo": "value",
         "type": "query"
+      },
+      {
+        "allowCustomValue": false,
+        "current": {},
+        "datasource": {
+          "type": "influxdb",
+          "uid": "${DS_EPA}"
+        },
+        "definition": "SELECT controllerId FROM controllers LIMIT 10",
+        "description": "070000000000000000000001 - A or 070000000000000000000002 - B",
+        "includeAll": true,
+        "label": "Controller",
+        "multi": true,
+        "name": "Controller",
+        "options": [],
+        "query": {
+          "query": "SELECT controllerId FROM controllers LIMIT 10",
+          "refId": "InfluxVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Controllers Dashboard",
   "uid": "epa-controllers-dashboard",
-  "version": 12,
+  "version": 3,
   "weekStart": ""
 }

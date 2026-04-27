@@ -145,7 +145,19 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
+            }
+          ]
         }
       ],
       "title": "Cache Drive Count",
@@ -239,7 +251,19 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
+            }
+          ]
         }
       ],
       "title": "Cache Volumes Count",
@@ -336,7 +360,19 @@
               }
             ]
           ],
-          "tags": []
+          "tags": [
+            {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
+            }
+          ]
         }
       ],
       "title": "Reads",
@@ -438,6 +474,12 @@
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         }
@@ -607,9 +649,15 @@
           ],
           "tags": [
             {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
               "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         },
@@ -835,6 +883,12 @@
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         },
@@ -1132,9 +1186,15 @@
           ],
           "tags": [
             {
+              "key": "sys_name::tag",
+              "operator": "=~",
+              "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
               "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         },
@@ -1170,13 +1230,6 @@
                 "type": "last"
               }
             ]
-          ],
-          "tags": [
-            {
-              "key": "flash_cache_id::tag",
-              "operator": "=",
-              "value": "3233343536373839303134323200000000000000"
-            }
           ]
         },
         {
@@ -1396,6 +1449,12 @@
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         },
@@ -1676,6 +1735,13 @@
           ],
           "tags": [
             {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
+            },
+            {
+              "condition": "AND",
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
@@ -1821,6 +1887,12 @@
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         }
@@ -1963,6 +2035,12 @@
               "key": "sys_name::tag",
               "operator": "=~",
               "value": "/^$SystemName$/"
+            },
+            {
+              "condition": "AND",
+              "key": "flash_cache_id::tag",
+              "operator": "=~",
+              "value": "/^$FlashCache$/"
             }
           ]
         }
@@ -2346,20 +2424,20 @@
         "type": "query"
       },
       {
-        "allowCustomValue": true,
+        "allowCustomValue": false,
         "current": {},
         "datasource": {
           "type": "influxdb",
           "uid": "${DS_EPA}"
         },
-        "definition": "SELECT volume_name FROM config_volumes LIMIT 50",
-        "description": "",
-        "label": "VolumeName",
+        "definition": "SHOW TAG VALUES FROM \"flashcache\" WITH KEY = \"flash_cache_id\"",
+        "includeAll": true,
+        "label": "FlashCache",
         "multi": true,
-        "name": "VolumeName",
+        "name": "FlashCache",
         "options": [],
         "query": {
-          "query": "SELECT volume_name FROM config_volumes LIMIT 50",
+          "query": "SHOW TAG VALUES FROM \"flashcache\" WITH KEY = \"flash_cache_id\"",
           "refId": "InfluxVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -2370,13 +2448,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "SSD Flash Cache for Hybrid Arrays Dashboard",
   "uid": "epa-ssd-flash-cache-for-hybrid-arrays-d",
-  "version": 3,
+  "version": 20,
   "weekStart": ""
 }

@@ -16,7 +16,7 @@ If you'd prefer to watch a 3 minute deployment video rather than read a lot of t
 ## Assumptions
 
 - Recent Kubernetes 
-- EPA v3.5.4 (InfluxDB v1, Grafana v12, SANtricity OS 12.00)
+- EPA v3.5.5 (InfluxDB v1, Grafana v12, SANtricity OS 12.00)
 - CSI plugin for persistent volumes
 - Existing InfluxDB, Grafana in the same namespace used for monitoring: `epa`
 

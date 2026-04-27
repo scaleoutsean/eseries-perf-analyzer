@@ -11,3 +11,4 @@ epa/tests/*.sh
 # other
 release.sh
 workspace.code-workspace
+epa/__pycache__
