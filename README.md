@@ -19,7 +19,7 @@ EPA 4 is essentially **an opinionated Prometheus exporter** (or a solution stack
 
 ![EPA 4 Diagram](./images/epa_diagram.png)
 
-Each EPA Collector monitors one and only one SANtricity system using the lowest-privilege monitor account. Each storage administrator can spin their own and have metrics scraped by own or centralized Prometheus Scraper.
+Each EPA Collector monitors one and only one SANtricity system using the lowest-privilege monitor account. Each storage administrator can spin their own and have metrics scraped by own or centralized Prometheus scraper.
 
 You can find more about its positioning and direction in my [post about EPA 4](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html).
 
@@ -47,14 +47,14 @@ cat ./scripts/SCRIPTS.md         # Read how to use these scripts
 ./scripts/gen_ca_tls_certs.py -h # optional, for Docker Compose users who want to create self-signed TLS
 ./scripts/setup-data-dirs.sh     # optional, for Docker Compose users; creates data directories
 make vendor                      # REQUIRED for Docker; downloads SANtricity client to epa/santricity_client directory
-pip install -r ./epa/requirements.txt  # REQUIRED for CLI execution (requests library, Prometheus client), not for Docker
+pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Prometheus client), not for Docker
 vim .env                         # optional, for Docker Compose Grafana version or non-default initial credentials
 python3 ./epa/collector.py -h 
 ```
 
 EPA Collector defaults to using SANtricity's built-in `monitor` account if the username is not specified. Simply set a password for that account and let Collector use the default account (`monitor`).
 
-Start Collector and check Prometheus exporter on your EPA 4 host (`localhost` or other, with firewall allowing access):
+Start Collector and check Prometheus exporter on your EPA 4 host (`localhost` or other, with firewall allowing access).
 
 Note that EPA Collector runs Prometheus exporter service on HTTP port **9080**. That can be changed in Compose or using collector.py's Prometheus port option.
 
@@ -84,7 +84,7 @@ Note that the optional steps (`make`, TLS generator and data directories scripts
 
 If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0`, for example) and use the same for both `collector` and `grafana-init` image version:
 
-- [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads read-made dashboards to Grafana
+- [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana
 - [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
 
 You should just change these two images to use GHCR, provide password for your `monitor` user on SANtricity and set your E-Series management IP address. The rest (not shown) should be able to remain as-is.
