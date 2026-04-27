@@ -521,7 +521,7 @@ PROMETHEUS_METRICS_CONFIG = {
         'info': {
             'name': 'eseries_volume_info',
             'desc': 'Volume configuration info',
-            'labels': ['sys_id', 'sys_name', 'wwn', 'label', 'volume_ref', 'volume_name', 'id', 'volume_group_ref', 'raid_level', 'status', 'is_disk_pool']
+            'labels': ['sys_id', 'sys_name', 'wwn', 'label', 'volume_ref', 'volume_name', 'id', 'volume_group_ref', 'raid_level', 'status', 'is_disk_pool', 'metadata']
         },
         'capacity_bytes': {
             'name': 'eseries_volume_capacity_bytes',

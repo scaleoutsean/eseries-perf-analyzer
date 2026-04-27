@@ -2344,24 +2344,6 @@ def collect_config_volumes(system_info):
                 volume['mapped_host_names'] = ''  # Empty string for unmapped volumes
                 volume['mapped_host_count'] = 0
 
-            # Add metadata as a single string field
-            metadata_list = volume.get('metadata', [])
-            if isinstance(metadata_list, list) and metadata_list:
-                kv_pairs = []
-                for item in metadata_list[:12]:
-                    if isinstance(item, dict):
-                        if 'key' in item and 'value' in item:
-                            kv_pairs.append(f"{item['key']}={item['value']}")
-                        else:
-                            for k, v in item.items():
-                                kv_pairs.append(f"{k}={v}")
-                if kv_pairs:
-                    volume['metadata'] = ','.join(kv_pairs)
-                else:
-                    volume.pop('metadata', None)
-            else:
-                volume.pop('metadata', None)
-
             # Flatten listOfMappings (take first mapping if multiple exist)
             mappings = volume.get('listOfMappings', [])
             if mappings and len(mappings) > 0:
@@ -2391,7 +2373,8 @@ def collect_config_volumes(system_info):
                     "volume_group_ref": str(volume_mapped.get("volume_group_ref", "unknown")),
                     "raid_level": str(volume_mapped.get("raid_level", "unknown")),
                     "status": str(volume_mapped.get("status", "unknown")),
-                    "is_disk_pool": str(volume_mapped.get("is_disk_pool", "unknown"))
+                    "is_disk_pool": str(volume_mapped.get("is_disk_pool", "unknown")),
+                    "metadata": str(volume_mapped.get("metadata", ""))
                 },
                 "fields": config_fields
             }
