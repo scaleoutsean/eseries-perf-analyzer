@@ -2,7 +2,10 @@ name: build-and-publish-ghcr
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -29,6 +32,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}
+          # Strip the 'v' prefix from the git tag
+          tags: |
+            type=match,pattern=v(.*),group=1
+            type=raw,value={{date 'YYYYMMDD'}}
+            type=raw,value=latest
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -49,12 +63,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:latest
-            ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Output pushed image name
         run: |
-          echo "Image pushed: ghcr.io/${{ github.repository }}/${{ matrix.image_name }}:${{ github.sha }}"
+          echo "Pushed ${{ steps.meta.outputs.tags }}"
