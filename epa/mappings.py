@@ -67,7 +67,7 @@ SNAPSHOT_IMAGES_MAPPING = [
     ("pitRef", "pit_ref", None),
     ("pitSequenceNumber", "pit_sequence_number", _to_integer),
     ("pitTimestamp", "pit_timestamp", _to_integer),
-    ("repositoryCapacityUtilization", "repository_capacity_utilization_percent", _to_integer),
+    ("repositoryCapacityUtilization", "repository_capacity_utilization_bytes", _to_integer),
     ("status", "status", None)
 ]
 

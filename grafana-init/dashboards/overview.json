@@ -2,9 +2,9 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "ad4nmtq",
-    "generation": 107,
-    "creationTimestamp": "2026-04-18T14:32:03Z",
+    "name": "epa-overview",
+    "generation": 5,
+    "creationTimestamp": "2026-04-27T05:19:03Z",
     "labels": {},
     "annotations": {}
   },
@@ -17,10 +17,7 @@
             "kind": "DataQuery",
             "group": "grafana",
             "version": "v0",
-            "spec": {},
-            "labels": {
-              "grafana.app/export-label": "grafana-1"
-            }
+            "spec": {}
           },
           "enable": true,
           "hide": true,
@@ -53,13 +50,12 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
+                        "exemplar": false,
                         "expr": "eseries_active_failures_total{sys_name=~\"$SystemName\"}",
                         "format": "time_series",
-                        "legendFormat": "__auto",
+                        "instant": false,
+                        "legendFormat": "{{sys_name}}: {{failure_type}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -109,7 +105,7 @@
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
+                    "mode": "thresholds"
                   }
                 },
                 "overrides": []
@@ -144,9 +140,6 @@
                         "instant": true,
                         "legendFormat": "",
                         "range": false
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -271,9 +264,6 @@
                         "instant": true,
                         "legendFormat": "__auto",
                         "range": false
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -384,9 +374,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -515,9 +502,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -622,9 +606,6 @@
                         "interval": "",
                         "legendFormat": "{{controller_id}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -742,9 +723,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -764,9 +742,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "B",
@@ -861,9 +836,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -942,9 +914,6 @@
                         "format": "time_series",
                         "legendFormat": "{{vol_name}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -1062,9 +1031,6 @@
                         "format": "time_series",
                         "legendFormat": "Used Pool Space",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "B",
@@ -1084,9 +1050,6 @@
                         "format": "time_series",
                         "legendFormat": "Free Pool Space",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "C",
@@ -1106,9 +1069,6 @@
                         "format": "time_series",
                         "legendFormat": "Unconfigured Pool Space",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -1365,9 +1325,6 @@
               "qryType": 1,
               "query": "label_values(sys_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",

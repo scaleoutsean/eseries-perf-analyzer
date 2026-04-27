@@ -3,8 +3,8 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "epa-controllers",
-    "generation": 2,
-    "creationTimestamp": "2026-04-27T05:40:53Z",
+    "generation": 4,
+    "creationTimestamp": "2026-04-27T05:19:02Z",
     "labels": {},
     "annotations": {}
   },
@@ -51,7 +51,7 @@
                       "spec": {
                         "editorMode": "builder",
                         "exemplar": false,
-                        "expr": "eseries_controller_info{sys_name=~\"$SystemName\"}",
+                        "expr": "eseries_controller_info{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\"}",
                         "format": "table",
                         "instant": true,
                         "legendFormat": "__auto",
