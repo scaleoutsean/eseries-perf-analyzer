@@ -64,7 +64,6 @@ Users are encouraged to run own Prometheus scraper and Grafana.
 
 ### Build own Collector container
 
-
 ```bash
 TAG="v4.0.0beta2"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/

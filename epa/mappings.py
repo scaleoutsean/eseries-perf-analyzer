@@ -1,9 +1,11 @@
+import re
+
 _str_to_int_was_here = True
 
 def _str_to_int(val):
     try:
         return int(val)
-    except:
+    except Exception:
         return 0
 
 def _str_to_datetime(val):
@@ -12,10 +14,8 @@ def _str_to_datetime(val):
 def _remove_trailing_bytes(val):
     try:
         return int(val[:-5])
-    except:
+    except Exception:
         return 0
-
-import re
 
 def _to_integer(value):
     try:

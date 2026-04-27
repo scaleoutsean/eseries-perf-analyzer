@@ -2,6 +2,7 @@ services:
 
   collector:
     image: epa/collector:${TAG}
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta2 # example of using GHCR image instead of building locally
     container_name: collector
     build: ./epa/
     mem_limit: 256m
@@ -62,6 +63,7 @@ services:
 
   grafana-init:
     image: epa/grafana-init:${TAG}
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta2 # example of using GHCR image instead of building locally
     profiles: ["init"]
     build: 
       context: ./grafana-init

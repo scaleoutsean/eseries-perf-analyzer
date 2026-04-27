@@ -15,6 +15,7 @@ import argparse
 import concurrent.futures
 import json
 import logging
+import os
 import random
 import re
 import sys
@@ -28,9 +29,6 @@ from urllib.parse import urlparse
 
 import requests
 
-import logging
-# Monkey-patch requests.models.Response.json to handle 424 and other errors gracefully
-_old_json = requests.models.Response.json
 from mappings import (
     CONFIG_DRIVES_MAPPING,
     CONFIG_STORAGE_POOLS_MAPPING,
@@ -49,6 +47,9 @@ from mappings import (
     extract_tag_keys,
     flatten_dict_one_level
 )
+
+# Monkey-patch requests.models.Response.json to handle 424 and other errors gracefully
+_old_json = requests.models.Response.json
 
 def _safe_json(self, **kwargs):
     res = _old_json(self, **kwargs)
@@ -80,7 +81,6 @@ def _safe_json(self, **kwargs):
 
 requests.models.Response.json = _safe_json
 
-import os
 
 # Prometheus client imports (optional - will gracefully handle if not available)
 try:
@@ -110,7 +110,7 @@ def metrics_timer(endpoint_name):
             try:
                 with EPA_SCRAPE_TIME.labels(endpoint=endpoint_name, system=sys_name).time():
                     return func(*args, **kwargs)
-            except Exception as e:
+            except Exception:
                 EPA_ERROR_COUNT.labels(error_type='execution', endpoint=endpoint_name, system=sys_name).inc()
                 raise
         return wrapper
@@ -492,7 +492,6 @@ def collect_config_drives(system_info):
             set_current_controller_index(random.randrange(0, 2))
 
         session = get_session()
-        json_body = list()
 
         # Get drive configuration data from the API
         drive_url = f"{get_controller('sys')}/{sys_id}/drives"
@@ -1002,7 +1001,7 @@ def should_collect_config_data():
     # Always collect on first iteration to populate caches immediately
     # This ensures volume name correlation cache is available for performance data
     if _CONFIG_COLLECTION_ITERATION_COUNTER == 1:
-        LOG.debug(f"Config collection: Iteration 1, collecting config data (first iteration cache population)")
+        LOG.debug("Config collection: Iteration 1, collecting config data (first iteration cache population)")
         return True
 
     collector_interval_minutes = CMD.intervalTime / 60.0
@@ -1290,8 +1289,6 @@ def collect_storage_metrics(system_info, live_stats_snapshot=None):
     try:
         session = get_session()
         json_body = list()
-        include_volumes = (not CMD.include) or ('volumes' in CMD.include)
-        include_interface = (not CMD.include) or ('interface' in CMD.include)
         drive_stats_list = session.get(
             f"{get_controller('sys')}/{sys_id}/analysed-drive-statistics").json()
         drive_locations = get_drive_location(sys_id, session)
@@ -2121,7 +2118,6 @@ def collect_config_controllers(system_info):
 
         try:
             from santricity_client.reports.controllers import controllers_report
-            from santricity_client.exceptions import RequestError
             from santricity_client.resources.interfaces import InterfacesResource
         except ImportError:
             # Fallback if santricity_client is not copied exactly
@@ -2129,7 +2125,6 @@ def collect_config_controllers(system_info):
             import os
             sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
             from santricity_client.reports.controllers import controllers_report
-            from santricity_client.exceptions import RequestError
             from santricity_client.resources.interfaces import InterfacesResource
 
         client = EPCClient()
@@ -2242,8 +2237,10 @@ def collect_config_system(system_info):
                 for key, nice_name, conv_func in STORAGE_SYSTEM_INFO_KEYS:
                     val = system_info.get(key, "")
                     if conv_func and val:
-                        try: val = conv_func(val)
-                        except Exception: pass
+                        try:
+                            val = conv_func(val)
+                        except Exception:
+                            pass
                     metric_tags[nice_name] = str(val)
                 prometheus_metrics['config_system']['info'].labels(**metric_tags).set(1.0)
             
@@ -2252,8 +2249,10 @@ def collect_config_system(system_info):
                 val = system_info.get(key)
                 if val is not None:
                     if conv_func:
-                        try: val = conv_func(val)
-                        except Exception: pass
+                        try:
+                            val = conv_func(val)
+                        except Exception:
+                            pass
                     
                     try:
                         fval = float(val)
@@ -2412,7 +2411,7 @@ def collect_config_volumes(system_info):
                 json_body.append(vol_config_item)
                 LOG.debug(f"Added config_volumes measurement for volume {volume.get('name', 'unknown')}")
             else:
-                LOG.debug(f"Skipped config_volumes measurement (not in --include filter)")
+                LOG.debug("Skipped config_volumes measurement (not in --include filter)")
 
         # Add aggregate summary metric
         if not CMD.include or "config_volumes_summary" in CMD.include:
@@ -2429,7 +2428,7 @@ def collect_config_volumes(system_info):
                 }
             }
             json_body.append(summary_item)
-            LOG.debug(f"Added config_volumes_summary measurement")
+            LOG.debug("Added config_volumes_summary measurement")
 
         LOG.debug(f"collect_config_volumes: Prepared {len(json_body)} measurements for Prometheus")
         
@@ -2818,7 +2817,6 @@ def collect_controller_metrics(system_info, live_stats_snapshot=None):
 
     try:
         json_body = list()
-        include_controllers = (not CMD.include) or ('controllers' in CMD.include)
 
         try:
             session = get_session()
