@@ -1326,9 +1326,12 @@ def collect_storage_metrics(system_info, live_stats_snapshot=None):
                 drive_response = session.get(f"{get_controller('sys')}/{sys_id}/drives").json()
 
                 for drive in drive_response:
+                    if str(drive.get('driveMediaType')).lower() != 'ssd':
+                        continue
+
                     drive_id = drive.get('id') or drive.get('driveRef')
                     ssd_wear = drive.get('ssdWearLife')
-                    
+
                     if drive_id and isinstance(ssd_wear, dict):
                         wear_data = {}
                         if 'spareBlocksRemainingPercent' in ssd_wear:
