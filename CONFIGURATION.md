@@ -104,3 +104,15 @@ If you use own Grafana and own Prometheus scraper and database, just make sure C
 It's all done automatically by Victoria Metrics. Data retention is set to 90 days in the Compose YAML.
 
 Refer to the Victoria Metrics documentation for the details on modifying values.
+
+## Customizing Prometheus port
+
+Collector and Compose make that easy, but there are other places where it may be set, such as `./vm/prometheus.yml`.
+
+Configure multiple scrape destinations in Victoria Metrics if you have multiple Collectors.
+
+## Customizing Grafana data source
+
+That's in `./grafana/provisioning/datasources/vm.yml`.
+
+You could, for example, configure Victoria Metrics as a Prometheus data source or use some other Prometheus-compatible database. 

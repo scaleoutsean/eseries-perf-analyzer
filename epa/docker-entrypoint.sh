@@ -63,6 +63,7 @@ fi
 CMD="${CMD} -i -s"
 
 # Execute the command
-echo "Executing: ${CMD}"
+DISPLAY_CMD=$(echo "${CMD}" | sed "s/-p ${PASSWORD}/-p \*\*\*\*\*/")
+echo "Executing: ${DISPLAY_CMD}"
 exec ${CMD}
 

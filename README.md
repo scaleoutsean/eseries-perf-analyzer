@@ -6,11 +6,11 @@
   - [Quick start](#quick-start)
     - [Use SANtricity `monitor` account](#use-santricity-monitor-account)
     - [Prometheus port](#prometheus-port)
-  - [Containerized EPA](#containerized-epa)
-    - [Build own Collector container](#build-own-collector-container)
-    - [Pre-created Collector container](#pre-created-collector-container)
-    - [Docker Compose service ports](#docker-compose-service-ports)
-    - [CLI](#cli)
+    - [Containerized EPA](#containerized-epa)
+      - [Build own Collector container](#build-own-collector-container)
+      - [Use pre-created Collector container](#use-pre-created-collector-container)
+      - [Docker Compose service ports](#docker-compose-service-ports)
+  - [Use `collector` from CLI](#use-collector-from-cli)
   - [Other documents](#other-documents)
   - [Change log](#change-log)
 
@@ -37,20 +37,20 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 
 | EPA version | Where to go |
 | :---:   | :-----------|
-| 4       | stay here   |
+| 4       | stay on thi page |
 | 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
 
 ### Use SANtricity `monitor` account
 
 EPA Collector defaults to using SANtricity's built-in `monitor` account unless you override that in arguments or Compose.
 
-It is suggested to just set a password for SANtricity account.
+It is suggested to just set a password for the SANtricity `monitor` account and use those credentials.
 
 ### Prometheus port
 
-Start Collector and check Prometheus exporter on your EPA 4 host (`localhost` or other, with firewall allowing access).
+When you start Collector, check Prometheus exporter on EPA 4 host (`localhost` or other, with firewall allowing access).
 
-Note that EPA Collector runs Prometheus exporter service on HTTP port **9080**. That can be changed in Compose or using Collector's Prometheus port option.
+EPA Collector defaults to running Prometheus exporter on HTTP port **9080**, which can be changed in Compose or using Collector's Prometheus port option.
 
 ```sh
 curl -v http://localhost:9080/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HTTP)"
@@ -58,18 +58,18 @@ curl -v http://localhost:9080/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HT
 
 If you run multiple instances of Collector on same system, VM or Compose stack, make sure each exposes a different external Prometheus port.
 
-## Containerized EPA
+### Containerized EPA
 
-Users are encouraged to run own Prometheus scraper and Grafana.
+Users are encouraged to run own Prometheus scraper, database and Grafana, but a ready-made stack is available.
 
-### Build own Collector container
+#### Build own Collector container
 
 ```bash
 TAG="v4.0.0beta2"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
-cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them
-./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates
+cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
+./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs
 ./scripts/setup-data-dirs.sh      # REQUIRED; creates data directories for Grafana, VM
 make vendor                       # REQUIRED; downloads SANtricity client to epa/santricity_client
 vim .env                          # optional, for Docker Compose Grafana version or non-default initial credentials
@@ -84,7 +84,7 @@ docker compose up -d
 
 Note that `make`, TLS and data directories-generating scripts are mandatory for Docker Compose users without own Grafana or database.
 
-### Pre-created Collector container
+#### Use pre-created Collector container
 
 If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0`, for example) and use the same for both `collector` and `grafana-init` image version:
 
@@ -105,7 +105,9 @@ services:
     image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta2
 ```
 
-### Docker Compose service ports
+You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
+
+#### Docker Compose service ports
 
 Service URLs (assuming access from `localhost`):
 
@@ -115,16 +117,16 @@ Service URLs (assuming access from `localhost`):
 
 For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI.
 
-### CLI
+## Use `collector` from CLI
 
-This only runs EPA Collector which gathers data and shares them over HTTP on Prometheus port
+This only runs EPA Collector which gathers data and shares them over HTTP on Prometheus port.
 
 ```bash
 TAG="v4.0.0beta2"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
-make vendor                            # REQUIRED for Docker; downloads SANtricity client to epa/santricity_client directory
-pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Prometheus client), not for Docker
+make vendor                            # REQUIRED; downloads SANtricity client to epa/santricity_client directory
+pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Prometheus client)
 python3 ./epa/collector.py -h 
 ```
 
@@ -134,13 +136,13 @@ Using default username `monitor` and SANtricity Web UI at 2.2.2.2:
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
 ```
 
-Open the browser and navigate to http://localhost:9080/metrics to see if Collector is working.
+Open the browser and navigate to http://localhost:9080/metrics to see if Collector's Prometheus exporter is working.
 
 ## Other documents
 
 - [SCRIPTS](./scripts/SCRIPTS.md) has more details on running the helper scripts
 - [CONFIGURATION](./CONFIGURATION.md) has extra details about configuration workflow
-- [SCREEENSHOTS](./SCREENSHOTS.md) has example screenshots and details about installing reference dashboards
+- [SCREENSHOTS](./SCREENSHOTS.md) has example screenshots and details about installing reference dashboards
 - [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, it has some basic EPA 4-related content
 
 ## Change log
