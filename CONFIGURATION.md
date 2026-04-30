@@ -80,6 +80,8 @@ python3 ./epa/collector.py --api 1.2.3.4 --password monitor123 --no-verify-ssl
 
 Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 minute period (as some metrics are collected on a slow schedule).
 
+**NOTE:** `--debug` may expose the credentials in container/Docker logs.
+
 ## Configure Grafana data source in Victoria Metrics
 
 Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics. The EPA reference stack uses Victoria Metrics.

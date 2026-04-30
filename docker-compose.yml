@@ -46,7 +46,7 @@ services:
       GF_SERVER_CERT_KEY: /etc/grafana/certs/grafana.key
       GF_SERVER_ROOT_URL: https://localhost:${GRAFANA_PORT:-3443}
       GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "false"
-      GF_INSTALL_PLUGINS: victoriametrics-metrics-datasource
+      GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-metrics-datasource
       GF_DATABASE_SSL_MODE: "enable"
       GF_PLUGIN_ENABLE_ALPHA: "true"
     volumes:
@@ -77,6 +77,7 @@ services:
       - GRAFANA_USER=${GRAFANA_ADMIN_USER:-admin}
       - GRAFANA_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GRAFANA_URL=https://grafana:3000
+      - GF_PLUGINS_PREINSTALL_SYNC=victoriametrics-metrics-datasource
       - REQUESTS_CA_BUNDLE=/certs/ca.crt
       - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
     volumes:
