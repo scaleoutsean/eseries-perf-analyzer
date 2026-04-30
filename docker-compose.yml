@@ -106,6 +106,25 @@ services:
       - eseries_perf_analyzer
     restart: unless-stopped
 
+
+  # -- WORKLOAD CALIBRATION --
+  # A synthetic fio workload generator for validating metrics in Grafana.
+  # Run this manually via:  sudo docker compose --profile test up fio-test
+  fio-test:
+    image: dmonakhov/alpine-fio:latest
+    container_name: epa-fio-tester
+    profiles: ["test"]
+    volumes:
+      # Change this path to match your SANtricity mount point!
+      - ./data/fio_test_mnt:/mnt/santricity:rw
+    # 8k block size, strictly throttled to 10 IOPS
+    command: >
+      fio --name=test-workload --filename=/mnt/santricity/test.img 
+      --size=50M --rw=randrw --bs=8k --ioengine=libaio 
+      --direct=1 --rate_iops=10 --time_based --runtime=3600
+    networks:
+      - eseries_perf_analyzer
+
 networks:
   eseries_perf_analyzer:
     driver: bridge
