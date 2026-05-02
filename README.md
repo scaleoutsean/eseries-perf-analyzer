@@ -37,7 +37,7 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 
 | EPA version | Where to go |
 | :---:   | :-----------|
-| 4       | stay on thi page |
+| 4       | stay on this page |
 | 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
 
 ### Use SANtricity `monitor` account
@@ -97,12 +97,12 @@ You should use the same docker-compose.yml, just change these two images to use 
 services:
 
   collector: 
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta2
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta3
     environment: 
       - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=2.2.2.2          # your E-Series 
   grafana-init:
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta2
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta3
 ```
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
@@ -122,7 +122,7 @@ For multiple E-Series systems, it's best to create multiple collector-only Docke
 This only runs EPA Collector which gathers data and shares them over HTTP on Prometheus port.
 
 ```bash
-TAG="v4.0.0beta2"
+TAG="v4.0.0beta3"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 make vendor                            # REQUIRED; downloads SANtricity client to epa/santricity_client directory
@@ -146,6 +146,11 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
 - [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, it has some basic EPA 4-related content
 
 ## Change log
+
+- 4.0.0beta3 (May 02, 2026)
+  - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4
+  - Fixes for packaging (fix auto-configuration of Grafana Data Source)
+  - Security: do not log SANtricity password in Docker container
 
 - 4.0.0beta2 (April 27, 2026)
   - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4

@@ -128,7 +128,7 @@ DEFAULT_SYSTEM_PORT = '8443'
 # Live stats cumulative time counters are treated as microseconds and normalized to ms.
 LIVE_TIME_COUNTER_TO_MS = 1.0 / 1000.0
 
-__version__ = '4.0.0beta2'
+__version__ = '4.0.0beta3'
 
 #######################
 # LIST OF METRICS #####
