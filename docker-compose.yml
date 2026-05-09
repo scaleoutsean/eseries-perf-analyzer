@@ -53,7 +53,7 @@ services:
       - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
       - ./certs/grafana:/etc/grafana/certs:ro
       - ./data/grafana:/var/lib/grafana
-      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - vm
     networks:
