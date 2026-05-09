@@ -115,7 +115,9 @@ Service URLs (assuming access from `localhost`):
 - Exposed: Grafana at [https://localhost:3443](https://localhost:3443)
 - **NOT** exposed: Victoria Metrics at [https://localhost:8428](https://localhost:8428) (it may be exposed by editing the Compose file)
 
-For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI.
+Do not open the exposed ports on the host unless you need external access. When you open them, you can limit access by IP and add a reverse proxy with authentication.
+
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See CONFIGURATION.md for more.
 
 ## Use `collector` from CLI
 
@@ -147,6 +149,15 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
 
 ## Change log
 
+- 4.0.0 (May ------, 2026)
+  - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
+  - Collector now only exports Prometheus metrics for any Prometheus scraper and Victoria Metrics is included in reference stack
+  - Live ("realtime") performance metrics (optional in EPA 3) replace averaged (default in EPA 3). Averaged are no longer available
+  - SANtricity Major Event Log ("MEL") no longer collected (users may use [syslog forwarding](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) for that; also current failures are available in Collector Prometheus metrics for alerting)
+  - Collector collects snapshot- and linked clone-related metrics and configuration information
+  - SANtricity Client library included in EPA to avoid duplication of API queries
+  - Grafana 13 (12.4+ recommended) and Prometheus-based dashboards included in reference stack
+
 - 4.0.0beta3 (May 02, 2026)
   - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4
   - Fixes for packaging (fix auto-configuration of Grafana Data Source)
@@ -168,6 +179,14 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
   - New feature: detailed collection of snapshots-related configuration and metrics
   - Removed features: MEL events (which belong to logging, not performance or even configuration monitoring)
   - Third party stack components: Docker Compose now includes Grafana 13 (and several reference dashboards which should work on v12 as well) and Victoria Metrics as reference Prometheus scraper and database
+
+- 3.5.5 (April 27, 2026)
+  - Address Grafana dashboard initialization issues in `grafana-init`, fix mappings
+  - Address various linting errors in the Python collector
+  - Update InfluxDB container image to `1.12.4-alpine`
+  - Fix minor aesthetic issues in several dashboards (Controllers, Other, SSD Flash Cache)
+  - EPA 3 GHCR container image releases now tagged with version (e.g. `:3.5.5`) since version 4 is also available
+  - Source code is in [v3.5.5](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) branch
 
 - 3.5.4 (April 6, 2026)
   - Upgrade Grafana from last v8 release to v12.4.1, update existing dashboards to work with v12

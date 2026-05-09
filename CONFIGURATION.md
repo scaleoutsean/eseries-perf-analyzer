@@ -10,7 +10,7 @@ This step is needed if you plan to run Compose stack, which requires data direct
 
 `./data/[grafana,grafana-dashboards,vm]` will be created with correct permissions as a result.
 
-I'm not even sure the second sub-directory (grafana-dashboards) is still required, but it may be if you want to upload own dashboards or something along those lines. They don't take up any space so it doesn't really matter.
+I'm not even sure the second Grafana sub-directory (grafana-dashboards) is still required, but it may be if you want to upload own dashboards or something along those lines. They don't take up any space so it doesn't really matter.
 
 ## Prepare TLS certificates
 
@@ -19,6 +19,8 @@ This step is required if you plan to run Victoria Metrics or Grafana as these re
 ```sh
 ./scripts/gen_ca_tls_certs.py -h
 ```
+
+You may use `all`, but reject E-Series certificate collection if your E-Series certificates are factory-shipped as you'd need to skip TLS validation on those from Collector in any case.
 
 ## Configure and test Collector's Prometheus service port
 
@@ -67,11 +69,12 @@ options:
   --max-iterations MAX_ITERATIONS
                         Maximum number of collection iterations to run (0 = unlimited). Useful for testing. Default: 0.
   --capture [DIR]       Capture SANtricity API request/response payloads to disk for replay or debugging. Optionally specify a directory; if omitted,              files are stored under ./captures/<timestamp>.
-  --no-verify-ssl       Disable TLS/SSL certificate verification for SANtricity API connections. Use only in lab/dev environments with self-signed certificates.
+  --no-verify-ssl       Disable TLS/SSL certificate verification for SANtricity API connections. Use only in lab/dev environments with self-signed
+                        certificates.
                         Default: False (verification enabled).
 ```
 
-The simplest way to run using default `monitor` account:
+The simplest way to run when using the default `monitor` account:
 
 ```sh
 pip install -r ./epa/requirements.txt
@@ -80,7 +83,7 @@ python3 ./epa/collector.py --api 1.2.3.4 --password monitor123 --no-verify-ssl
 
 Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 minute period (as some metrics are collected on a slow schedule).
 
-**NOTE:** `--debug` may expose the credentials in container/Docker logs.
+**NOTE:** `--debug` may expose SANtricity credentials in Collector or Docker logs.
 
 ## Configure Grafana data source in Victoria Metrics
 
