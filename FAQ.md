@@ -6,13 +6,14 @@
     - [What's recommended - EPA 4 or EPA 3?](#whats-recommended---epa-4-or-epa-3)
     - [Where can I see list of supported metrics?](#where-can-i-see-list-of-supported-metrics)
     - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
+    - [How much RAM does a Collector container instance need?](#how-much-ram-does-a-collector-container-instance-need)
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
   - [EPA 3](#epa-3)
     - [Is EPA 3 still maintained?](#is-epa-3-still-maintained)
     - [Why do I need to fill in so many details in Collector's YAML file?](#why-do-i-need-to-fill-in-so-many-details-in-collectors-yaml-file)
     - [It's not convenient for me to have multiple storage admins edit the same `./epa/docker-compose.yml`](#its-not-convenient-for-me-to-have-multiple-storage-admins-edit-the-same-epadocker-composeyml)
     - [How can I customize Grafana's options?](#how-can-i-customize-grafanas-options)
-    - [What if I run my own InfluxDB v1 and Grafana? Can I use this Collector without EPA?](#what-if-i-run-my-own-influxdb-v1-and-grafana-can-i-use-this-collector-without-epa)
+    - [Can I use this Collector without EPA stack?](#can-i-use-this-collector-without-epa-stack)
     - [How can I protect EPA's InfluxDB from unauthorized access?](#how-can-i-protect-epas-influxdb-from-unauthorized-access)
     - [Where's my InfluxDB data?](#wheres-my-influxdb-data)
     - [Where's my Grafana data? I see nothing when I look at the dashboards!](#wheres-my-grafana-data-i-see-nothing-when-i-look-at-the-dashboards)
@@ -48,98 +49,105 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 You can run collector and see with `curl http://localhost:9080/metrics`.
 
-Example from 4.0.0beta1:
+Example from 4.0.0beta3:
 
 ```sh
-# HELP epa_scrape_duration_seconds Time spent scraping SANtricity
-# HELP epa_scrape_duration_seconds_created Time spent scraping SANtricity
-# HELP epa_scrape_errors_total Number of failures during collection
-# HELP epa_metrics_generated_total Number of metrics successfully generated
-# HELP eseries_disk_iops_total Total IOPS for disk
-# HELP eseries_disk_throughput_bytes_per_second Disk throughput in bytes/sec
-# HELP eseries_disk_response_time_seconds Disk response time in seconds
-# HELP eseries_disk_ssd_wear_percent SSD wear level percentage
-# HELP eseries_controller_iops_total Controller IOPS
-# HELP eseries_controller_throughput_bytes_per_second Controller throughput in bytes/sec
-# HELP eseries_controller_cpu_utilization_percent Controller CPU utilization
-# HELP eseries_controller_cache_hit_percent Controller cache hit percentage
-# HELP eseries_volume_iops_total Volume IOPS
-# HELP eseries_volume_throughput_bytes_per_second Volume throughput in bytes/sec
-# HELP eseries_volume_response_time_seconds Volume response time in seconds
-# HELP eseries_epa_status EPA collector status (1=OK, 0=Error/Unreachable)
-# HELP eseries_interface_iops_total Interface IOPS
-# HELP eseries_interface_throughput_bytes_per_second Interface throughput in bytes/sec
-# HELP eseries_interface_queue_depth Interface queue depth
-# HELP eseries_power_consumption_watts Total power consumption in watts
-# HELP eseries_temperature_celsius Temperature in Celsius
-# HELP eseries_flashcache_bytes Flash Cache byte metrics
-# HELP eseries_flashcache_blocks_total Flash Cache block metrics (delta)
-# HELP eseries_flashcache_ops_total Flash Cache operations (delta)
-# HELP eseries_flashcache_components Flash Cache related component counts
-# HELP eseries_active_failures_total Number of active failures
-# HELP eseries_volume_info Volume configuration info
-# HELP eseries_volume_capacity_bytes Volume capacity in bytes
-# HELP eseries_volume_total_size_bytes Volume total size in bytes
-# HELP eseries_storage_pool_info Storage pool configuration info
-# HELP eseries_storage_pool_free_space_bytes Storage pool free space in bytes
-# HELP eseries_storage_pool_used_space_bytes Storage pool used space in bytes
-# HELP eseries_storage_pool_total_raided_space_bytes Storage pool total raided space in bytes
-# HELP eseries_host_group_info Host group configuration info
-# HELP eseries_host_info Host configuration info
-# HELP eseries_drive_info Drive configuration info
-# HELP eseries_drive_raw_capacity_bytes Drive raw capacity in bytes
-# HELP eseries_drive_usable_capacity_bytes Drive usable capacity in bytes
-# HELP eseries_controller_info Controller configuration info
-# HELP eseries_interface_info Interface configuration info
-# HELP eseries_system_info System configuration info
-# HELP eseries_system_drive_count System metric drive_count
-# HELP eseries_system_tray_count System metric tray_count
-# HELP eseries_system_used_pool_space System metric used_pool_space
-# HELP eseries_system_free_pool_space System metric free_pool_space
-# HELP eseries_system_unconfigured_space System metric unconfigured_space
-# HELP eseries_system_hot_spare_count System metric hot_spare_count
-# HELP eseries_system_host_spares_used System metric host_spares_used
-# HELP eseries_system_media_scan_period_days System metric media_scan_period_days
-# HELP eseries_system_defined_partition_count System metric defined_partition_count
-# HELP eseries_system_unconfigured_space_bytes System metric unconfigured_space_bytes
-# HELP eseries_system_free_pool_space_bytes System metric free_pool_space_bytes
-# HELP eseries_system_hot_spare_size_bytes System metric hot_spare_size_bytes
-# HELP eseries_system_used_pool_space_bytes System metric used_pool_space_bytes
-# HELP eseries_interface_alert Interface alert status (1=down, 0=ok)
-# HELP eseries_consistency_group_info Consistency group info info
-# HELP eseries_repository_info Repository info info
-# HELP eseries_repository_aggregate_capacity_bytes Repository info - aggregate_capacity_bytes
-# HELP eseries_snapshot_group_info Snapshot group info info
-# HELP eseries_snapshot_group_repository_capacity_bytes Snapshot group info - repository_capacity_bytes
-# HELP eseries_snapshot_image_info Snapshot image info info
-# HELP eseries_snapshot_image_pit_capacity_bytes Snapshot image info - pit_capacity_bytes
-# HELP eseries_snapshot_image_pit_sequence_number Snapshot image info - pit_sequence_number
-# HELP eseries_snapshot_image_pit_timestamp Snapshot image info - pit_timestamp
-# HELP eseries_snapshot_image_repository_capacity_utilization_percent Snapshot image info - repository_capacity_utilization_percent
-# HELP eseries_snapshot_volume_info Snapshot volume info info
-# HELP eseries_snapshot_volume_base_volume_capacity_bytes Snapshot volume info - base_volume_capacity_bytes
-# HELP eseries_snapshot_volume_repository_capacity_bytes Snapshot volume info - repository_capacity_bytes
-# HELP eseries_snapshot_volume_total_size_in_bytes Snapshot volume info - total_size_in_bytes
-# HELP eseries_snapshot_volume_view_sequence_number Snapshot volume info - view_sequence_number
-# HELP eseries_snapshot_volume_view_time Snapshot volume info - view_time
-# HELP eseries_snapshot_group_utilization_info Snapshot group utilization info
-# HELP eseries_snapshot_group_utilization_pit_group_bytes_used Snapshot group utilization - pit_group_bytes_used
-# HELP eseries_snapshot_group_utilization_pit_group_bytes_available Snapshot group utilization - pit_group_bytes_available
-# HELP eseries_snapshot_volume_utilization_info Snapshot volume utilization info
-# HELP eseries_snapshot_volume_utilization_view_bytes_used Snapshot volume utilization - view_bytes_used
-# HELP eseries_snapshot_volume_utilization_view_bytes_available Snapshot volume utilization - view_bytes_available
-# HELP eseries_consistency_group_member_info CG member info info
-# HELP eseries_snapshot_schedule_info Snapshot schedule info info
-# HELP eseries_snapshot_schedule_creation_time Snapshot schedule info - creation_time
-# HELP eseries_snapshot_schedule_last_run_time Snapshot schedule info - last_run_time
-# HELP eseries_snapshot_schedule_next_run_time Snapshot schedule info - next_run_time
-# HELP eseries_snapshot_schedule_stop_time Snapshot schedule info - stop_time
-# HELP eseries_snapshot_schedule_schedule_start_date Snapshot schedule info - schedule_start_date
+# TYPE epa_scrape_duration_seconds summary
+# TYPE epa_scrape_duration_seconds_created gauge
+# TYPE epa_scrape_errors_total counter
+# TYPE epa_metrics_generated_total gauge
+# TYPE eseries_disk_iops_total gauge
+# TYPE eseries_disk_throughput_bytes_per_second gauge
+# TYPE eseries_disk_response_time_seconds gauge
+# TYPE eseries_disk_ssd_wear_percent gauge
+# TYPE eseries_controller_iops_total gauge
+# TYPE eseries_controller_throughput_bytes_per_second gauge
+# TYPE eseries_controller_cpu_utilization_percent gauge
+# TYPE eseries_controller_cache_hit_percent gauge
+# TYPE eseries_volume_iops_total gauge
+# TYPE eseries_volume_stat_total gauge
+# TYPE eseries_volume_throughput_bytes_per_second gauge
+# TYPE eseries_volume_response_time_seconds gauge
+# TYPE eseries_epa_status gauge
+# TYPE eseries_interface_iops_total gauge
+# TYPE eseries_interface_throughput_bytes_per_second gauge
+# TYPE eseries_interface_queue_depth gauge
+# TYPE eseries_power_consumption_watts gauge
+# TYPE eseries_temperature_celsius gauge
+# TYPE eseries_flashcache_bytes gauge
+# TYPE eseries_flashcache_blocks_total gauge
+# TYPE eseries_flashcache_ops_total gauge
+# TYPE eseries_flashcache_components gauge
+# TYPE eseries_active_failures_total gauge
+# TYPE eseries_volume_info gauge
+# TYPE eseries_volume_capacity_bytes gauge
+# TYPE eseries_volume_total_size_bytes gauge
+# TYPE eseries_storage_pool_info gauge
+# TYPE eseries_storage_pool_free_space_bytes gauge
+# TYPE eseries_storage_pool_used_space_bytes gauge
+# TYPE eseries_storage_pool_total_raided_space_bytes gauge
+# TYPE eseries_host_group_info gauge
+# TYPE eseries_host_info gauge
+# TYPE eseries_drive_info gauge
+# TYPE eseries_drive_raw_capacity_bytes gauge
+# TYPE eseries_drive_usable_capacity_bytes gauge
+# TYPE eseries_controller_info gauge
+# TYPE eseries_interface_info gauge
+# TYPE eseries_system_info gauge
+# TYPE eseries_system_drive_count gauge
+# TYPE eseries_system_tray_count gauge
+# TYPE eseries_system_used_pool_space gauge
+# TYPE eseries_system_free_pool_space gauge
+# TYPE eseries_system_unconfigured_space gauge
+# TYPE eseries_system_hot_spare_count gauge
+# TYPE eseries_system_host_spares_used gauge
+# TYPE eseries_system_media_scan_period_days gauge
+# TYPE eseries_system_defined_partition_count gauge
+# TYPE eseries_system_unconfigured_space_bytes gauge
+# TYPE eseries_system_free_pool_space_bytes gauge
+# TYPE eseries_system_hot_spare_size_bytes gauge
+# TYPE eseries_system_used_pool_space_bytes gauge
+# TYPE eseries_interface_alert gauge
+# TYPE eseries_consistency_group_info gauge
+# TYPE eseries_repository_info gauge
+# TYPE eseries_repository_aggregate_capacity_bytes gauge
+# TYPE eseries_snapshot_group_info gauge
+# TYPE eseries_snapshot_group_repository_capacity_bytes gauge
+# TYPE eseries_snapshot_image_info gauge
+# TYPE eseries_snapshot_image_pit_capacity_bytes gauge
+# TYPE eseries_snapshot_image_pit_sequence_number gauge
+# TYPE eseries_snapshot_image_pit_timestamp gauge
+# TYPE eseries_snapshot_image_repository_capacity_utilization_bytes gauge
+# TYPE eseries_snapshot_volume_info gauge
+# TYPE eseries_snapshot_volume_base_volume_capacity_bytes gauge
+# TYPE eseries_snapshot_volume_repository_capacity_bytes gauge
+# TYPE eseries_snapshot_volume_total_size_in_bytes gauge
+# TYPE eseries_snapshot_volume_view_sequence_number gauge
+# TYPE eseries_snapshot_volume_view_time gauge
+# TYPE eseries_snapshot_group_utilization_info gauge
+# TYPE eseries_snapshot_group_utilization_pit_group_bytes_used gauge
+# TYPE eseries_snapshot_group_utilization_pit_group_bytes_available gauge
+# TYPE eseries_snapshot_volume_utilization_info gauge
+# TYPE eseries_snapshot_volume_utilization_view_bytes_used gauge
+# TYPE eseries_snapshot_volume_utilization_view_bytes_available gauge
+# TYPE eseries_consistency_group_member_info gauge
+# TYPE eseries_snapshot_schedule_info gauge
+# TYPE eseries_snapshot_schedule_creation_time gauge
+# TYPE eseries_snapshot_schedule_last_run_time gauge
+# TYPE eseries_snapshot_schedule_next_run_time gauge
+# TYPE eseries_snapshot_schedule_stop_time gauge
+# TYPE eseries_snapshot_schedule_schedule_start_date gauge
 ```
+
+`eseries_volume_stat_total` has a bunch of volume performance metrics.
 
 ### How to scrape multiple Collector instances from Victoria Metrics?
 
 Update `./vm/prometheus.yml`, rebuild, and restart `vm` service. You should also be able to do it in the UI or using their API/CLI.
+
+### How much RAM does a Collector container instance need?
+
+Below 64 MiB on average.
 
 ### I've generated TLS certificates but my client still says it's untrusted
 
@@ -165,11 +173,11 @@ They just need to be able to reach the same InfluxDB (and even that is only if y
 
 EPA doesn't change Grafana in any way, so follow the official Grafana documentation.
 
-### What if I run my own InfluxDB v1 and Grafana? Can I use this Collector without EPA?
+### Can I use this Collector without EPA stack?
 
-Yes. That's another reason why I made collector.py a stand-alone script without dependencies on the WSP. Just build this fork of EPA and collector container, and then run just `docker compose up collector`.
+Yes. That's another reason why I made collector.py a stand-alone script without dependencies on the WSP. Just run `docker compose up -d collector`.
 
-Reference dashboards are in `./epa/grafana-init/dashboards/` and you may need to update them for Grafana other than version 8.
+Reference dashboards are in `./epa/grafana-init/dashboards/` (remember to use a version 3 branch, not current `master`). They may need to be modified for your version of Grafana (most recent versions should work fine with Grafana 12.4).
 
 ### How can I protect EPA's InfluxDB from unauthorized access?
 

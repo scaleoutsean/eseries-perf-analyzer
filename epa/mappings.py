@@ -821,7 +821,7 @@ VOLUME_LIVE_MAPPING = [
     ("readOps", "read_ops", float),
     ("readTimeMax", "read_time_max", float),
     ("readTimeTotal", "read_time_total", float),
-    ("totalBlksEvicted", "total_blks_evicted", float),
+    ("totalBlksEvicted", "total_blocks_evicted", float),
     ("totalIosShipped", "total_ios_shipped", float),
     ("writeBytes", "write_bytes", float),
     ("writeCacheHitOps", "write_cache_hit_ops", float),

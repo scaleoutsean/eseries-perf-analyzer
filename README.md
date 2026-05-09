@@ -149,14 +149,14 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
 
 ## Change log
 
-- 4.0.0 (----)
+- 4.0.0 (May 9, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Collector now only exports Prometheus metrics for any Prometheus scraper and Victoria Metrics is included in reference stack
   - Live ("realtime") performance metrics (optional in EPA 3) replace averaged (default in EPA 3). Averaged are no longer available
   - SANtricity Major Event Log ("MEL") no longer collected (users may use [syslog forwarding](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) for that; also current failures are available in Collector Prometheus metrics for alerting)
   - Collector collects snapshot- and linked clone-related metrics and configuration information
   - SANtricity Client library included in EPA to avoid duplication of API queries
-  - Grafana 13 (12.4+ recommended) and Prometheus-based dashboards included in reference stack
+  - Grafana 13 (12.4+ recommended) with several dashboards included in reference EPA stack
 
 - 4.0.0beta3 (May 02, 2026)
   - **Breaking changes**: do not "upgrade" from EPA 3 - deploy version 4 alongside version 3 if you want to try EPA 4

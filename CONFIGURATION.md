@@ -120,7 +120,7 @@ Configure multiple scrape destinations in Victoria Metrics if you have multiple 
 
 That's in `./grafana/provisioning/datasources/vm.yml`.
 
-You could, for example, configure Victoria Metrics as a Prometheus data source or use some other Prometheus-compatible database.
+You could, for example, configure Victoria Metrics as a Prometheus data source or scrape Collector data by some other Prometheus-compatible database.
 
 ## Calibration and testing
 

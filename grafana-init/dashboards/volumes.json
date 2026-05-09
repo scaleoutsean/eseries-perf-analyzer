@@ -2,9 +2,9 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "admf9jg",
-    "generation": 44,
-    "creationTimestamp": "2026-04-18T14:54:27Z",
+    "name": "epa-volumes",
+    "generation": 13,
+    "creationTimestamp": "2026-04-30T13:02:42Z",
     "labels": {},
     "annotations": {}
   },
@@ -17,10 +17,7 @@
             "kind": "DataQuery",
             "group": "grafana",
             "version": "v0",
-            "spec": {},
-            "labels": {
-              "grafana.app/export-label": "grafana-1"
-            }
+            "spec": {}
           },
           "enable": true,
           "hide": true,
@@ -37,7 +34,7 @@
         "kind": "Panel",
         "spec": {
           "id": 1,
-          "title": "Volume IOPS (Combined)",
+          "title": "Volume IO operations per second (Combined)",
           "description": "",
           "links": [],
           "data": {
@@ -57,9 +54,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -106,7 +100,6 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "binBps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -168,7 +161,7 @@
         "kind": "Panel",
         "spec": {
           "id": 2,
-          "title": "Volume IOPS (Read)",
+          "title": "Volume IO operations per second (Read)",
           "description": "",
           "links": [],
           "data": {
@@ -188,9 +181,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -237,7 +227,6 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "binBps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -299,7 +288,7 @@
         "kind": "Panel",
         "spec": {
           "id": 3,
-          "title": "Volume IOPS (Write)",
+          "title": "Volume IO operations per second (Write)",
           "description": "",
           "links": [],
           "data": {
@@ -319,9 +308,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -368,7 +354,6 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "binBps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -430,7 +415,7 @@
         "kind": "Panel",
         "spec": {
           "id": 4,
-          "title": "Volume IOPS (R/W)",
+          "title": "Volume IO operations per second (R/W)",
           "description": "",
           "links": [],
           "data": {
@@ -450,9 +435,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -499,7 +481,6 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "binBps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
@@ -547,9 +528,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -640,9 +618,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -749,9 +724,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -882,9 +854,6 @@
                         "instant": true,
                         "legendFormat": "__auto",
                         "range": false
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -1006,9 +975,6 @@
                         "instant": true,
                         "legendFormat": "__auto",
                         "range": false
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -1306,9 +1272,6 @@
               "qryType": 1,
               "query": "label_values(sys_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",
@@ -1341,9 +1304,6 @@
               "qryType": 1,
               "query": "label_values(vol_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",
