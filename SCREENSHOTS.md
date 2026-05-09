@@ -23,7 +23,7 @@ Controllers have details like CPU utilization, throughput and IOPS. They also us
 
 ![Controllers](./images/dashboard_controllers.png)
 
-Volumes use live metrics which SANtricity exposes as "rate" metrics and EPA collector adjusts to "per second" rates for you.
+Volumes use live metrics which SANtricity exposes as "rate" metrics and EPA collector adjusts to "per second" rates for you. `eseries_volume_stat_total` (not shown) containers various performance metrics that can be used for detailed performance monitoring.
 
 ![Volumes](./images/dashboard_volumes.png)
 

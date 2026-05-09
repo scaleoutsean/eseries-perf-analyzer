@@ -139,7 +139,58 @@ Example from 4.0.0beta3:
 # TYPE eseries_snapshot_schedule_schedule_start_date gauge
 ```
 
-`eseries_volume_stat_total` has a bunch of volume performance metrics.
+`eseries_volume_stat_total` has various volume performance metrics such as:
+
+- `average_read_op_size`
+- `average_write_op_size`
+- `cache_blocks_in_use`
+- `cache_write_wait_hit_bytes`
+- `cache_write_wait_hit_iops`
+- `error_redundancy_check_indeterminate_reads`
+- `error_redundancy_check_recovered_reads`
+- `error_redundancy_check_unrecovered_reads`
+- `flash_cache_hit_pct`
+- `flash_cache_read_hit_bytes`
+- `flash_cache_read_hit_ops`
+- `flash_cache_read_hit_time_max`
+- `flash_cache_read_hit_time_total`
+- `flash_cache_read_response_time`
+- `flash_cache_read_throughput`
+- `full_stripe_write_bytes`
+- `idle_time`
+- `mapped_host_count`
+- `other_ops`
+- `other_time_max`
+- `other_time_total`
+- `prefetch_hit_bytes`
+- `prefetch_miss_bytes`
+- `queue_depth_max`
+- `queue_depth_total`
+- `random_bytes_total`
+- `random_ios_total`
+- `read_bytes`
+- `read_cache_utilization`
+- `read_hit_bytes`
+- `read_hit_ops`
+- `read_hit_time_max`
+- `read_hit_time_total`
+- `read_ops`
+- `read_physical_iops`
+- `read_time_max`
+- `read_time_total`
+- `total_blocks_evicted`
+- `total_ios_shipped`
+- `write_bytes`
+- `write_cache_hit_ops`
+- `write_cache_utilization`
+- `write_hit_bytes`
+- `write_hit_ops`
+- `write_hit_time_max`
+- `write_hit_time_total`
+- `write_ops`
+- `write_physical_iops`
+- `write_time_max`
+- `write_time_total`
 
 ### How to scrape multiple Collector instances from Victoria Metrics?
 
