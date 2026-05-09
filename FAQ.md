@@ -47,11 +47,11 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 ### Where can I see list of supported metrics?
 
-You can run collector and see with `curl http://localhost:9080/metrics`.
+You can run collector (or browser) and see with `curl http://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system).
 
-Example from 4.0.0beta3:
+Example from 4.0.0:
 
-```sh
+```raw
 # TYPE epa_scrape_duration_seconds summary
 # TYPE epa_scrape_duration_seconds_created gauge
 # TYPE epa_scrape_errors_total counter
@@ -191,6 +191,8 @@ Example from 4.0.0beta3:
 - `write_physical_iops`
 - `write_time_max`
 - `write_time_total`
+
+Where `time_total` appears, it seems to represent cumulative time in *microseconds*. Since the SANtricity documentation poorly documents performance counters and their values can sometimes be nonsense (negative performance or percentage values above 100), I do not try to interpret these in fancy ways and suggest relying on the basic ones instead.
 
 ### How to scrape multiple Collector instances from Victoria Metrics?
 

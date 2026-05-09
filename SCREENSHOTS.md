@@ -5,7 +5,7 @@ These exist to demonstrate that metrics as well as basic configuration details a
 How to install dashboards:
 
 - Default EPA stack (with Victoria Metrics): run `docker compose up grafana-init`
-- Grafana set up for a Prometheus-compatible data source: manually import dashboards from `./grafana-init/dashboards/`, they should work with standard Prometheus data sources (databases). If you notice any Victoria Metrics format-specific issues with the reference dashboards, try creating a similar panel using generic Prometheus source and report that in issues
+- Grafana set up for a Prometheus-compatible data source: manually import dashboards from `./grafana-init/dashboards/`, they should work with standard Prometheus data sources (databases). If you notice any Victoria Metrics format-specific issues with the reference dashboards, try creating a similar panel using a generic Prometheus source and report that in issues
 
 The Overview dashboard shows an example of a configuration table, with top-down time series, gauges and so on.
 
