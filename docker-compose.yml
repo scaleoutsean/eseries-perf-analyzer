@@ -120,8 +120,8 @@ services:
     # 8k block size, strictly throttled to 10 IOPS
     command: >
       fio --name=test-workload --filename=/mnt/santricity/test.img 
-      --size=50M --rw=randrw --bs=8k --ioengine=libaio 
-      --direct=1 --rate_iops=10 --time_based --runtime=3600
+      --size=50M --rw=randrw --bs=4k --ioengine=libaio
+      --direct=1 --rate_iops=80,20 --time_based --runtime=3600 --status-interval=600
     networks:
       - eseries_perf_analyzer
 

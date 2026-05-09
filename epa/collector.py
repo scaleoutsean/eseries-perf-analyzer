@@ -35,6 +35,7 @@ from mappings import (
     CONFIG_VOLUMES_MAPPING,
     CONFIG_WORKLOADS_MAPPING,
     DRIVE_MAPPING,
+    VOLUME_LIVE_MAPPING,
     GLOBAL_ID_CACHE,
     HOSTS_MAPPING,
     HOST_GROUPS_MAPPING,
@@ -863,25 +864,25 @@ def send_to_prometheus(measurement, tags, fields):
             }
             
             # Map disk fields to Prometheus metrics
-            if 'combinedIOps' in fields and fields['combinedIOps'] is not None:
-                measurement_metrics['iops'].labels(**dtags).set(fields['combinedIOps'])
+            if 'combined_iops' in fields and fields['combined_iops'] is not None:
+                measurement_metrics['iops'].labels(**dtags).set(fields['combined_iops'])
 
             # Throughput metrics
-            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+            for direction, field in [('read', 'read_throughput'), ('write', 'write_throughput'), ('combined', 'combined_throughput')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['throughput'].labels(**dtags, direction=direction).set(fields[field])
 
             # Response time metrics
-            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+            for operation, field in [('read', 'read_response_time'), ('write', 'write_response_time'), ('combined', 'combined_response_time')]:
                 if field in fields and fields[field] is not None:
                     # Convert milliseconds to seconds for Prometheus
                     measurement_metrics['response_time'].labels(**dtags, operation=operation).set(fields[field] / 1000.0)
 
             # SSD wear metrics
-            if 'spareBlocksRemainingPercent' in fields and fields['spareBlocksRemainingPercent'] is not None:
-                measurement_metrics['ssd_wear'].labels(**dtags, metric='spare_blocks_remaining').set(fields['spareBlocksRemainingPercent'])
-            if 'percentEnduranceUsed' in fields and fields['percentEnduranceUsed'] is not None:
-                measurement_metrics['ssd_wear'].labels(**dtags, metric='endurance_used').set(fields['percentEnduranceUsed'])
+            if 'spare_blocks_remaining_percent' in fields and fields['spare_blocks_remaining_percent'] is not None:
+                measurement_metrics['ssd_wear'].labels(**dtags, metric='spare_blocks_remaining').set(fields['spare_blocks_remaining_percent'])
+            if 'percent_endurance_used' in fields and fields['percent_endurance_used'] is not None:
+                measurement_metrics['ssd_wear'].labels(**dtags, metric='endurance_used').set(fields['percent_endurance_used'])
 
         elif measurement == 'controllers':
             # Controller IOPS
@@ -905,19 +906,28 @@ def send_to_prometheus(measurement, tags, fields):
 
         elif measurement == 'volumes':
             # Volume IOPS
-            for operation, field in [('read', 'readIOps'), ('write', 'writeIOps'), ('other', 'otherIOps'), ('combined', 'combinedIOps')]:
+            for operation, field in [('read', 'read_iops'), ('write', 'write_iops'), ('other', 'other_iops'), ('combined', 'combined_iops')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['iops'].labels(**tags, operation=operation).set(fields[field])
 
             # Volume throughput
-            for direction, field in [('read', 'readThroughput'), ('write', 'writeThroughput'), ('combined', 'combinedThroughput')]:
+            for direction, field in [('read', 'read_throughput'), ('write', 'write_throughput'), ('combined', 'combined_throughput')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['throughput'].labels(**tags, direction=direction).set(fields[field])
 
             # Volume response time
-            for operation, field in [('read', 'readResponseTime'), ('write', 'writeResponseTime'), ('combined', 'combinedResponseTime')]:
+            for operation, field in [('read', 'read_response_time'), ('write', 'write_response_time'), ('combined', 'combined_response_time')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['response_time'].labels(**tags, operation=operation).set(fields[field] / 1000.0)
+
+            # Map remaining fields from VOLUME_LIVE_MAPPING directly instead of 'raw_' iteration
+            if 'raw_stats' in measurement_metrics:
+                ignore_keys = {'read_iops', 'write_iops', 'other_iops', 'combined_iops', 
+                               'read_throughput', 'write_throughput', 'combined_throughput',
+                               'read_response_time', 'write_response_time', 'combined_response_time'}
+                for field_key, field_val in fields.items():
+                    if isinstance(field_val, (int, float)) and field_key not in ignore_keys:
+                        measurement_metrics['raw_stats'].labels(**tags, stat=field_key).set(field_val)
 
         elif measurement == 'interface':
             # Interface IOPS
@@ -936,8 +946,8 @@ def send_to_prometheus(measurement, tags, fields):
                     measurement_metrics['queue_depth'].labels(**tags, metric=metric).set(fields[field])
 
         elif measurement == 'power':
-            if 'totalPower' in fields and fields['totalPower'] is not None:
-                measurement_metrics['total_power'].labels(**tags).set(fields['totalPower'])
+            if 'total_power' in fields and fields['total_power'] is not None:
+                measurement_metrics['total_power'].labels(**tags).set(fields['total_power'])
 
         elif measurement == 'temp':
             if 'temp' in fields and fields['temp'] is not None:
@@ -1218,7 +1228,7 @@ def collect_symbol_stats(system_info):
                         "sys_id": sys_id,
                         "sys_name": sys_name
                     },
-                    "fields": {"totalPower": int(psu_total)}
+                    "fields": {"total_power": int(psu_total)}
                 }
                 if not CMD.include or item["measurement"] in CMD.include:
                     json_body.append(item)
@@ -1649,38 +1659,44 @@ def collect_storage_metrics(system_info, live_stats_snapshot=None):
                                     host_names.append(host_name)
 
                 volume_fields = {
-                    'averageReadOpSize': avg_read_op_size,
-                    'averageWriteOpSize': avg_write_op_size,
-                    'combinedIOps': combined_iops,
-                    'combinedResponseTime': combined_response_time,
-                    'combinedThroughput': combined_throughput,
-                    'flashCacheHitPct': flash_cache_hit_pct,
-                    'flashCacheReadHitBytes': delta_fc_hit_bytes / dt if dt > 0 else 0,
-                    'flashCacheReadHitOps': delta_fc_hit_ops / dt if dt > 0 else 0,
-                    'flashCacheReadResponseTime': flash_cache_resp,
-                    'flashCacheReadThroughput': delta_fc_hit_bytes / dt if dt > 0 else 0,
-                    'otherIOps': other_iops,
-                    'queueDepthMax': current_values['queueDepthMax'],
-                    'queueDepthTotal': current_values['queueDepthTotal'],
-                    'readCacheUtilization': read_cache_util,
-                    'readHitBytes': delta_read_hit_bytes / dt if dt > 0 else 0,
-                    'readHitOps': delta_read_hit_ops / dt if dt > 0 else 0,
-                    'readIOps': read_iops,
-                    'readOps': delta_read_ops,
-                    'readPhysicalIOps': read_iops,
-                    'readResponseTime': read_response_time,
-                    'readThroughput': read_throughput,
-                    'writeCacheUtilization': write_cache_util,
-                    'writeHitBytes': delta_write_hit_bytes / dt if dt > 0 else 0,
-                    'writeHitOps': delta_write_hit_ops / dt if dt > 0 else 0,
-                    'writeIOps': write_iops,
-                    'writeOps': delta_write_ops,
-                    'writePhysicalIOps': write_iops,
-                    'writeResponseTime': write_response_time,
-                    'writeThroughput': write_throughput,
+                    'average_read_op_size': avg_read_op_size,
+                    'average_write_op_size': avg_write_op_size,
+                    'combined_iops': combined_iops,
+                    'combined_response_time': combined_response_time,
+                    'combined_throughput': combined_throughput,
+                    'flash_cache_hit_pct': flash_cache_hit_pct,
+                    'flash_cache_read_hit_bytes': delta_fc_hit_bytes / dt if dt > 0 else 0,
+                    'flash_cache_read_hit_ops': delta_fc_hit_ops / dt if dt > 0 else 0,
+                    'flash_cache_read_response_time': flash_cache_resp,
+                    'flash_cache_read_throughput': delta_fc_hit_bytes / dt if dt > 0 else 0,
+                    'other_iops': other_iops,
+                    'read_cache_utilization': read_cache_util,
+                    'read_hit_bytes': delta_read_hit_bytes / dt if dt > 0 else 0,
+                    'read_hit_ops': delta_read_hit_ops / dt if dt > 0 else 0,
+                    'read_iops': read_iops,
+                    'read_ops': delta_read_ops,
+                    'read_physical_iops': read_iops,
+                    'read_response_time': read_response_time,
+                    'read_throughput': read_throughput,
+                    'write_cache_utilization': write_cache_util,
+                    'write_hit_bytes': delta_write_hit_bytes / dt if dt > 0 else 0,
+                    'write_hit_ops': delta_write_hit_ops / dt if dt > 0 else 0,
+                    'write_iops': write_iops,
+                    'write_ops': delta_write_ops,
+                    'write_physical_iops': write_iops,
+                    'write_response_time': write_response_time,
+                    'write_throughput': write_throughput,
                     'mapped_host_names': ','.join(host_names) if host_names else '',
                     'mapped_host_count': len(host_names)
                 }
+                
+                # Apply explicit JSON mapping for requested stats and inject to dictionary
+                mapped_api_stats = apply_mapping(stats, VOLUME_LIVE_MAPPING)
+                # Keep keys that do NOT duplicate manually calculated ones to prefer rates
+                for m_k, m_v in mapped_api_stats.items():
+                    if m_k not in volume_fields:
+                        volume_fields[m_k] = m_v
+
                 vol_item = {
                     "measurement": "volumes",
                     "tags": {

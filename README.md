@@ -132,7 +132,7 @@ pip install -r ./epa/requirements.txt  # REQUIRED for CLI (requests library, Pro
 python3 ./epa/collector.py -h 
 ```
 
-Using default username `monitor` and SANtricity Web UI at 2.2.2.2:
+Using default username `monitor` with SANtricity Web/API address 2.2.2.2:
 
 ```sh
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
@@ -149,7 +149,7 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
 
 ## Change log
 
-- 4.0.0 (May ------, 2026)
+- 4.0.0 (----)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Collector now only exports Prometheus metrics for any Prometheus scraper and Victoria Metrics is included in reference stack
   - Live ("realtime") performance metrics (optional in EPA 3) replace averaged (default in EPA 3). Averaged are no longer available
@@ -186,7 +186,7 @@ Open the browser and navigate to http://localhost:9080/metrics to see if Collect
   - Update InfluxDB container image to `1.12.4-alpine`
   - Fix minor aesthetic issues in several dashboards (Controllers, Other, SSD Flash Cache)
   - EPA 3 GHCR container image releases now tagged with version (e.g. `:3.5.5`) since version 4 is also available
-  - Source code is in [v3.5.5](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) branch
+  - Source code: [v3.5.5](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5)
 
 - 3.5.4 (April 6, 2026)
   - Upgrade Grafana from last v8 release to v12.4.1, update existing dashboards to work with v12
