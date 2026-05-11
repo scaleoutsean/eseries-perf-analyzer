@@ -35,7 +35,7 @@ services:
       - "traefik.http.services.collector.loadbalancer.server.port=9080"
 
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.7
     container_name: traefik
     restart: unless-stopped
     command:
@@ -46,7 +46,7 @@ services:
       - "--providers.file.filename=/etc/traefik/dynamic.yml"
       - "--entrypoints.metrics.address=:9080"
       - "--entrypoints.grafana.address=:3443"
-      - "--serverstransport.rootcas=/certs/ca.crt"
+      - "--serverstransport.insecureskipverify=true"
     ports:
       - "${PROMETHEUS_PORT:-9080}:9080"
       - "${GRAFANA_PORT:-3443}:3443"

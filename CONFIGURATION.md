@@ -36,6 +36,8 @@ You may disable or remove `traefik` service if you do not wish to allow external
 
 You may replace the self-generated Traefik TLS certificate with own by adding them to `./certs/proxy/` and optionally editing `./traefik_dynamic.yml` if your certificate file names are different. The CA certificate can be left in place so that Traefik can validate Grafana or potentially other TLS service (such as VM, if it's enabled for TLS access) behind it.
 
+Note that Traefik presently does not validate self-signed TLS certificate created for Grafana because Traefik requires SAN information to match host name for which self-signed TLS certificates would have to be generated differently. Since Grafana is running within the same Compose stack and self-signed certificates aren't the right way in any case, HTTPS is used, but validation skipped. You may replace the Grafana certificate with valid TLS certificate on your own if you wish.
+
 ## Run Collector
 
 These arguments and switches are available in Compose as well, although it is suggested to not change Prometheus port setting since that requires a change in Victoria Metrics as well - for external access, simply change the Traefik settings instead.
@@ -101,10 +103,9 @@ If you do it manually elsewhere:
 
 If you use **own** Grafana **and** choose to use Victoria Metrics from EPA stack:
 
-- You need to expose service port for `vm` service in docker-compose.yml to allow Grafana to reach Victoria Metrics from the outside. This may be done by proxying access via Traefik, or by directly exposing Victoria Metrics' service
-- Allow external access from Grafana to the Victoria Metrics port in Compose file (in Traefik or VM service)
-- Additionally, you may enable authentication on Traefik or limit access to the Grafana (source) IP
-- Copy any CA/Victoria Metrics certificates to your Grafana instance to enable TLS validation if you do not wish to skip/disable that
+- You need to expose the service port for `vm` service in docker-compose.yml to allow Grafana to reach Victoria Metrics from the outside. This may be done by proxying access to https://vm:8428 via Traefik, or by directly exposing Victoria Metrics' service
+- Allow external access from Grafana to the Victoria Metrics port in Compose file (in Traefik or VM service definition)
+- If you use Traefik to proxy access to VM, disable TLS certificate validation for VM the same way it is disabled for Grafana (see above in the Traefik section). Additionally, you may enable authentication on Traefik or limit access to the Grafana (source) IP
 
 If you use own Grafana and own Prometheus scraper/database, Collector's Prometheus port is already exposed via Traefik. You can add extra options (TLS, authentication, rate limiting) to Traefik configuration if you wish.
 

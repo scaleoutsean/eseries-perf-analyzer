@@ -5,7 +5,7 @@
 # Creates CA and TLS certificates for various services in EPA 4               #
 #                                                                             #
 # Author: @scaleoutSean (Github)                                              #
-# Repository: https://github.com/scaleoutsean/sfc                             #
+# Repository: https://github.com/scaleoutsean/eseries-perf-analyzer           #
 # License: the Apache License Version 2.0                                     #
 ###############################################################################
 
@@ -124,7 +124,7 @@ x509_extensions = v3_ca
 prompt = no
 
 [req_distinguished_name]
-CN = SFC-CA
+CN = EPA-CA
 
 [v3_ca]
 subjectKeyIdentifier = hash
@@ -590,5 +590,5 @@ if __name__ == "__main__":
         create_proxy_config()
         copy_ca_to_all()
 
-    # Optional E-Series trust certificate bootstrap for SFC.
+    # Optional E-Series trust certificate bootstrap for EPA.
     maybe_download_eseries_certificate(args.download_eseries_cert, args.eseries_controllers)

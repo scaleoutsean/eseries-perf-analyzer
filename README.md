@@ -113,17 +113,17 @@ Services:
 
 | Service | Exposed | URL | Note |
 | :------ | :------:| :----| :-----|
-| `traefik` | Yes   | https://HOSTNAME:[3443,9080] | Reverse proxy for external access to `collector`, `grafana` (**HTTPS**-only) |
+| `traefik` | Yes   | https://HOSTNAME:9080/metrics, https://HOSTNAME:3443 | Reverse proxy for external access to `collector`, `grafana` (**HTTPS**-only) |
 | `collector`| No   | http://collector:9080/metrics | Accessible within Compose (i.e. `vm`, `traefik`) |
 | `grafana` | No    | https://grafana:3443 | Grafana service, proxied by Traefik |
 | `grafana-init` |No| - | Deploys reference dashboards to Grafana |
-| `vm`    | No      | http://vm:8428        | Victoria Metrics, scrapes metrics from `collector` |
+| `vm`    | No      | https://vm:8428        | Victoria Metrics, scrapes metrics directly from `collector` |
 
-For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different for each). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See CONFIGURATION.md for more.
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different for each). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
 
 ## Use `collector` from CLI
 
-This only runs EPA Collector which gathers data and shares them over HTTP on Prometheus port.
+This only runs EPA Collector which gathers SANtricity metrics and serves them at http://HOSTNAME:9080/metrics. Open or close host's external HTTP access to the port as needed.
 
 ```bash
 TAG="v4.0.0beta3"
@@ -140,16 +140,22 @@ Using default username `monitor` with SANtricity Web/API address 2.2.2.2:
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
 ```
 
-Open the browser and navigate to http://HOSTNAME:9080/metrics to see if Collector's Prometheus exporter is working.
+Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0.1:9080/metrics) to see if Collector's Prometheus exporter is working.
 
 ## Other documents
 
 - [SCRIPTS](./scripts/SCRIPTS.md) has more details on running the helper scripts
-- [CONFIGURATION](./CONFIGURATION.md) has extra details about configuration workflow
-- [SCREENSHOTS](./SCREENSHOTS.md) has example screenshots and details about installing reference dashboards
-- [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, it has some basic EPA 4-related content
+- [CONFIGURATION](./CONFIGURATION.md) has extra details about the configuration workflow
+- [SCREENSHOTS](./SCREENSHOTS.md) has example screenshots and some details about installing reference dashboards
+- [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, with some EPA 4-related content
 
 ## Change log
+
+- 4.0.0 (May 13, 2026)
+  - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
+  - Changes from 4.0.0 beta versions plus the addition of Traefik-based reverse HTTPS proxy for Collector and Grafana
+  - Update README and other documents to reflect the addition of Traefik
+  - Minor adjustments to the scripts to generate TLS certificates for Traefik
 
 - 4.0.0 (May 9, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4

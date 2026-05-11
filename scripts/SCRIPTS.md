@@ -33,7 +33,7 @@ subject=CN = proxy
 Do you want to download certificate from E-Series (n/Y): n
 ```
 
-Check the result and if okay, run the other script to generate data directories.
+Check the result and if okay, run the other script to generate data directories and setup permissions on them.
 
 ```sh
 $ ll certs/
@@ -64,4 +64,4 @@ Setup complete! You can now run:
 $ docker compose build
 ```
 
-You can edit `.env` (that shouldn't be necessary, though) or `docker-compose.yml` (you need to, especially E-Series controller IP(s) and password for the monitor account), before you run `docker compose up -d`.
+You can edit `.env` (that shouldn't be necessary, though) and `docker-compose.yml` (you need to, especially E-Series controller IP(s) and password for the monitor account), before you run `docker compose up -d`.
