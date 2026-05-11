@@ -65,7 +65,7 @@ Users are encouraged to run own Prometheus scraper, database and Grafana, but a 
 #### Build own Collector container
 
 ```bash
-TAG="v4.0.0beta2"
+TAG="v4.0.0"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
@@ -97,12 +97,12 @@ You can use the same docker-compose.yml file - just change these two images to u
 services:
 
   collector: 
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta3
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0
     environment: 
       - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=2.2.2.2          # your E-Series 
   grafana-init:
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta3
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0
 ```
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
@@ -126,7 +126,7 @@ For multiple E-Series systems, it's best to create multiple collector-only Docke
 This only runs EPA Collector which gathers SANtricity metrics and serves them at http://HOSTNAME:9080/metrics. Open or close host's external HTTP access to the port as needed.
 
 ```bash
-TAG="v4.0.0beta3"
+TAG="v4.0.0"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 make vendor                            # REQUIRED; downloads SANtricity client to epa/santricity_client directory
@@ -153,9 +153,10 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 
 - 4.0.0 (May 13, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
-  - Changes from 4.0.0 beta versions plus the addition of Traefik-based reverse HTTPS proxy for Collector and Grafana
+  - Export more volume performance metrics
+  - All changes from the 4.0.0 beta releases with the addition of Traefik-based reverse HTTPS proxy for Collector, Grafana and optionally Victoria Metrics
+  - Minor adjustments to the helper scripts to generate TLS certificates for Traefik
   - Update README and other documents to reflect the addition of Traefik
-  - Minor adjustments to the scripts to generate TLS certificates for Traefik
 
 - 4.0.0 (May 9, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
