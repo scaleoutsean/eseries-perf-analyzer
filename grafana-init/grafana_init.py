@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class GrafanaInitializer:
     def __init__(self):
-        self.grafana_url = os.getenv('GRAFANA_URL', 'http://grafana:3000')
+        self.grafana_url = os.getenv('GRAFANA_URL', 'https://grafana:3443')
         self.grafana_user = os.getenv('GRAFANA_USER', 'admin')
         self.grafana_password = os.getenv('GRAFANA_PASSWORD', 'admin')
         

@@ -71,7 +71,7 @@ cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
 ./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs
 ./scripts/setup-data-dirs.sh      # REQUIRED; creates data directories for Grafana, VM
-make vendor                       # REQUIRED; downloads SANtricity client to epa/santricity_client
+make vendor                       # REQUIRED; downloads SANtricity Client (Python) to ./epa/santricity_client
 vim .env                          # optional, for Docker Compose Grafana version or non-default initial credentials
 vim docker-compose.yml            # REQUIRED; you must provide correct SANtricity API IP/FQDN, credentials
 ```
@@ -88,10 +88,10 @@ Note that `make`, TLS and data directories-generating scripts are mandatory for 
 
 If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0`, for example) and use the same for both `collector` and `grafana-init` image version:
 
-- [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana
 - [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
+- [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana, so you don't need it if you upload own dashboards or do it manually
 
-You should use the same docker-compose.yml, just change these two images to use GHCR, provide a password for your `monitor` user on SANtricity and your E-Series management IP address. The rest (not shown) should be able to remain as-is.
+You can use the same docker-compose.yml file - just change these two images to use the GHCR links, and provide a password for your `monitor` user on SANtricity and the E-Series management IP address(es). The rest (not shown) should be able to remain as-is.
 
 ```yaml
 services:
@@ -109,15 +109,17 @@ You still need to run the scripts, but you don't need "`make vendor`" because yo
 
 #### Docker Compose service ports
 
-Service URLs (assuming access from `localhost`):
+Services:
 
-- Exposed: EPA Collector's Prometheus metrics at [http://localhost:9080/metrics](http://localhost:9080/metrics) - expose different ports if running multiple Collectors
-- Exposed: Grafana at [https://localhost:3443](https://localhost:3443)
-- **NOT** exposed: Victoria Metrics at [https://localhost:8428](https://localhost:8428) (it may be exposed by editing the Compose file)
+| Service | Exposed | URL | Note |
+| :------ | :------:| :----| :-----|
+| `traefik` | Yes   | https://HOSTNAME:[3443,9080] | Reverse proxy for external access to `collector`, `grafana` (**HTTPS**-only) |
+| `collector`| No   | http://collector:9080/metrics | Accessible within Compose (i.e. `vm`, `traefik`) |
+| `grafana` | No    | https://grafana:3443 | Grafana service, proxied by Traefik |
+| `grafana-init` |No| - | Deploys reference dashboards to Grafana |
+| `vm`    | No      | http://vm:8428        | Victoria Metrics, scrapes metrics from `collector` |
 
-Do not open the exposed ports on the host unless you need external access. When you open them, you can limit access by IP and add a reverse proxy with authentication.
-
-For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See CONFIGURATION.md for more.
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different for each). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See CONFIGURATION.md for more.
 
 ## Use `collector` from CLI
 
@@ -138,7 +140,7 @@ Using default username `monitor` with SANtricity Web/API address 2.2.2.2:
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
 ```
 
-Open the browser and navigate to http://localhost:9080/metrics to see if Collector's Prometheus exporter is working.
+Open the browser and navigate to http://HOSTNAME:9080/metrics to see if Collector's Prometheus exporter is working.
 
 ## Other documents
 

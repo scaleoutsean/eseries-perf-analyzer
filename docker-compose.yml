@@ -12,8 +12,6 @@ services:
       options:
         max-file: "5"
         max-size: 10m
-    ports:
-      - "9080:9080"
     environment: 
       - USERNAME=monitor
       - PASSWORD=monitor123  # non-production pass, thank you very much
@@ -29,6 +27,36 @@ services:
       - ./certs/_master/ca.crt:/certs/ca.crt:ro
     networks:
       - eseries_perf_analyzer
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.collector.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.collector.entrypoints=metrics"
+      - "traefik.http.routers.collector.tls=true"
+      - "traefik.http.services.collector.loadbalancer.server.port=9080"
+
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--log.level=INFO"
+      - "--api.insecure=true" # Enables the Traefik dashboard on 8080 (optional)
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.metrics.address=:9080"
+      - "--entrypoints.grafana.address=:3443"
+      - "--serverstransport.rootcas=/certs/ca.crt"
+    ports:
+      - "${PROMETHEUS_PORT:-9080}:9080"
+      - "${GRAFANA_PORT:-3443}:3443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro"
+      - "./certs/proxy:/certs/proxy:ro"
+      - "./certs/_master/ca.crt:/certs/ca.crt:ro"
+    networks:
+      - eseries_perf_analyzer
 
   grafana:
     image: grafana:13.0-ubuntu
@@ -36,8 +64,6 @@ services:
     build:
       context: ./grafana/
     restart: unless-stopped
-    ports:
-      - "${GRAFANA_PORT:-3443}:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
@@ -60,6 +86,13 @@ services:
       eseries_perf_analyzer:
         aliases:
           - grafana
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.grafana.entrypoints=grafana"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.services.grafana.loadbalancer.server.scheme=https"
 
   grafana-init:
     image: grafana-init:${TAG}
@@ -76,7 +109,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
       - GRAFANA_USER=${GRAFANA_ADMIN_USER:-admin}
       - GRAFANA_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GRAFANA_URL=https://grafana:3000
+      - GRAFANA_URL=${GRAFANA_URL:-https://grafana:3000}
       - GF_PLUGINS_PREINSTALL_SYNC=victoriametrics-metrics-datasource
       - REQUESTS_CA_BUNDLE=/certs/ca.crt
       - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt

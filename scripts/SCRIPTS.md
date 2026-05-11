@@ -20,9 +20,7 @@ usage: gen_ca_tls_certs.py [-h]
   [--use-sudo] [--force-regenerate]
 ```
 
-You can't use `--download-eseries-cert` if your E-Series certs are invalid, so we'll skip that step. Assuming you've screwed up once already, `--force-generate` can be used to help.
-
-The `ca` is CA, the `vm` is Victoria Metrics, `grafana` is Grafana. You don't need `s3` (it's from version 3 where Versity Gateway was optional at one time) for EPA 4.0.0.
+You can't use `--download-eseries-cert` if your E-Series certs are invalid (not mapped to a resolvable FQDN or hostname), so we'll skip that step. Assuming you've screwed up once already, `--force-generate` can be used to create "missing" or new self-signed certificates.
 
 ```sh
 $ ./scripts/gen_ca_tls_certs.py --service all --force-regenerate
@@ -31,7 +29,7 @@ subject=CN = grafana
 Certificate request self-signature ok
 subject=CN = vm
 Certificate request self-signature ok
-subject=CN = s3
+subject=CN = proxy
 Do you want to download certificate from E-Series (n/Y): n
 ```
 
@@ -45,9 +43,7 @@ drwxr-xr-x 13 root root 4096 Apr 26 15:56 ../
 drwxr-xr-x  2 root root 4096 Apr 26 15:56 eseries/
 drwxr-xr-x  2 root root 4096 Apr 26 15:58 grafana/
 drwxr-xr-x  2 root root 4096 Apr 26 15:58 _master/
-drwxr-xr-x  2 root root 4096 Apr 26 15:58 s3/
-drwxr-xr-x  2 root root 4096 Apr 26 15:56 sfc/
-drwxr-xr-x  2 root root 4096 Apr 26 15:56 utils/
+drwxr-xr-x  2 root root 4096 Apr 26 15:58 proxy/
 drwxr-xr-x  2 root root 4096 Apr 26 15:58 vm/
 
 $ ./scripts/setup-data-dirs.sh
@@ -68,4 +64,4 @@ Setup complete! You can now run:
 $ docker compose build
 ```
 
-You can edit `.env` (that shouldn't be necessary) or `docker-compose.yml` (you need to, especially array IP(s) and the password for the monitor account), before you can run `docker compose up -d`.
+You can edit `.env` (that shouldn't be necessary, though) or `docker-compose.yml` (you need to, especially E-Series controller IP(s) and password for the monitor account), before you run `docker compose up -d`.

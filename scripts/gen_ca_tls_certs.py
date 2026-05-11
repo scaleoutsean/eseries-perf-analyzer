@@ -273,8 +273,8 @@ def create_vm_config():
     logging.info("Victoria Metrics TLS material created at %s", str(dest))
     return (key_path, cert_path)
 
-def create_s3_config():
-    # Create S3 Gateway CSR, sign it with CA key, copy to ./certs/s3
+def create_proxy_config():
+    # Create S3 Gateway CSR, sign it with CA key, copy to ./certs/proxy
     master = pathlib.Path("./certs/_master")
     ca_key = master / "ca.key"
     ca_crt = master / "ca.crt"
@@ -282,19 +282,19 @@ def create_s3_config():
     if not (ca_key.exists() and ca_crt.exists()):
         create_certificates()
 
-    dest = pathlib.Path("./certs/s3")
-    key_path, cert_path = gen_sign_csr(dest, "s3", "/CN=s3")
+    dest = pathlib.Path("./certs/proxy")
+    key_path, cert_path = gen_sign_csr(dest, "proxy", "/CN=proxy")
 
-    conf_path = dest / "s3_tls.conf"
+    conf_path = dest / "proxy_tls.conf"
     conf_text = (
-        "# Minimal S3 TLS configuration (example)\n"
+        "# Minimal Proxy TLS configuration (example)\n"
         f"tls_cert = {str(cert_path)}\n"
         f"tls_key = {str(key_path)}\n"
         f"tls_ca = {str(dest / 'ca.crt')}\n"
     )
     _write_text_file(conf_path, conf_text)
 
-    logging.info("S3 TLS material created at %s", str(dest))
+    logging.info("Proxy TLS material created at %s", str(dest))
     return (key_path, cert_path)
 
 def create_grafana_config():
@@ -336,7 +336,7 @@ def create_grafana_config():
 def copy_ca_to_all():
     # Copies CA public key to all services
     src = pathlib.Path("./certs/_master/ca.crt")
-    for service in ["s3", "vm", "grafana", "sfc", "utils"]:
+    for service in ["proxy", "vm", "grafana"]:
         dst = pathlib.Path(f"./certs/{service}/ca.crt")
         _ensure_dir(dst.parent)
         _write_bytes_file(dst, src.read_bytes())
@@ -580,14 +580,14 @@ if __name__ == "__main__":
     elif args.service == "grafana":
         create_grafana_config()
         copy_ca_to_all()
-    elif args.service == "s3":
-        create_s3_config()
+    elif args.service == "proxy":
+        create_proxy_config()
         copy_ca_to_all()        
     else:
         create_certificates()
         create_grafana_config()
         create_vm_config()
-        create_s3_config()
+        create_proxy_config()
         copy_ca_to_all()
 
     # Optional E-Series trust certificate bootstrap for SFC.

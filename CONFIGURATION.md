@@ -24,17 +24,21 @@ You may use `all`, but reject E-Series certificate collection if your E-Series c
 
 ## Configure and test Collector's Prometheus service port
 
-It is recommended to just leave Prometheus port at 9080 as it is in `.env` and `collector.py`. Then you don't have to do anything.
+It is recommended to just leave Collector's Prometheus port at 9080 as it is in `.env` and `collector.py`.
 
-But, if you must, here's how you can:
+If you change Prometheus port to another value *and* want to use Victoria Metrics, set the same port in `./vm/prometheus.yml` before starting Victoria Metrics service. To scrape multiple Collectors from Victoria Metrics, add them to `./vm/prometheus.yml`.
 
-- Set it in `.env` (default: `9080`), Compose, or with `python3 ./epa/collector.py --prometheus-port 9080` when running from the CLI
-- Use `curl http://COLLECTOR:<PROM_PORT>/metrics` to verify it's working
-- If you change Prometheus port to another value *and* want to use Victoria Metrics, set the same port in `./vm/prometheus.yml` before starting Victoria Metrics service
+## Configure Traefik
+
+By default, you don't have to. Traefik simply routes external requests to `collector` and `grafana` **via HTTPS only**. Victoria Metrics accesses Collector from *within* the stack and without going through Traefik.
+
+You may disable or remove `traefik` service if you do not wish to allow external access to Collector's metrics. If you deal with untrusted networks, `traefik.http.middlewares.*` can be configured to add rate limiting, and other features (such as authentication) can be added for extra security.
+
+You may replace the self-generated Traefik TLS certificate with own by adding them to `./certs/proxy/` and optionally editing `./traefik_dynamic.yml` if your certificate file names are different. The CA certificate can be left in place so that Traefik can validate Grafana or potentially other TLS service (such as VM, if it's enabled for TLS access) behind it.
 
 ## Run Collector
 
-These arguments and switches are available in Compose as well.
+These arguments and switches are available in Compose as well, although it is suggested to not change Prometheus port setting since that requires a change in Victoria Metrics as well - for external access, simply change the Traefik settings instead.
 
 ```sh
 # 
@@ -47,7 +51,7 @@ usage: collector.py [-h] [-u USERNAME] [-p PASSWORD] [--api API [API ...]]
     [--max-iterations MAX_ITERATIONS] [--capture [DIR]] [--no-verify-ssl]
 ```
 
-Some of the more impactful ones:
+Some of the more impactful arguments:
 
 ```sh
 options:
@@ -87,22 +91,22 @@ Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 min
 
 ## Configure Grafana data source in Victoria Metrics
 
-Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics. The EPA reference stack uses Victoria Metrics.
+Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics through Traefik's external port. The EPA reference stack uses Victoria Metrics which accesses Collector by its Docker service name within the Compose stack.
 
-If you run use reference stack (Collector, Grafana, Victoria Metrics), Grafana's data source will be created automatically when you run `docker compose up` after the above two steps and `grafana-init` container.
+If you run use this reference stack (Collector, Grafana, Victoria Metrics, Traefik), Grafana's data source will be created automatically when you run `docker compose up` after the above two steps and `grafana-init` container.
 
 If you do it manually elsewhere:
 
 ![Configure Victoria Metrics Data Source](./images/epa_configuration_data_source_example_vm_01.png)
 
-If you use own Grafana **and** choose to use Victoria Metrics from EPA stack:
+If you use **own** Grafana **and** choose to use Victoria Metrics from EPA stack:
 
-- You need to expose service port for `vm` service in docker-compose.yml to allow Grafana to reach Victoria Metrics from the outside
-- Allow external access from Grafana to the Victoria Metrics port from Compose file
-- Copy any CA/Victoria Metrics certificates to Grafana to enable TLS validation if you do not wish to skip/disable that
-- Additionally, you may enable authentication on V or limit access to specific Grafana (source) IP
+- You need to expose service port for `vm` service in docker-compose.yml to allow Grafana to reach Victoria Metrics from the outside. This may be done by proxying access via Traefik, or by directly exposing Victoria Metrics' service
+- Allow external access from Grafana to the Victoria Metrics port in Compose file (in Traefik or VM service)
+- Additionally, you may enable authentication on Traefik or limit access to the Grafana (source) IP
+- Copy any CA/Victoria Metrics certificates to your Grafana instance to enable TLS validation if you do not wish to skip/disable that
 
-If you use own Grafana and own Prometheus scraper and database, just make sure Collector's Prometheus Port is exposed to your scraper.
+If you use own Grafana and own Prometheus scraper/database, Collector's Prometheus port is already exposed via Traefik. You can add extra options (TLS, authentication, rate limiting) to Traefik configuration if you wish.
 
 ## Down-sampling and retention for Victoria Metrics data
 
@@ -110,17 +114,13 @@ It's all done automatically by Victoria Metrics. Data retention is set to 90 day
 
 Refer to the Victoria Metrics documentation for the details on modifying values.
 
-## Customizing Prometheus port
-
-Collector and Compose make that easy, but there are other places where it may be set, such as `./vm/prometheus.yml`.
-
-Configure multiple scrape destinations in Victoria Metrics if you have multiple Collectors.
-
 ## Customizing Grafana data source
 
 That's in `./grafana/provisioning/datasources/vm.yml`.
 
-You could, for example, configure Victoria Metrics as a Prometheus data source or scrape Collector data by some other Prometheus-compatible database.
+You could, for example, configure Victoria Metrics as a Prometheus data source or scrape Collector data by some other Prometheus-compatible database, in which case you'd want a different data source added to Grafana.
+
+If you replace Victoria Metrics with Prometheus, the reference dashboards may need small changes, so perhaps try adding a new data source first (while leaving VM's "EPA" data source in place), and fully replace VM's "EPA" with a new Prometheus "EPA" if the dashboards work okay with your Prometheus data source.
 
 ## Calibration and testing
 
