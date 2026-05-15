@@ -151,7 +151,7 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 
 ## Change log
 
-- 4.0.0 (May 13, 2026)
+- 4.0.0 (May 15, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Export more volume performance metrics
   - All changes from the 4.0.0 beta releases with the addition of Traefik-based reverse HTTPS proxy for Collector, Grafana and optionally Victoria Metrics

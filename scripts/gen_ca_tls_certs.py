@@ -206,7 +206,7 @@ def gen_sign_csr(dest: pathlib.Path, base_name: str, subj: str, days: str = "365
     dns_names = [common_name]
     ip_names = []
 
-    if base_name in ("influxdb", "s3", "grafana", "explorer", "vm"):
+    if base_name in ("influxdb", "proxy", "grafana", "explorer", "vm"):
         dns_names = [base_name, "localhost"]
         ip_names = ["127.0.0.1"]
 
@@ -479,7 +479,7 @@ def maybe_download_eseries_certificate(download_mode: str = "auto", eseries_cont
             if not sys.stdin.isatty():
                 logging.warning("--download-eseries-cert=yes set without --eseries-controllers in non-interactive mode; skipping download.")
                 return
-            user_input = input("E-Series host or URL (example: 192.168.1.34 or https://sf.example.local:443): ").strip()
+            user_input = input("E-Series host or URL (example: 192.168.1.34 or https://santricity.example.local:443): ").strip()
         else:
             if not sys.stdin.isatty():
                 logging.info("Non-interactive session detected. Skipping optional E-Series cert download.")
@@ -488,7 +488,7 @@ def maybe_download_eseries_certificate(download_mode: str = "auto", eseries_cont
             if answer in ("n", "no"):
                 logging.info("Skipped E-Series certificate download by user choice.")
                 return
-            user_input = input("E-Series host or URL (example: 192.168.1.34 or https://sf.example.local:443): ").strip()
+            user_input = input("E-Series host or URL (example: 192.168.1.34 or https://santricity.example.local:443): ").strip()
 
         for item in user_input.split(","):
             item = item.strip()
@@ -546,7 +546,7 @@ def maybe_download_eseries_certificate(download_mode: str = "auto", eseries_cont
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Generate CA and per-service TLS certificates.")
-    parser.add_argument("--service", choices=["all", "grafana", "eseries", "ca", "vm", "s3"], default="all", help="Which certs to generate")
+    parser.add_argument("--service", choices=["all", "grafana", "eseries", "proxy", "ca", "vm"], default="all", help="Which certs to generate")
     parser.add_argument(
         "--download-eseries-cert",
         choices=["auto", "yes", "no"],
