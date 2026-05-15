@@ -14,16 +14,16 @@ If you don't have own CA and/or certificates, create a virtual environment and i
 $ pip install tomlkit
 $ ./scripts/gen_ca_tls_certs.py  -h
 usage: gen_ca_tls_certs.py [-h] 
-  [--service {all,grafana,eseries,ca,vm,s3}]
+  [--service {all,grafana,proxy,eseries,ca,vm}]
   [--download-eseries-cert {auto,yes,no}] 
   [--eseries-controllers ESERIES_CONTROLLERS]
   [--use-sudo] [--force-regenerate]
 ```
 
-You can't use `--download-eseries-cert` if your E-Series certs are invalid (not mapped to a resolvable FQDN or hostname), so we'll skip that step. Assuming you've screwed up once already, `--force-generate` can be used to create "missing" or new self-signed certificates.
+You can't use `--download-eseries-cert` if your E-Series certs are invalid (not mapped to a resolvable FQDN or hostname), so we'll skip that step. Assuming you've screwed up once already, `--force-generate` can be used to create "missing" or new self-signed certificates. Add `--use-sudo` if the script complains it can't change permissions (which may happen if some of the files are owned by the root user).
 
 ```sh
-$ ./scripts/gen_ca_tls_certs.py --service all --force-regenerate
+$ ./scripts/gen_ca_tls_certs.py --service all --force-regenerate --use-sudo
 Certificate request self-signature ok
 subject=CN = grafana
 Certificate request self-signature ok
