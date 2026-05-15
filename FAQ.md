@@ -8,6 +8,7 @@
     - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
     - [How much RAM does a Collector container instance need?](#how-much-ram-does-a-collector-container-instance-need)
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
+    - [IOPS seem](#iops-seem)
   - [EPA 3](#epa-3)
     - [Is EPA 3 still maintained?](#is-epa-3-still-maintained)
     - [Why do I need to fill in so many details in Collector's YAML file?](#why-do-i-need-to-fill-in-so-many-details-in-collectors-yaml-file)
@@ -39,7 +40,7 @@
 
 ### What's the main difference compared to EPA 3?
 
-EPA 4 removes database from the picture and retains only Prometheus metrics (which most people didn't even know about, but they've been available for a while). See more about other differences and reasons behind changes [here](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html).
+EPA 4 removes database from the picture and retains only Prometheus metrics (which most people didn't even know about, but they've been available for a while). See more about other differences and reasons behind the changes [here](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html).
 
 ### What's recommended - EPA 4 or EPA 3?
 
@@ -47,7 +48,7 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 ### Where can I see list of supported metrics?
 
-You can run collector (or browser) and see with `curl http://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system).
+You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system).
 
 Example from 4.0.0:
 
@@ -205,6 +206,14 @@ Below 64 MiB on average.
 ### I've generated TLS certificates but my client still says it's untrusted
 
 The browser does not trust self-created CA certificates. You need to import it or - even better - use own CA to generate TLS certificates for EPA containers.
+
+### IOPS seem
+
+Not all "IO per second" are in 4 kiB requests per second. EPA 3 used API endpoints with pre-computed statistics, while EPA 4 uses "live". That means IO requests are just IO requests. Live metrics need to be computed and normalized in order to produce similar IO
+
+- (Total Bytes Now - Total Bytes Previous) - gives us Total Bytes for the interval. Use similar for count incremental IOPS.
+- (Total Bytes / Total IOPS) - gives average I/O size for the period.
+- `eseries_controller_throughput_bytes_per_second / 4096` would give you normalized bytes in 4 KiB units.
 
 ## EPA 3
 
