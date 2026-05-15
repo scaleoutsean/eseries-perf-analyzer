@@ -19,7 +19,7 @@ services:
       - API_PORT=8443
       - DEBUG=false
       - TLS_VERIFY=false
-      - COLLECTION_INTERVAL=120
+      - COLLECTION_INTERVAL=60
       - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9080}
       - REQUESTS_CA_BUNDLE=/certs/ca.crt
       - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
