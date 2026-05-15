@@ -879,10 +879,10 @@ def send_to_prometheus(measurement, tags, fields):
                     measurement_metrics['response_time'].labels(**dtags, operation=operation).set(fields[field] / 1000.0)
 
             # SSD wear metrics
-            if 'spare_blocks_remaining_percent' in fields and fields['spare_blocks_remaining_percent'] is not None:
-                measurement_metrics['ssd_wear'].labels(**dtags, metric='spare_blocks_remaining').set(fields['spare_blocks_remaining_percent'])
-            if 'percent_endurance_used' in fields and fields['percent_endurance_used'] is not None:
-                measurement_metrics['ssd_wear'].labels(**dtags, metric='endurance_used').set(fields['percent_endurance_used'])
+            if 'spareBlocksRemainingPercent' in fields and fields['spareBlocksRemainingPercent'] is not None:
+                measurement_metrics['ssd_wear'].labels(**dtags, metric='spare_blocks_remaining').set(fields['spareBlocksRemainingPercent'])
+            if 'percentEnduranceUsed' in fields and fields['percentEnduranceUsed'] is not None:
+                measurement_metrics['ssd_wear'].labels(**dtags, metric='endurance_used').set(fields['percentEnduranceUsed'])
 
         elif measurement == 'controllers':
             # Controller IOPS
