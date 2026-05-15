@@ -8,7 +8,8 @@
     - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
     - [How much RAM does a Collector container instance need?](#how-much-ram-does-a-collector-container-instance-need)
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
-    - [IOPS seem](#iops-seem)
+    - [IOPS seem off](#iops-seem-off)
+    - [What replaces MEL events in EPA 4?](#what-replaces-mel-events-in-epa-4)
   - [EPA 3](#epa-3)
     - [Is EPA 3 still maintained?](#is-epa-3-still-maintained)
     - [Why do I need to fill in so many details in Collector's YAML file?](#why-do-i-need-to-fill-in-so-many-details-in-collectors-yaml-file)
@@ -207,13 +208,27 @@ Below 64 MiB on average.
 
 The browser does not trust self-created CA certificates. You need to import it or - even better - use own CA to generate TLS certificates for EPA containers.
 
-### IOPS seem
+### IOPS seem off
 
-Not all "IO per second" are in 4 kiB requests per second. EPA 3 used API endpoints with pre-computed statistics, while EPA 4 uses "live". That means IO requests are just IO requests. Live metrics need to be computed and normalized in order to produce similar IO
+Not all "IO per second" happen in 4 kiB requests. EPA 3 used API endpoints with pre-computed statistics, while EPA 4 uses "live" (raw) counters. That means IO requests represent the number of IO requests. Live metrics need to be computed and normalized in order to produce similar figures that we get in EPA 3:
 
-- (Total Bytes Now - Total Bytes Previous) - gives us Total Bytes for the interval. Use similar for count incremental IOPS.
+- (Total Bytes Now - Total Bytes Previous) - gives us Total Bytes for the interval. Use similar to count incremental IOPS.
 - (Total Bytes / Total IOPS) - gives average I/O size for the period.
 - `eseries_controller_throughput_bytes_per_second / 4096` would give you normalized bytes in 4 KiB units.
+
+### What replaces MEL events in EPA 4?
+
+`eseries_active_failures_total` - number of active failures, with by-type tags in `failure_type`. Example:
+
+`eseries_active_failures_total{failure_type="none",object_ref="",object_type="none",sys_id="7F0000011E1E1E1E1E1E1E1E1E1E1E1E",sys_name="EF80"} 0.0`
+
+See a Grafana example of multiple failures [here](https://scaleoutsean.github.io/2026/04/30/singleton-qdrant-vector-db-netapp-eseries-santricity-csi.html).
+
+You can create notifiers from a Prometheus scraper, or in Grafana, depending on your requirements.
+
+Documentation links:
+- [Grafana alerting](https://grafana.com/docs/grafana/latest/alerting/)
+- Prometheus [Alert Manager](https://prometheus.io/docs/alerting/latest/alertmanager/)
 
 ## EPA 3
 
