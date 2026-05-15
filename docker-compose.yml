@@ -2,7 +2,7 @@ services:
 
   collector:
     image: collector:${TAG}
-    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0beta3 # example of using GHCR image instead of building locally
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0 # example of using GHCR image instead of building locally
     container_name: collector
     build: ./epa/
     mem_limit: 256m
@@ -96,7 +96,7 @@ services:
 
   grafana-init:
     image: grafana-init:${TAG}
-    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0beta2 # example of using GHCR image instead of building locally
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0 # example of using GHCR image instead of building locally
     profiles: ["init"]
     build: 
       context: ./grafana-init
@@ -122,7 +122,7 @@ services:
   vm:
     image: victoriametrics/victoria-metrics:latest
     container_name: vm
-    # ports:  # Grafana users will just use Grafana and not VM, but if you require access to VM, uncomment this section
+    # ports:  # Grafana users will just use Grafana and not VM, but if you require access to VM, uncomment this section and enable Traefik routing to VM in the traefik_dynamic.yml file.
     #  - "8428:8428"
     volumes:
       - ./certs/vm:/etc/victoria-metrics:ro

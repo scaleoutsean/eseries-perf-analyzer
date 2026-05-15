@@ -140,7 +140,7 @@ Using default username `monitor` with SANtricity Web/API address 2.2.2.2:
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
 ```
 
-Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0.1:9080/metrics) to see if Collector's Prometheus exporter is working.
+Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0.1:9080/metrics) to see if Collector's Prometheus exporter is working. If running from Docker, Traefik is used and HTTPS must be specified instead.
 
 ## Other documents
 
