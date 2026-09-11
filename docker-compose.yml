@@ -13,8 +13,8 @@ services:
         max-file: "5"
         max-size: 10m
     environment: 
-      - USERNAME=monitor
-      - PASSWORD=monitor123  # non-production pass, thank you very much
+      - USERNAME=admin
+      - PASSWORD=infiniti  # non-production pass, thank you very much
       - API=192.168.1.194
       - API_PORT=8443
       - DEBUG=false
@@ -59,7 +59,7 @@ services:
       - eseries_perf_analyzer
 
   grafana:
-    image: grafana:13.0-ubuntu
+    image: grafana/grafana:13.0-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
