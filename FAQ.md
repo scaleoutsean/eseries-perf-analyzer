@@ -198,7 +198,7 @@ Where `time_total` appears, it seems to represent cumulative time in *microsecon
 
 ### How to scrape multiple Collector instances from Victoria Metrics?
 
-- Use `two-array-docker-compose.yml` (move it, or just the two `collector` services, to `docker-compose.yml`). Notice that your `collector` container will become `collector1` and `collector2` after that. The Traefik labels also look different. You need to remove the unnecessary `collector` container, and start `collector1` and `collector2` (or whatever your names are). Check the logs.
+- Use `two-array-docker-compose.yml` (move it, or just the two `collector` services, to `docker-compose.yml`). Notice that your `collector` container will become `collector1` and `collector2` after that. The Traefik labels also look different. You need to remove the unnecessary `collector` container, and start `collector1` and `collector2` (or whatever your names are). `.env` hard-codes the Prometheus port (also see [CONFIGURATION](./CONFIGURATION.md)), so remove that or override it for each collector. Start all collectors and check the logs.
 - Once that's working, update `./vm/prometheus.yml` to add the newly named collectors/ports (see `vm/prometheus-two-array.yml`). Stop, remove and restart `vm` service. Check that VM is successfully scraping the new collectors
 
 ```sh
