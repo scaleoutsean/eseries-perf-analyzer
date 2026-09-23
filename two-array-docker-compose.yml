@@ -1,10 +1,20 @@
+# Reference example: monitoring two E-Series arrays with two collector instances.
+#
+# Run with:  sudo docker compose -f two-array-docker-compose.yml up -d
+# (pass -f on every compose command, or the default docker-compose.yml is used instead)
+#
+# When copying a collector stanza to add a third array, each copy needs a unique:
+#   - service name        (becomes the DNS name VictoriaMetrics scrapes)
+#   - container_name
+#   - Traefik router, middleware and service names, and a unique PathPrefix rule
+# and the new target must be added to vm/prometheus-two-array.yml.
+
 services:
 
-  collector:
+  collector1:
     image: collector:${TAG}
     # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0 # example of using GHCR image instead of building locally
-    # Adding a second array? See two-array-docker-compose.yml for a complete working example.
-    container_name: collector
+    container_name: collector1
     build: ./epa/
     mem_limit: 256m
     restart: unless-stopped
@@ -30,13 +40,47 @@ services:
       - eseries_perf_analyzer
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.collector.rule=PathPrefix(`/collector`)"
-      - "traefik.http.routers.collector.entrypoints=metrics"
-      - "traefik.http.routers.collector.tls=true"
-      - "traefik.http.routers.collector.middlewares=collector-strip"
-      - "traefik.http.middlewares.collector-strip.stripprefix.prefixes=/collector"
-      - "traefik.http.services.collector.loadbalancer.server.port=9080"
+      - "traefik.http.routers.collector1.rule=PathPrefix(`/collector1`)"
+      - "traefik.http.routers.collector1.entrypoints=metrics"
+      - "traefik.http.routers.collector1.tls=true"
+      - "traefik.http.routers.collector1.middlewares=collector1-strip"
+      - "traefik.http.middlewares.collector1-strip.stripprefix.prefixes=/collector1"
+      - "traefik.http.services.collector1.loadbalancer.server.port=9080"
 
+  collector2:
+    image: collector:${TAG}
+    container_name: collector2
+    build: ./epa/
+    mem_limit: 256m
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "5"
+        max-size: 10m
+    environment:
+      - USERNAME=admin
+      - PASSWORD=infiniti  # non-production pass, thank you very much
+      - API=192.168.1.195   # <-- second array's controller IP
+      - API_PORT=8443
+      - DEBUG=false
+      - TLS_VERIFY=false
+      - COLLECTION_INTERVAL=60
+      - PROMETHEUS_PORT=9080
+      - REQUESTS_CA_BUNDLE=/certs/ca.crt
+      - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
+    volumes:
+      - ./certs/_master/ca.crt:/certs/ca.crt:ro
+    networks:
+      - eseries_perf_analyzer
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.collector2.rule=PathPrefix(`/collector2`)"
+      - "traefik.http.routers.collector2.entrypoints=metrics"
+      - "traefik.http.routers.collector2.tls=true"
+      - "traefik.http.routers.collector2.middlewares=collector2-strip"
+      - "traefik.http.middlewares.collector2-strip.stripprefix.prefixes=/collector2"
+      - "traefik.http.services.collector2.loadbalancer.server.port=9080"
 
   traefik:
     image: traefik:v3.7
@@ -130,7 +174,7 @@ services:
     #  - "8428:8428"
     volumes:
       - ./certs/vm:/etc/victoria-metrics:ro
-      - ./vm/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./vm/prometheus-two-array.yml:/etc/prometheus/prometheus.yml:ro
       - ./data/vm:/storage
     command:
       - "-storageDataPath=/storage"

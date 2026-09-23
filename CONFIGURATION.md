@@ -24,9 +24,18 @@ You may use `all`, but reject E-Series certificate collection if your E-Series c
 
 ## Configure and test Collector's Prometheus service port
 
-It is recommended to just leave Collector's Prometheus port at 9080 as it is in `.env` and `collector.py`.
+It is strongly recommended to just leave Collector's Prometheus port at 9080 as it is in `.env` and `collector.py` because there are dependencies (including in Traefik).
 
-If you change Prometheus port to another value *and* want to use Victoria Metrics, set the same port in `./vm/prometheus.yml` before starting Victoria Metrics service. To scrape multiple Collectors from Victoria Metrics, add them to `./vm/prometheus.yml`.
+If you change Prometheus port to another value *and* want to use Victoria Metrics, set the same port in `./vm/prometheus.yml` before starting Victoria Metrics service. To scrape multiple Collectors from Victoria Metrics, add them to `./vm/prometheus.yml` or see `vm/prometheus-two-array.yml`.
+
+Example test for `collector1` (if two collectors are used, the first one may be `collector1`):
+
+```sh
+# single collector setup
+sudo docker exec vm wget -qO- http://collector:9080/metrics | head -3
+# multi-collector setup depends on the name you gave it; by convention, in multi-array setups we use collector1
+sudo docker exec vm wget -qO- http://collector1:9080/metrics | head -3
+```
 
 ## Configure Traefik
 
