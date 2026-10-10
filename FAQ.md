@@ -257,7 +257,7 @@ Documentation links:
 - [Grafana alerting](https://grafana.com/docs/grafana/latest/alerting/)
 - Prometheus [Alert Manager](https://prometheus.io/docs/alerting/latest/alertmanager/)
 
-Consider [Victoria Logs](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) to Docker Compose for SANtricity logs.
+If you need more features related to logging, consider adding [Victoria Logs](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) to Docker Compose and forwarding SANtricity logs to it.
 
 ## EPA 3
 
