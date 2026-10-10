@@ -65,7 +65,7 @@ Users are encouraged to run own Prometheus scraper, database and Grafana, but a 
 #### Build own Collector container
 
 ```bash
-TAG="v4.0.0"
+TAG="v4.0.1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
@@ -86,7 +86,7 @@ Note that `make`, TLS and data directories-generating scripts are mandatory for 
 
 #### Use pre-created Collector container
 
-If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.0`, for example) and use the same for both `collector` and `grafana-init` image version:
+If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.1`, for example) and use the same for both `collector` and `grafana-init` image version:
 
 - [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
 - [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana, so you don't need it if you upload own dashboards or do it manually
@@ -97,12 +97,12 @@ You can use the same docker-compose.yml file - just change these two images to u
 services:
 
   collector: 
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.1
     environment: 
       - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=2.2.2.2          # your E-Series 
   grafana-init:
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.1
 ```
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
@@ -151,6 +151,11 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 
 ## Change log
 
+- 4.0.1 (Oct 10, 2026)
+  - **No changes** to EPA Collector
+  - Changed: partial fix for issue #41 (three queries in the controller.json dashboard now show correct IOPS)
+  - Changed: minor documentation improvements (backup/restore for Victoria Metrics)
+
 - 4.0.0 (May 15, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Export more volume performance metrics
@@ -158,7 +163,7 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
   - Minor adjustments to the helper scripts to generate TLS certificates for Traefik
   - Update README and other documents to reflect the addition of Traefik
 
-- 4.0.0 (May 9, 2026)
+- 4.0.0beta4 (May 9, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Collector now only exports Prometheus metrics for any Prometheus scraper and Victoria Metrics is included in reference stack
   - Live ("realtime") performance metrics (optional in EPA 3) replace averaged (default in EPA 3). Averaged are no longer available
