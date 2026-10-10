@@ -263,9 +263,11 @@ If you need more features related to logging, consider adding [Victoria Logs](ht
 
 ### Is EPA 3 still maintained?
 
-Yes. Find those in version branches such as [this one](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) (released in April 2026).
+Yes, for SANtricity 11.9x versions. Find EPA 3 releases in version branches such as [this one](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) (released in April 2026).
 
 Bug reports are accepted and issues will be worked on, although EPA is really maintenance-free. Just update 3rd party dependencies in `./epa/collector/requirements.txt` and rebuild. EPA 3 seems to work fine with SANtricity 12, but if anyone notices and reports a bug related to SANtricty 12 differences, it will be fixed.
+
+SANtricity 12 introduced API changes, so issues are expected. Please use EPA 4 for SANtricity 12.
 
 ### Why do I need to fill in so many details in Collector's YAML file?
 
