@@ -126,7 +126,7 @@ For multiple E-Series systems, it's best to create multiple collector-only Docke
 This only runs EPA Collector which gathers SANtricity metrics and serves them at http://HOSTNAME:9080/metrics. Open or close host's external HTTP access to the port as needed.
 
 ```bash
-TAG="v4.0.0"
+TAG="v4.0.1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 make vendor                            # REQUIRED; downloads SANtricity client to epa/santricity_client directory
