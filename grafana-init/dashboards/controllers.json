@@ -602,7 +602,7 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "rate(eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"combined\"}[$__rate_interval])",
+                        "expr": "eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"combined\"}",
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
@@ -718,7 +718,7 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "rate(eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"read\"}[$__rate_interval])",
+                        "expr": "eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"read\"}",
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
@@ -834,7 +834,7 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "rate(eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"write\"}[$__rate_interval])",
+                        "expr": "eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"write\"}",
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true

@@ -6,6 +6,7 @@
     - [What's recommended - EPA 4 or EPA 3?](#whats-recommended---epa-4-or-epa-3)
     - [Where can I see list of supported metrics?](#where-can-i-see-list-of-supported-metrics)
     - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
+    - [How to backup Victoria Metrics database?](#how-to-backup-victoria-metrics-database)
     - [How much RAM does a Collector container instance need?](#how-much-ram-does-a-collector-container-instance-need)
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
     - [IOPS seem off](#iops-seem-off)
@@ -242,6 +243,7 @@ docker run --rm \
   -src=fs:///backup/instance1 \
   -storageDataPath=/storage
 ```
+Add `-skipFilePreallocation` if you don't want to pre-allocate.
 
 ### How much RAM does a Collector container instance need?
 
