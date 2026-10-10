@@ -7,6 +7,7 @@
     - [Where can I see list of supported metrics?](#where-can-i-see-list-of-supported-metrics)
     - [How to scrape multiple Collector instances from Victoria Metrics?](#how-to-scrape-multiple-collector-instances-from-victoria-metrics)
     - [How to backup Victoria Metrics database?](#how-to-backup-victoria-metrics-database)
+    - [How to preserve and view Victoria Metrics collected elsewhere](#how-to-preserve-and-view-victoria-metrics-collected-elsewhere)
     - [How much RAM does a Collector container instance need?](#how-much-ram-does-a-collector-container-instance-need)
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
     - [IOPS seem off](#iops-seem-off)
@@ -50,7 +51,7 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 ### Where can I see list of supported metrics?
 
-You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system).
+You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system). Keep an eye on issue #41 as incorrectly named metrics (gauges with `_total` in mame) will at some point be corrected to drop `_total`.
 
 Example from 4.0.0:
 
@@ -244,6 +245,13 @@ docker run --rm \
   -storageDataPath=/storage
 ```
 Add `-skipFilePreallocation` if you don't want to pre-allocate.
+
+### How to preserve and view Victoria Metrics collected elsewhere
+
+- Backup database using `vmbackup`, copy it to an empty EPA 4 instance of the same version and restore with `vmrestore`
+- If only Grafana and VM services are started, you should be able to see already collected charts
+
+Remember that `vmrestore` overwrites existing VM data.
 
 ### How much RAM does a Collector container instance need?
 
