@@ -35,10 +35,10 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 
 **NOTE:** `master` branch may be ahead of Releases. You may download and decompress all EPA 4 and 3 releases from [Releases](https://github.com/scaleoutsean/eseries-perf-analyzer/releases).
 
-| EPA version | Where to go |
-| :---:   | :-----------|
-| 4       | stay on this page |
-| 3       | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
+| EPA version | SANtricity version | Where to go |
+| :---:   | :-------:|  :-----| 
+| 4       | 12.x, 11.9x| stay on this page |
+| 3       | 11.9x | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
 
 ### Use SANtricity `monitor` account
 
@@ -154,7 +154,7 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 - 4.0.1 (Oct 10, 2026)
   - **No changes** to EPA Collector
   - Changed: partial fix for issue #41 (three queries in the controller.json dashboard now show correct IOPS)
-  - Changed: minor documentation improvements (backup/restore for Victoria Metrics)
+  - New: minor documentation improvements (backup/restore for Victoria Metrics)
 
 - 4.0.0 (May 15, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
@@ -163,7 +163,7 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
   - Minor adjustments to the helper scripts to generate TLS certificates for Traefik
   - Update README and other documents to reflect the addition of Traefik
 
-- 4.0.0beta4 (May 9, 2026)
+- 4.0.0 (May 9, 2026)
   - **Breaking changes**: EPA 3 users cannot upgrade to EPA 4. Fresh installation is required. EPA 4 beta can be upgraded to EPA 4
   - Collector now only exports Prometheus metrics for any Prometheus scraper and Victoria Metrics is included in reference stack
   - Live ("realtime") performance metrics (optional in EPA 3) replace averaged (default in EPA 3). Averaged are no longer available
