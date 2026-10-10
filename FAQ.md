@@ -227,6 +227,11 @@ docker run --rm \
   -dst=fs:///backup/instance1
 ```
 
+To restore:
+- `docker compose stop vm` # restore must be done on a stopped instance
+- Use [vmrestore](https://docs.victoriametrics.com/victoriametrics/vmrestore/)
+- The restore path is overwritten (e.g. `-src=fs:///backup -storageDataPath=fs:///storage`). **WARNING:** this destroys existing VM data, so stand up a fresh instance for testing to confirm the paths work out
+
 ### How much RAM does a Collector container instance need?
 
 Below 64 MiB on average.
