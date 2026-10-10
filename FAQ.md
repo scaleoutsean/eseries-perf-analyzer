@@ -257,6 +257,8 @@ Documentation links:
 - [Grafana alerting](https://grafana.com/docs/grafana/latest/alerting/)
 - Prometheus [Alert Manager](https://prometheus.io/docs/alerting/latest/alertmanager/)
 
+Consider [Victoria Logs](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) to Docker Compose for SANtricity logs.
+
 ## EPA 3
 
 ### Is EPA 3 still maintained?
