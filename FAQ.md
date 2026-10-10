@@ -207,6 +207,26 @@ docker logs collector2
 docker logs vm
 ```
 
+### How to backup Victoria Metrics database?
+
+There are several ways. Consider [vmbackup](https://docs.victoriametrics.com/victoriametrics/vmbackup/) first. 
+
+In this example we create a backup directory and access VM - which runs over TLS here - to dump data to that directory.
+
+```sh
+mkdir vm-backup
+
+docker run --rm \
+  --network container:vm \
+  -v "$PWD/data/vm:/storage:ro" \
+  -v "$PWD/vm-backup:/backup" \
+  victoriametrics/vmbackup:latest \
+  -storageDataPath=/storage \
+  -snapshot.createURL=https://localhost:8428/snapshot/create \
+  -snapshot.tlsInsecureSkipVerify \
+  -dst=fs:///backup/instance1
+```
+
 ### How much RAM does a Collector container instance need?
 
 Below 64 MiB on average.

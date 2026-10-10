@@ -132,6 +132,7 @@ services:
       - ./certs/vm:/etc/victoria-metrics:ro
       - ./vm/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./data/vm:/storage
+      # - ./vm-backup:/backup # optional destination for backup to disk
     command:
       - "-storageDataPath=/storage"
       - "-promscrape.config=/etc/prometheus/prometheus.yml"
