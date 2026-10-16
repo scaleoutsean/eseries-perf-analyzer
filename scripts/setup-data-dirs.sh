@@ -26,7 +26,6 @@ echo "Verification:"
 ls -la data/
 
 echo ""
-echo "Setup complete! You can now run:"
-echo "  docker compose up -d"
+echo "Directory creation complete! See README.md for other instructions." 
 echo ""
 
