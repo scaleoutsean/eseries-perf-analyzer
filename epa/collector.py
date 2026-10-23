@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from api import get_json
+from api import get_drive_statistics, get_json
 from mappings import (
     CONFIG_DRIVES_MAPPING,
     CONFIG_STORAGE_POOLS_MAPPING,
@@ -1319,8 +1319,14 @@ def collect_storage_metrics(system_info, live_stats_snapshot=None):
     try:
         session = get_session()
         json_body = list()
-        drive_stats_list = session.get(
-            f"{get_controller('sys')}/{sys_id}/analysed-drive-statistics").json()
+        try:
+            drive_stats_list = get_drive_statistics(
+                session, f"{get_controller('sys')}/{sys_id}",
+                statistics_fetch_time=max(300, CMD.intervalTime),
+            )
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            LOG.warning("Could not retrieve analyzed drive statistics: %s", exc)
+            drive_stats_list = []
         drive_locations = get_drive_location(sys_id, session)
         if CMD.showDriveNames:
             for stats in drive_stats_list:
@@ -3157,7 +3163,7 @@ if __name__ == "__main__":
     LOG.info("volumes: live-statistics counter deltas (first iteration skipped)")
     LOG.info("controllers: live-statistics counter deltas (first iteration skipped)")
     LOG.info("interfaces: live-statistics counter deltas (first iteration skipped)")
-    LOG.info("disks: non-cached statistics counter deltas (first iteration skipped)")    
+    LOG.info("disks: analyzed drive statistics (array-calculated rates and averages)")
     LOG.info("===============================")
 
     sys_id = "unknown"

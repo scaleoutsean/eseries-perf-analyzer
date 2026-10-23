@@ -210,6 +210,7 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
   - New: basic Podman support added for latest RPM-based distributions (RHEL 10-like). Traefik container requires additional changes, but key container (EPA Collector) should work fine.
   - Changed: fixed several minor response-handling bugs.
   - Changed: incorrectly named counters from issue #41 remain available, but are now deprecated (and will remain throughout v4). Correct counter names have been added (same values, different names). Grafana dashboards keep using the old names, but can be modified to use new since both are available.
+  - Changed: `analysed/drive-statistics` (deprecated in 12.1) to use `analyzed/drive-statistics` without affecting metrics
 
 - 4.0.1 (Oct 10, 2026)
   - **No changes** to EPA Collector

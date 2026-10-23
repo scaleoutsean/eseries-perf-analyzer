@@ -100,6 +100,16 @@ Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 min
 
 **NOTE:** `--debug` may expose SANtricity credentials in Collector or Docker logs.
 
+## Drive performance statistics
+
+Drive performance collection prefers `/analyzed/drive-statistics`, replacing the `/analysed-drive-statistics` endpoint deprecated since SANtricity 12.10. This migration applies to every array model, independently of the newer transport-counter hardware allowlist below.
+
+The paged response contains `statistics` and `tokenId`. The collector follows each single-use token using the `token-id` query parameter until `tokenId` is null. Pages contain historical periods newest-first, so only the first (newest) row for each drive is exported. The historical fetch window is at least 300 seconds, or the polling interval when that is longer; it does not change the array's analysis or averaging interval. Invalid pages, repeated tokens, and failed later pages are rejected rather than exporting partial results.
+
+Older arrays fall back to `/analysed-drive-statistics` only when the initial replacement request returns HTTP 404 or 405. A successful empty statistics list is valid during warm-up and does not trigger fallback. Authentication failures, server failures, and malformed responses do not trigger fallback either. Drive-fetch failures are logged and skip drive updates for that cycle without preventing the remaining storage measurements from being collected.
+
+Existing drive metric names, mappings, and units are unchanged. These remain array-calculated rates and averages, not raw counter deltas. The replacement and an actual disk-only collector cycle were verified against the EF80 12.1 simulator, returning all 24 drives without legacy fallback. Legacy fallback and multi-page history handling are covered by offline regression tests.
+
 ## SANtricity 12.1 transport counters
 
 The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The `EF80` model identifier has been confirmed against a live 12.1 simulator; `EF50` still requires live confirmation. No numeric model aliases are guessed.
