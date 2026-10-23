@@ -66,7 +66,7 @@ Users are encouraged to run own Prometheus scraper, database and Grafana, but a 
 #### Build own Collector container
 
 ```bash
-TAG="v4.0.1"
+TAG="v4.1.0"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
@@ -87,7 +87,7 @@ Note that `make`, TLS and data directories-generating scripts are mandatory for 
 
 #### Use pre-created Collector container
 
-If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.0.1`, for example) and use the same for both `collector` and `grafana-init` image version:
+If you want to use pre-created GHCR containers rather than build own, set the right version with `:{TAG}` (`:4.1.0`, for example) and use the same for both `collector` and `grafana-init` image version:
 
 - [collector](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fcollector)
 - [grafana-init](https://github.com/scaleoutsean/eseries-perf-analyzer/pkgs/container/eseries-perf-analyzer%2Fgrafana-init) - this one just uploads reference dashboards to Grafana, so you don't need it if you upload own dashboards or do it manually
@@ -98,12 +98,12 @@ You can use the same docker-compose.yml file - just change these two images to u
 services:
 
   collector: 
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.1
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.1.0
     environment: 
       - PASSWORD=monitor123  # non-production pass, thank you very much
       - API=2.2.2.2          # your E-Series 
   grafana-init:
-    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.1
+    image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.1.0
 ```
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
@@ -180,7 +180,7 @@ For multiple E-Series systems, it's best to create multiple collector-only Docke
 This only runs EPA Collector which gathers SANtricity metrics and serves them at http://HOSTNAME:9080/metrics. Open or close host's external HTTP access to the port as needed.
 
 ```bash
-TAG="v4.0.1"
+TAG="v4.1.0"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 make vendor                            # REQUIRED; downloads SANtricity client to epa/santricity_client directory
@@ -204,6 +204,12 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 - [FAQs](./FAQ.md) - mostly EPA 3-focused at the moment, with some EPA 4-related content
 
 ## Change log
+
+- 4.1.0 (TBD)
+  - New: add hand-picked (not all available) RDMA, NVMe, kernel metrics for SANtricity 12.1+ *and* EF50/EF80 (not collected for other arrays or any v12.0): nvmeof/statistics, rdma/statistics, nvme-tcp/kernel-statistics.
+  - New: basic Podman support added for latest RPM-based distributions (RHEL 10-like). Traefik container requires additional changes, but key container (EPA Collector) should work fine.
+  - Changed: fixed several minor response-handling bugs.
+  - Changed: incorrectly named counters from issue #41 remain available, but are now deprecated (and will remain throughout v4). Correct counter names have been added (same values, different names). Grafana dashboards keep using the old names, but can be modified to use new since both are available.
 
 - 4.0.1 (Oct 10, 2026)
   - **No changes** to EPA Collector

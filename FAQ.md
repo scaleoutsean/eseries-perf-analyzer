@@ -51,7 +51,7 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 ### Where can I see list of supported metrics?
 
-You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system). Keep an eye on issue #41 as incorrectly named metrics (gauges with `_total` in mame) will at some point be corrected to drop `_total`.
+You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system). Keep an eye on issue #41 as incorrectly named metrics (gauges with `_total` in mame) since v4.1.0 have corrected "shadow" metrics that drop `_total` and have identical values, so uses should use the currected metrics in new dashboards or panels. The included Grafana dashboards still use the old names as those remain available throughout EPA v4.
 
 Example from 4.0.0:
 
@@ -211,7 +211,7 @@ docker logs vm
 
 ### How to backup Victoria Metrics database?
 
-There are several ways. Consider [vmbackup](https://docs.victoriametrics.com/victoriametrics/vmbackup/) first. 
+There are several ways. Consider [vmbackup](https://docs.victoriametrics.com/victoriametrics/vmbackup/) first.
 
 In this example we create a backup directory and access VM - which runs over TLS here - to dump data to that directory.
 
@@ -230,7 +230,8 @@ docker run --rm \
 ```
 
 To restore:
-- `docker compose stop vm` # restore must be done on a stopped instance
+
+- `docker compose stop vm` - restore must be done on a stopped instance
 - Use [vmrestore](https://docs.victoriametrics.com/victoriametrics/vmrestore/)
 - The restore path is overwritten (e.g. `-src=fs:///backup -storageDataPath=fs:///storage/...`). **WARNING:** this destroys existing VM data, so stand up a fresh instance for testing to confirm the paths work out
 
@@ -244,6 +245,7 @@ docker run --rm \
   -src=fs:///backup/instance1 \
   -storageDataPath=/storage
 ```
+
 Add `-skipFilePreallocation` if you don't want to pre-allocate.
 
 ### How to preserve and view Victoria Metrics collected elsewhere
@@ -275,11 +277,12 @@ Not all "IO per second" happen in 4 kiB requests. EPA 3 used API endpoints with 
 
 `eseries_active_failures_total{failure_type="none",object_ref="",object_type="none",sys_id="7F0000011E1E1E1E1E1E1E1E1E1E1E1E",sys_name="EF80"} 0.0`
 
-See a Grafana example of multiple failures [here](https://scaleoutsean.github.io/2026/04/30/singleton-qdrant-vector-db-netapp-eseries-santricity-csi.html).
+See a Grafana [example of multiple failures here](https://scaleoutsean.github.io/2026/04/30/singleton-qdrant-vector-db-netapp-eseries-santricity-csi.html).
 
 You can create notifiers from a Prometheus scraper, or in Grafana, depending on your requirements.
 
 Documentation links:
+
 - [Grafana alerting](https://grafana.com/docs/grafana/latest/alerting/)
 - Prometheus [Alert Manager](https://prometheus.io/docs/alerting/latest/alertmanager/)
 
@@ -480,7 +483,7 @@ Rates versus absolute counts across the time interval `dt`.
   - It calculates these by dividing the raw operations count by the time differential `dt` in seconds (`read_iops = delta_read_iops_total / dt`)
   - If you polled after 60 seconds and 6,000 requests occurred, readIOps = 100 per second
 
-So basically:
+So, basically:
 
 - Ops = Volume / Distance (Total operations logged since the last check)
 - IOps = Speed / Velocity (Operations per Second)

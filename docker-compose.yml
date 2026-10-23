@@ -2,7 +2,7 @@ services:
 
   collector:
     image: localhost/collector:${TAG}
-    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0 # example of using GHCR image instead of building locally
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.1.0 # example of using GHCR image instead of building locally
     # Adding a second array? See two-array-docker-compose.yml for a complete working example.
     container_name: collector
     build: ./epa/
