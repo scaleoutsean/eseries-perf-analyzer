@@ -9,6 +9,7 @@
     - [Containerized EPA](#containerized-epa)
       - [Build own Collector container](#build-own-collector-container)
       - [Use pre-created Collector container](#use-pre-created-collector-container)
+      - [Podman on RHEL 8](#podman-on-rhel-8)
       - [Docker Compose service ports](#docker-compose-service-ports)
   - [Use `collector` from CLI](#use-collector-from-cli)
   - [Other documents](#other-documents)
@@ -69,7 +70,7 @@ TAG="v4.0.1"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
-./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs
+./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs; may require: pip install tomlkit
 ./scripts/setup-data-dirs.sh      # REQUIRED; creates data directories for Grafana, VM
 make vendor                       # REQUIRED; downloads SANtricity Client (Python) to ./epa/santricity_client
 vim .env                          # optional, for Docker Compose Grafana version or non-default initial credentials
@@ -106,6 +107,44 @@ services:
 ```
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
+
+#### Podman on RHEL 8
+
+The main [Compose file](./docker-compose.yml) supports Docker by default and rootful Podman with the settings below. Install Podman and a compatible `podman-compose` provider first; provider availability depends on your enabled RHEL repositories. These instructions use `podman-compose` explicitly rather than the `docker` compatibility command.
+
+Complete the certificate generation, directory setup, `make vendor` (if building locally), and array configuration steps above. The directory setup script creates `data/vm` as well as Grafana's directories; run it again when upgrading an existing checkout.
+
+Add these settings to the checkout's `.env` file, preserving its existing values:
+
+```dotenv
+CONTAINER_SOCKET=/run/podman/podman.sock
+SELINUX_VOLUME_SUFFIX=,z
+```
+
+`CONTAINER_SOCKET` changes only the host socket path; Traefik still sees `/var/run/docker.sock` inside its container. `SELINUX_VOLUME_SUFFIX=,z` enables shared SELinux labels on application bind mounts, including certificates used by multiple services. Leave it unset for Docker's existing behavior. Do not apply `:z` or `:Z` to the container engine socket.
+
+Start a root shell, change to the actual checkout directory, and enable Podman's rootful API socket:
+
+```sh
+sudo -i
+cd /path/to/eseries-perf-analyzer
+systemctl enable --now podman.socket
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml config
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml build collector grafana grafana-init
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml up -d
+```
+
+When using the pre-created GHCR images instead, skip the build command and remove the corresponding `build` entries. To upload the reference dashboards after Grafana is ready:
+
+```sh
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml --profile init run --rm grafana-init
+```
+
+Use the same two `-f` options for subsequent commands such as `logs` and `down`. Rootful Podman has separate image and container storage from rootless Podman; `--privileged` is not needed.
+
+The [Podman override](./docker-compose.podman.yml) disables SELinux container separation only for Traefik so it can access the API socket; SELinux remains enabled for the host and other services. Socket access grants powerful control over rootful containers even when the socket is mounted read-only. Do not expose the API over an unauthenticated TCP port.
+
+Upstream image names and Dockerfile base images are fully qualified to avoid Podman's registry-selection prompts. Locally built Collector and Grafana initializer images use the `localhost/` namespace. Docker users do not need the Podman override or either setting above, and can continue using `docker compose up -d`.
 
 #### Docker Compose service ports
 

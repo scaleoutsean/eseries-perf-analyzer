@@ -1,7 +1,7 @@
 services:
 
   collector:
-    image: collector:${TAG}
+    image: localhost/collector:${TAG}
     # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.0.0 # example of using GHCR image instead of building locally
     # Adding a second array? See two-array-docker-compose.yml for a complete working example.
     container_name: collector
@@ -25,7 +25,7 @@ services:
       - REQUESTS_CA_BUNDLE=/certs/ca.crt
       - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
     volumes:
-      - ./certs/_master/ca.crt:/certs/ca.crt:ro
+      - ./certs/_master/ca.crt:/certs/ca.crt:ro${SELINUX_VOLUME_SUFFIX:-}
     networks:
       - eseries_perf_analyzer
     labels:
@@ -39,7 +39,7 @@ services:
 
 
   traefik:
-    image: traefik:v3.7
+    image: docker.io/library/traefik:v3.7
     container_name: traefik
     restart: unless-stopped
     command:
@@ -55,15 +55,15 @@ services:
       - "${PROMETHEUS_PORT:-9080}:9080"
       - "${GRAFANA_PORT:-3443}:3443"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro"
-      - "./certs/proxy:/certs/proxy:ro"
-      - "./certs/_master/ca.crt:/certs/ca.crt:ro"
+      - "${CONTAINER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro"
+      - "./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro${SELINUX_VOLUME_SUFFIX:-}"
+      - "./certs/proxy:/certs/proxy:ro${SELINUX_VOLUME_SUFFIX:-}"
+      - "./certs/_master/ca.crt:/certs/ca.crt:ro${SELINUX_VOLUME_SUFFIX:-}"
     networks:
       - eseries_perf_analyzer
 
   grafana:
-    image: grafana/grafana:13.0-ubuntu
+    image: docker.io/grafana/grafana:13.0-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
@@ -80,10 +80,10 @@ services:
       GF_DATABASE_SSL_MODE: "enable"
       GF_PLUGIN_ENABLE_ALPHA: "true"
     volumes:
-      - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro
-      - ./certs/grafana:/etc/grafana/certs:ro
-      - ./data/grafana:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./certs/_master/ca.crt:/usr/local/share/ca-certificates/ca.crt:ro${SELINUX_VOLUME_SUFFIX:-}
+      - ./certs/grafana:/etc/grafana/certs:ro${SELINUX_VOLUME_SUFFIX:-}
+      - ./data/grafana:/var/lib/grafana:rw${SELINUX_VOLUME_SUFFIX:-}
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro${SELINUX_VOLUME_SUFFIX:-}
     depends_on:
       - vm
     networks:
@@ -99,7 +99,7 @@ services:
       - "traefik.http.services.grafana.loadbalancer.server.scheme=https"
 
   grafana-init:
-    image: grafana-init:${TAG}
+    image: localhost/grafana-init:${TAG}
     # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0 # example of using GHCR image instead of building locally
     profiles: ["init"]
     build: 
@@ -118,21 +118,21 @@ services:
       - REQUESTS_CA_BUNDLE=/certs/ca.crt
       - GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=/certs/ca.crt
     volumes:
-      - ./certs/_master/ca.crt:/certs/ca.crt:ro
+      - ./certs/_master/ca.crt:/certs/ca.crt:ro${SELINUX_VOLUME_SUFFIX:-}
     networks:
       - eseries_perf_analyzer
     restart: "no"
 
   vm:
-    image: victoriametrics/victoria-metrics:latest
+    image: docker.io/victoriametrics/victoria-metrics:latest
     container_name: vm
     # ports:  # Grafana users will just use Grafana and not VM, but if you require access to VM, uncomment this section and enable Traefik routing to VM in the traefik_dynamic.yml file.
     #  - "8428:8428"
     volumes:
-      - ./certs/vm:/etc/victoria-metrics:ro
-      - ./vm/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./data/vm:/storage
-      # - ./vm-backup:/backup # optional destination for backup to disk
+      - ./certs/vm:/etc/victoria-metrics:ro${SELINUX_VOLUME_SUFFIX:-}
+      - ./vm/prometheus.yml:/etc/prometheus/prometheus.yml:ro${SELINUX_VOLUME_SUFFIX:-}
+      - ./data/vm:/storage:rw${SELINUX_VOLUME_SUFFIX:-}
+      # - ./vm-backup:/backup:rw${SELINUX_VOLUME_SUFFIX:-} # optional destination for backup to disk
     command:
       - "-storageDataPath=/storage"
       - "-promscrape.config=/etc/prometheus/prometheus.yml"
@@ -149,12 +149,12 @@ services:
   # A synthetic fio workload generator for validating metrics in Grafana.
   # Run this manually via:  sudo docker compose --profile test up fio-test
   fio-test:
-    image: dmonakhov/alpine-fio:latest
+    image: docker.io/dmonakhov/alpine-fio:latest
     container_name: epa-fio-tester
     profiles: ["test"]
     volumes:
       # Change this path to match your SANtricity mount point!
-      - ./data/fio_test_mnt:/mnt/santricity:rw
+      - ./data/fio_test_mnt:/mnt/santricity:rw${SELINUX_VOLUME_SUFFIX:-}
     # 8k block size, strictly throttled to 10 IOPS
     command: >
       fio --name=test-workload --filename=/mnt/santricity/test.img 

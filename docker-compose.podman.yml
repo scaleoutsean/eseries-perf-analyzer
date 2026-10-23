@@ -1,0 +1,4 @@
+services:
+  traefik:
+    security_opt:
+      - label=disable
