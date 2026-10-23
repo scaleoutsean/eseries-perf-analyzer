@@ -388,6 +388,79 @@ STORAGE_SYSTEM_GAUGE_KEYS = [
   ("usedPoolSpaceAsString", "used_pool_space_bytes", _str_to_int),
 ]
 
+TRANSPORT_METRIC_DEFS = {
+    "nvmeof": {
+        "endpoint": "/nvmeof/statistics",
+        "prefix": "eseries_nvmeof",
+        "fields": [
+            (("totalControllerCount",), "controllers", "gauge", {}),
+            (("keepAliveTimeouts",), "keep_alive_timeouts_total", "counter", {}),
+            (("maxIoQueuesConnectFailures",), "connection_limit_failures_total", "counter", {"limit": "io_queues"}),
+            (("maxControllerConnectFailures",), "connection_limit_failures_total", "counter", {"limit": "controllers"}),
+            (("nvmeControllerResets",), "controller_resets_total", "counter", {}),
+            (("nvmeControllerShutdowns",), "controller_shutdowns_total", "counter", {}),
+        ] + [
+            ((source, field), metric, "counter", dict(queue=queue, **labels))
+            for source, queue in (("adminQueue", "admin"), ("ioQueue", "io"))
+            for field, metric, labels in (
+                ("successfulConnectRequests", "queue_successful_connect_requests_total", {}),
+                ("connectionFailures", "queue_connection_failures_total", {}),
+                ("disconnects", "queue_disconnects_total", {}),
+                ("commandsGoodStatus", "queue_commands_total", {"status": "good"}),
+                ("commandsErrorStatus", "queue_commands_total", {"status": "error"}),
+            )
+        ],
+    },
+    "rdma": {
+        "endpoint": "/rdma/statistics",
+        "prefix": "eseries_rdma",
+        "fields": [
+            ((source,), metric, "counter", {})
+            for source, metric in (
+                ("symbolErrors", "symbol_errors_total"),
+                ("recoveredLinkErrors", "recovered_link_errors_total"),
+                ("unrecoveredLinkErrors", "unrecovered_link_errors_total"),
+                ("rxPacketErrors", "receive_packet_errors_total"),
+                ("rxEbpDelimitedPackets", "receive_ebp_delimited_packets_total"),
+                ("txPortDownPacketDiscards", "transmit_port_down_packet_discards_total"),
+                ("txConstraintErrorPacketDiscards", "transmit_constraint_error_packet_discards_total"),
+                ("rxConstraintErrorPacketDiscards", "receive_constraint_error_packet_discards_total"),
+                ("rxSubnetManagementDroppedPackets", "receive_subnet_management_dropped_packets_total"),
+                ("txTotalBytes", "transmit_bytes_total"),
+                ("rxTotalBytes", "receive_bytes_total"),
+                ("txTotalPackets", "transmit_packets_total"),
+                ("rxTotalPackets", "receive_packets_total"),
+            )
+        ],
+    },
+    "nvme_tcp_kernel": {
+        "endpoint": "/nvme-tcp/kernel-statistics",
+        "prefix": "eseries_nvme_tcp_kernel",
+        "fields": [
+            (("kernelEthernetStatistics", "ethernetRxStatistics", source),
+             f"receive_{metric}_total", "counter", {})
+            for source, metric in (
+                ("bytes", "bytes"), ("packets", "packets"), ("errors", "errors"),
+                ("dropped", "dropped_packets"), ("crcErrors", "crc_errors"),
+                ("fifoErrors", "fifo_errors"), ("frameErrors", "frame_errors"),
+                ("lengthErrors", "length_errors"), ("missedErrors", "missed_errors"),
+                ("multicast", "multicast_packets"), ("overErrors", "over_errors"),
+            )
+        ] + [
+            (("kernelEthernetStatistics", "ethernetTxStatistics", source),
+             f"transmit_{metric}_total", "counter", {})
+            for source, metric in (
+                ("bytes", "bytes"), ("packets", "packets"), ("errors", "errors"),
+                ("dropped", "dropped_packets"), ("abortedErrors", "aborted_errors"),
+                ("carrierChanges", "carrier_changes"), ("carrierErrors", "carrier_errors"),
+                ("collisions", "collisions"), ("fifoErrors", "fifo_errors"),
+                ("heartbeatErrors", "heartbeat_errors"), ("windowErrors", "window_errors"),
+            )
+        ],
+    },
+}
+
+
 PROMETHEUS_METRICS_CONFIG = {
     'disks': {
         'iops': {

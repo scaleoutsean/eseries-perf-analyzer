@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from api import get_json
 from mappings import (
     CONFIG_DRIVES_MAPPING,
     CONFIG_STORAGE_POOLS_MAPPING,
@@ -674,6 +675,7 @@ FUNCTION_MEASUREMENTS = {
     "collect_config_controllers": ["config_controllers"],
     'collect_storage_metrics': ['disks', 'interface', 'volumes'],
     'collect_controller_metrics': ['controllers'],
+    'collect_transport_metrics': ['nvmeof', 'rdma', 'nvme_tcp_kernel'],
     'collect_symbol_stats': ['power', 'temp'],
     'collect_system_state': ['failures', 'interface_alerts'],
     'collect_config_storage_pools': ['config_storage_pools'],
@@ -730,6 +732,7 @@ if CONFIG_COLLECTION_INTERVAL_MINUTES < collector_interval_minutes:
 prometheus_registry = None
 prometheus_metrics = {}
 prometheus_server = None
+transport_metrics = None
 
 def setup_prometheus():
     """
@@ -775,6 +778,10 @@ def setup_prometheus():
         prometheus_metrics[measurement] = prom_dict
 
     # Start HTTP server in background thread
+    from transport_metrics import TransportMetrics
+    global transport_metrics
+    transport_metrics = TransportMetrics()
+    prometheus_registry.register(transport_metrics)
     start_prometheus_server()
 
 
@@ -1075,12 +1082,10 @@ def get_session():
 def _get_live_statistics_snapshot(session, system_id):
     """Fetch live statistics payload once for reuse across collectors."""
     try:
-        response = session.get(
+        return get_json(
+            session,
             f"{get_controller('sys')}/{system_id}/live-statistics",
-            timeout=(6.10, 15),
         )
-        response.raise_for_status()
-        return response.json()
     except Exception as exc:  # pylint: disable=broad-exception-caught
         LOG.warning("Could not retrieve live statistics snapshot: %s", exc)
         return None
@@ -1283,6 +1288,21 @@ def collect_symbol_stats(system_info):
         # Reset controller selection for next collection session
         set_current_controller_index(None)
 
+
+
+@metrics_timer("transport")
+def collect_transport_metrics(system_info):
+    """Collect supported SANtricity 12.1 transport snapshots."""
+    if transport_metrics is None:
+        return
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    try:
+        transport_metrics.update(
+            get_session(), system_info, get_controller("sys"), get_controller("fw"), CMD.include,
+        )
+    finally:
+        set_current_controller_index(None)
 
 
 def collect_storage_metrics(system_info, live_stats_snapshot=None):
@@ -3173,17 +3193,23 @@ if __name__ == "__main__":
             else:
                 resp_json = response.json()
                 
+            if transport_metrics is not None and not (resp_json.get("wwn") or resp_json.get("id")):
+                transport_metrics.clear(sys_id)
             sys_id = resp_json.get("wwn", resp_json.get("id", "unknown"))
             sys_name = resp_json.get("name", "unknown")
             
         except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
             LOG.warning("Unable to connect to the API! %s", e)
+            if transport_metrics is not None:
+                transport_metrics.clear(sys_id)
             if PROMETHEUS_AVAILABLE and 'system_status' in prometheus_metrics:
                 # Might not have actual sys_name/id if initial connect fails, fallback to placeholders
                 if sys_id != "unknown" and sys_name != "unknown":
                     prometheus_metrics['system_status']['epa_status'].labels(sys_id=sys_id, sys_name=sys_name, endpoint="collector").set(0.0)
         except Exception as e:
             LOG.warning("Unexpected exception! %s", e)
+            if transport_metrics is not None:
+                transport_metrics.clear(sys_id)
             if PROMETHEUS_AVAILABLE and 'system_status' in prometheus_metrics:
                 if sys_id != "unknown" and sys_name != "unknown":
                     prometheus_metrics['system_status']['epa_status'].labels(sys_id=sys_id, sys_name=sys_name, endpoint="collector").set(0.0)
@@ -3229,6 +3255,9 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_controller_metrics']):
                     LOG.info("Collecting controller metrics...")
                     collect_controller_metrics(sys, live_stats_snapshot=live_stats_snapshot)
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_transport_metrics']):
+                    LOG.info("Collecting transport metrics...")
+                    collect_transport_metrics(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_symbol_stats']):
                     LOG.info("Collecting power and temperature data...")
                     collect_symbol_stats(sys)
@@ -3266,6 +3295,7 @@ if __name__ == "__main__":
             else:
                 # Default: collect all measurements
                 LOG.info("Starting full collection cycle for all measurements...")
+                collect_transport_metrics(sys)
                 LOG.info("Collecting storage metrics (disks, interface, volumes)...")
                 collect_storage_metrics(sys, live_stats_snapshot=live_stats_snapshot)
 

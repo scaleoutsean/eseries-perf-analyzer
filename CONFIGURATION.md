@@ -102,7 +102,7 @@ Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 min
 
 ## SANtricity 12.1 transport counters
 
-The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The exact model identifiers and release strings still require validation against a live 12.1 simulator or array; no numeric model aliases are guessed.
+The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The `EF80` model identifier has been confirmed against a live 12.1 simulator; `EF50` still requires live confirmation. No numeric model aliases are guessed.
 
 To request only these groups:
 
@@ -126,9 +126,13 @@ All new metrics have `sys_id`, `sys_name`, `controller_id`, and `interface_id` l
 
 The collector exports absolute `raw` snapshots, not `relative` values or analysed endpoint averages. Use `rate(eseries_rdma_receive_bytes_total[5m])` for bytes per second, for example. A counter decrease is exported as a reset, not accumulated into an exporter-local counter. Existing metrics and dashboards retain their current names and behavior; this does not rename misleading legacy `_total` gauges or change their types.
 
-Successful empty interface lists produce no statistics, not fabricated zero values. Missing, negative, or invalid numeric fields are omitted, while valid zeros are preserved. Empty/no-usable-data results and HTTP 404/405/501 responses back off for 15 minutes; other HTTP failures, timeouts, invalid JSON, and malformed payloads retry after 60 seconds. Backoff is per array and endpoint. Failed/empty endpoint samples and disappeared interfaces are removed from the export rather than held at their previous values. Discovery and endpoint failures are reported in collector logs.
+Successful empty interface lists produce no statistics, not fabricated zero values. Missing, negative, or invalid numeric fields are omitted, while valid zeros are preserved. Fields marked `unknown` in `qualifiers.raw` are also omitted, including numeric zeros that are explicitly qualified as unknown. Empty/no-usable-data results and HTTP 404/405/501 responses back off for 15 minutes; other HTTP failures, timeouts, invalid JSON, and malformed payloads retry after 60 seconds. Backoff is per array and endpoint. Failed/empty endpoint samples and disappeared interfaces are removed from the export rather than held at their previous values. Discovery and endpoint failures are reported in collector logs.
 
-RDMA `txWaitTime` and unicast/multicast breakdowns are intentionally excluded pending reliable definitions. Simulator checks are still required for model detection, permissions under the `monitor` account, and real endpoint behavior. Real hardware or documentation is needed to confirm counter semantics and accuracy.
+RDMA `txWaitTime` and unicast/multicast breakdowns are intentionally excluded pending reliable definitions. Real hardware or documentation is needed to confirm counter semantics and accuracy.
+
+Live validation on 2026-10-23 used an EF80 NVMe/RoCE simulator with `model: EF80`, management version `12.10.00.9024`, display version `12.10`, and separate RAID firmware `02.10.01.00`. Read-only requests using the supplied `admin` account succeeded with both system ID `1` and the array WWN. Two collector cycles exposed 128 NVMe-oF samples and 96 RDMA samples across eight interfaces, with valid Prometheus counter/gauge types and a healthy metrics HTTP endpoint. RDMA `symbolErrors` was marked unknown on all interfaces and correctly omitted.
+
+The simulator returned successful empty interface lists for TCP kernel statistics despite identifying as EF80. The exporter produced no TCP kernel metrics and backed off after one request; a model match alone therefore does not guarantee populated counters. Firmware discovery ran once, and NVMe-oF/RDMA were fetched once per polling cycle. The exported values did not change between cycles, so counter progression and accuracy were not established. Populated TCP kernel responses remain fixture-tested only. Permissions under the `monitor` account and EF50 live identification remain unverified.
 
 Offline regression tests cover HTTP failures, discovery caching, nested mappings, Prometheus types, counter resets, endpoint isolation, and selective collector cycles with mocked HTTP. With the collector requirements installed, run them from the checkout root:
 
