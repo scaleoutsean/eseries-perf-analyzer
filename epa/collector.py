@@ -621,6 +621,7 @@ PARSER.add_argument('--debug-force-config', action='store_true', default=False,
 PARSER.add_argument('--include', nargs='+', required=False,
                     help='Only collect specified measurements. Options: '
                     'disks, interface, volumes, controllers, power, temp, '
+                        'host_performance, host_interface_performance, host_interface_lun_performance, '
                          'failures, config_storage_pools, config_workloads, config_volumes, config_hosts, config_drives, flashcache. '
                          'Example: --include disks interface. If not specified, '
                          'all measurements are collected.')
@@ -676,6 +677,7 @@ FUNCTION_MEASUREMENTS = {
     'collect_storage_metrics': ['disks', 'interface', 'volumes'],
     'collect_controller_metrics': ['controllers'],
     'collect_transport_metrics': ['nvmeof', 'rdma', 'nvme_tcp_kernel'],
+    'collect_host_performance_metrics': ['host_performance', 'host_interface_performance', 'host_interface_lun_performance'],
     'collect_symbol_stats': ['power', 'temp'],
     'collect_system_state': ['failures', 'interface_alerts'],
     'collect_config_storage_pools': ['config_storage_pools'],
@@ -733,6 +735,7 @@ prometheus_registry = None
 prometheus_metrics = {}
 prometheus_server = None
 transport_metrics = None
+host_performance_metrics = None
 
 def setup_prometheus():
     """
@@ -782,6 +785,10 @@ def setup_prometheus():
     global transport_metrics
     transport_metrics = TransportMetrics()
     prometheus_registry.register(transport_metrics)
+    from host_metrics import HostPerformanceMetrics
+    global host_performance_metrics
+    host_performance_metrics = HostPerformanceMetrics(statistics_fetch_time=max(300, CMD.intervalTime))
+    prometheus_registry.register(host_performance_metrics)
     start_prometheus_server()
 
 
@@ -1299,6 +1306,21 @@ def collect_transport_metrics(system_info):
         set_current_controller_index(random.randrange(0, 2))
     try:
         transport_metrics.update(
+            get_session(), system_info, get_controller("sys"), get_controller("fw"), CMD.include,
+        )
+    finally:
+        set_current_controller_index(None)
+
+
+@metrics_timer("host_performance")
+def collect_host_performance_metrics(system_info):
+    """Collect gated analyzed host, interface, and host-LUN performance."""
+    if host_performance_metrics is None:
+        return
+    if len(CMD.api) > 1:
+        set_current_controller_index(random.randrange(0, 2))
+    try:
+        host_performance_metrics.update(
             get_session(), system_info, get_controller("sys"), get_controller("fw"), CMD.include,
         )
     finally:
@@ -3199,23 +3221,27 @@ if __name__ == "__main__":
             else:
                 resp_json = response.json()
                 
-            if transport_metrics is not None and not (resp_json.get("wwn") or resp_json.get("id")):
-                transport_metrics.clear(sys_id)
+            if not (resp_json.get("wwn") or resp_json.get("id")):
+                for snapshot_metrics in (transport_metrics, host_performance_metrics):
+                    if snapshot_metrics is not None:
+                        snapshot_metrics.clear(sys_id)
             sys_id = resp_json.get("wwn", resp_json.get("id", "unknown"))
             sys_name = resp_json.get("name", "unknown")
             
         except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as e:
             LOG.warning("Unable to connect to the API! %s", e)
-            if transport_metrics is not None:
-                transport_metrics.clear(sys_id)
+            for snapshot_metrics in (transport_metrics, host_performance_metrics):
+                if snapshot_metrics is not None:
+                    snapshot_metrics.clear(sys_id)
             if PROMETHEUS_AVAILABLE and 'system_status' in prometheus_metrics:
                 # Might not have actual sys_name/id if initial connect fails, fallback to placeholders
                 if sys_id != "unknown" and sys_name != "unknown":
                     prometheus_metrics['system_status']['epa_status'].labels(sys_id=sys_id, sys_name=sys_name, endpoint="collector").set(0.0)
         except Exception as e:
             LOG.warning("Unexpected exception! %s", e)
-            if transport_metrics is not None:
-                transport_metrics.clear(sys_id)
+            for snapshot_metrics in (transport_metrics, host_performance_metrics):
+                if snapshot_metrics is not None:
+                    snapshot_metrics.clear(sys_id)
             if PROMETHEUS_AVAILABLE and 'system_status' in prometheus_metrics:
                 if sys_id != "unknown" and sys_name != "unknown":
                     prometheus_metrics['system_status']['epa_status'].labels(sys_id=sys_id, sys_name=sys_name, endpoint="collector").set(0.0)
@@ -3264,6 +3290,9 @@ if __name__ == "__main__":
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_transport_metrics']):
                     LOG.info("Collecting transport metrics...")
                     collect_transport_metrics(sys)
+                if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_host_performance_metrics']):
+                    LOG.info("Collecting host performance metrics...")
+                    collect_host_performance_metrics(sys)
                 if any(m in CMD.include for m in FUNCTION_MEASUREMENTS['collect_symbol_stats']):
                     LOG.info("Collecting power and temperature data...")
                     collect_symbol_stats(sys)
@@ -3302,6 +3331,7 @@ if __name__ == "__main__":
                 # Default: collect all measurements
                 LOG.info("Starting full collection cycle for all measurements...")
                 collect_transport_metrics(sys)
+                collect_host_performance_metrics(sys)
                 LOG.info("Collecting storage metrics (disks, interface, volumes)...")
                 collect_storage_metrics(sys, live_stats_snapshot=live_stats_snapshot)
 

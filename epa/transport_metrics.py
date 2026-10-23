@@ -36,6 +36,9 @@ def release_version(payload):
 class TransportMetrics:
     """Publish absolute transport snapshots without changing legacy metrics."""
 
+    metric_definitions = TRANSPORT_METRIC_DEFS
+    log_name = "Transport metrics"
+
     def __init__(self, clock=time.monotonic, discovery_interval=900, retry_interval=60):
         self.clock = clock
         self.discovery_interval = discovery_interval
@@ -47,10 +50,10 @@ class TransportMetrics:
 
     def _families(self):
         families = {}
-        for definition in TRANSPORT_METRIC_DEFS.values():
+        for definition in self.metric_definitions.values():
             for path, suffix, kind, extra_labels in definition["fields"]:
                 name = f"{definition['prefix']}_{suffix}"
-                labels = ["sys_id", "sys_name", "controller_id", "interface_id"] + sorted(extra_labels)
+                labels = definition.get("labels", ["sys_id", "sys_name", "controller_id", "interface_id"]) + sorted(extra_labels)
                 family_type = CounterMetricFamily if kind == "counter" else GaugeMetricFamily
                 description = f"{definition['prefix']} {suffix.removesuffix('_total').replace('_', ' ')}"
                 families.setdefault(name, family_type(name, description, labels=labels))
@@ -77,14 +80,14 @@ class TransportMetrics:
     def update(self, session, system_info, system_root, firmware_root, include=None):
         system_id = system_info.get("wwn") or system_info.get("id")
         selected = {
-            measurement for measurement in TRANSPORT_METRIC_DEFS
+            measurement for measurement in self.metric_definitions
             if not include or measurement in include
         }
         if not selected or not self.eligible(session, system_info, firmware_root):
             self.clear(system_id)
             return
         now = self.clock()
-        for measurement, definition in TRANSPORT_METRIC_DEFS.items():
+        for measurement, definition in self.metric_definitions.items():
             key = (system_id, measurement)
             if measurement not in selected:
                 with self._lock:
@@ -93,11 +96,11 @@ class TransportMetrics:
             if now < self._retry_after.get(key, 0):
                 continue
             try:
-                payload = get_json(session, f"{system_root}/{system_id}{definition['endpoint']}")
+                payload = self._fetch(session, f"{system_root}/{system_id}{definition['endpoint']}", definition)
                 snapshot = self._parse(payload, system_info, definition)
                 if not snapshot:
                     self._retry_after[key] = now + self.discovery_interval
-                    LOG.info("No usable %s interface statistics for %s; backing off", measurement, system_id)
+                    LOG.info("No usable %s statistics for %s; backing off", measurement, system_id)
                 else:
                     self._retry_after.pop(key, None)
             except requests.exceptions.HTTPError as exc:
@@ -113,6 +116,9 @@ class TransportMetrics:
                 snapshot = ()
             with self._lock:
                 self._snapshots[key] = snapshot
+
+    def _fetch(self, session, url, definition):
+        return get_json(session, url)
 
     @staticmethod
     def _parse(payload, system_info, definition):
@@ -186,7 +192,7 @@ class TransportMetrics:
             except (requests.exceptions.RequestException, ValueError) as exc:
                 reason = f"release discovery unavailable: {exc}"
                 interval = self.retry_interval
-                LOG.warning("Transport metrics discovery failed for %s: %s", system_id, exc)
+                LOG.warning("%s discovery failed for %s: %s", self.log_name, system_id, exc)
 
         if cached and (cached["fingerprint"] != fingerprint or cached["eligible"] != supported
                    or cached["version"] != version):
@@ -200,6 +206,6 @@ class TransportMetrics:
             "eligible": supported,
             "version": version,
         }
-        LOG.info("Transport metrics for %s: %s (%s)", system_id,
+        LOG.info("%s for %s: %s (%s)", self.log_name, system_id,
                  "eligible" if supported else "skipped", reason)
         return supported

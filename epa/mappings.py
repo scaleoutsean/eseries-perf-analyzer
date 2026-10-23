@@ -388,6 +388,52 @@ STORAGE_SYSTEM_GAUGE_KEYS = [
   ("usedPoolSpaceAsString", "used_pool_space_bytes", _str_to_int),
 ]
 
+HOST_PERFORMANCE_FIELDS = [
+    ((source,), suffix, "gauge", labels)
+    for source, suffix, labels in (
+        ("readIOps", "iops", {"operation": "read"}),
+        ("writeIOps", "iops", {"operation": "write"}),
+        ("otherIOps", "iops", {"operation": "other"}),
+        ("combinedIOps", "iops", {"operation": "combined"}),
+        ("readThroughput", "throughput_bytes_per_second", {"direction": "read"}),
+        ("writeThroughput", "throughput_bytes_per_second", {"direction": "write"}),
+        ("combinedThroughput", "throughput_bytes_per_second", {"direction": "combined"}),
+        ("readResponseTime", "response_time_seconds", {"operation": "read"}),
+        ("writeResponseTime", "response_time_seconds", {"operation": "write"}),
+        ("combinedResponseTime", "response_time_seconds", {"operation": "combined"}),
+        ("readResponseTimeStdDev", "response_time_stddev_seconds", {"operation": "read"}),
+        ("writeResponseTimeStdDev", "response_time_stddev_seconds", {"operation": "write"}),
+        ("combinedResponseTimeStdDev", "response_time_stddev_seconds", {"operation": "combined"}),
+        ("averageReadOpSize", "average_io_size_bytes", {"operation": "read"}),
+        ("averageWriteOpSize", "average_io_size_bytes", {"operation": "write"}),
+        ("readOps", "operations_per_interval", {"operation": "read"}),
+        ("writeOps", "operations_per_interval", {"operation": "write"}),
+        ("readTimeMax", "response_time_max_seconds", {"operation": "read"}),
+        ("writeTimeMax", "response_time_max_seconds", {"operation": "write"}),
+        ("observedTimeInMS", "observed_timestamp_seconds", {}),
+    )
+]
+
+HOST_PERFORMANCE_METRIC_DEFS = {
+    measurement: {
+        "endpoint": f"/analyzed/{endpoint}",
+        "prefix": prefix,
+        "fields": HOST_PERFORMANCE_FIELDS,
+        "identity_keys": identities,
+        "labels": ["sys_id", "sys_name"] + labels,
+    }
+    for measurement, endpoint, prefix, identities, labels in (
+        ("host_performance", "host-statistics", "eseries_host",
+         ("hostId",), ["host_id"]),
+        ("host_interface_performance", "host-interface-statistics", "eseries_host_interface",
+         ("hostId", "controllerId", "interfaceId"), ["host_id", "controller_id", "interface_id"]),
+        ("host_interface_lun_performance", "host-interface-lun-statistics", "eseries_host_interface_lun",
+         ("hostId", "controllerId", "interfaceId", "volumeId"),
+         ["host_id", "controller_id", "interface_id", "volume_id"]),
+    )
+}
+
+
 TRANSPORT_METRIC_DEFS = {
     "nvmeof": {
         "endpoint": "/nvmeof/statistics",
