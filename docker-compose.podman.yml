@@ -1,4 +1,6 @@
 services:
   traefik:
+    volumes:
+      - "${CONTAINER_SOCKET:-/run/podman/podman.sock}:/var/run/docker.sock:ro"
     security_opt:
       - label=disable

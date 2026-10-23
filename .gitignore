@@ -15,6 +15,9 @@ tmp
 TODO.md
 _REL.md
 tests
+!/tests/
+/tests/*
+!/tests/test_transport_metrics.py
 certs/
 data/
 epa/santricity_client

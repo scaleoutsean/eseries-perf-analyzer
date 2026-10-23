@@ -100,6 +100,44 @@ Add `--debug --max-iterations 20 --capture /tmp/` to get debug logs for a 20 min
 
 **NOTE:** `--debug` may expose SANtricity credentials in Collector or Docker logs.
 
+## SANtricity 12.1 transport counters
+
+The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The exact model identifiers and release strings still require validation against a live 12.1 simulator or array; no numeric model aliases are guessed.
+
+To request only these groups:
+
+```sh
+python3 ./epa/collector.py --api 1.2.3.4 --password monitor123 --include nvmeof rdma nvme_tcp_kernel
+```
+
+The exporter reads `model` from storage-system metadata and checks the `management` release in firmware `codeVersions`, falling back to `bundleDisplay` when needed. It does not compare the separate RAID firmware version against 12.1. Eligibility is cached for 15 minutes and refreshed earlier when the observed model or firmware metadata changes. Failed or unknown release discovery is retried after 60 seconds.
+
+New metrics have snake_case names and explicit Prometheus types:
+
+| Example | Type | Meaning |
+| :--- | :--- | :--- |
+| `eseries_nvmeof_controllers` | Gauge | Current controller connections per interface |
+| `eseries_nvmeof_keep_alive_timeouts_total` | Counter | Raw cumulative keep-alive timeouts |
+| `eseries_nvmeof_queue_commands_total` | Counter | Commands by `queue` (`admin`/`io`) and `status` (`good`/`error`) |
+| `eseries_rdma_receive_bytes_total` | Counter | Raw cumulative received bytes |
+| `eseries_nvme_tcp_kernel_receive_bytes_total` | Counter | Raw cumulative kernel Ethernet received bytes |
+
+All new metrics have `sys_id`, `sys_name`, `controller_id`, and `interface_id` labels. Connection-limit failures additionally use `limit`, and queue metrics use `queue`. The source fields are explicitly mapped in [epa/mappings.py](./epa/mappings.py); internal keys such as `ethernetRxStatistics` are not exported as metric names.
+
+The collector exports absolute `raw` snapshots, not `relative` values or analysed endpoint averages. Use `rate(eseries_rdma_receive_bytes_total[5m])` for bytes per second, for example. A counter decrease is exported as a reset, not accumulated into an exporter-local counter. Existing metrics and dashboards retain their current names and behavior; this does not rename misleading legacy `_total` gauges or change their types.
+
+Successful empty interface lists produce no statistics, not fabricated zero values. Missing, negative, or invalid numeric fields are omitted, while valid zeros are preserved. Empty/no-usable-data results and HTTP 404/405/501 responses back off for 15 minutes; other HTTP failures, timeouts, invalid JSON, and malformed payloads retry after 60 seconds. Backoff is per array and endpoint. Failed/empty endpoint samples and disappeared interfaces are removed from the export rather than held at their previous values. Discovery and endpoint failures are reported in collector logs.
+
+RDMA `txWaitTime` and unicast/multicast breakdowns are intentionally excluded pending reliable definitions. Simulator checks are still required for model detection, permissions under the `monitor` account, and real endpoint behavior. Real hardware or documentation is needed to confirm counter semantics and accuracy.
+
+Offline regression tests cover HTTP failures, discovery caching, nested mappings, Prometheus types, counter resets, endpoint isolation, and selective collector cycles with mocked HTTP. With the collector requirements installed, run them from the checkout root:
+
+```sh
+PYTHONPATH=epa python3 -m unittest discover -s tests -p 'test_transport_metrics.py'
+```
+
+For live validation, first capture storage-system metadata and firmware `codeVersions` to confirm the model/release gate, then run the selected groups with `--capture --max-iterations 2`. Check access using the `monitor` account as well as response shapes and changes between successive `raw` snapshots. The checked HTTP helper is used by the new discovery/statistics paths and the existing live-statistics fetch; other legacy `.json()` callers retain their old behavior pending a separate migration.
+
 ## Configure Grafana data source in Victoria Metrics
 
 Any Prometheus scraper (and database) can be used to scrape EPA Collector metrics through Traefik's external port. The EPA reference stack uses Victoria Metrics which accesses Collector by its Docker service name within the Compose stack.

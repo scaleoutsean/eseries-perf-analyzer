@@ -9,7 +9,7 @@
     - [Containerized EPA](#containerized-epa)
       - [Build own Collector container](#build-own-collector-container)
       - [Use pre-created Collector container](#use-pre-created-collector-container)
-      - [Podman on RHEL 8](#podman-on-rhel-8)
+      - [Podman on RHEL 10](#podman-on-rhel-10)
       - [Docker Compose service ports](#docker-compose-service-ports)
   - [Use `collector` from CLI](#use-collector-from-cli)
   - [Other documents](#other-documents)
@@ -108,20 +108,21 @@ services:
 
 You still need to run the scripts, but you don't need "`make vendor`" because you won't build the container.
 
-#### Podman on RHEL 8
+#### Podman on RHEL 10
 
-The main [Compose file](./docker-compose.yml) supports Docker by default and rootful Podman with the settings below. Install Podman and a compatible `podman-compose` provider first; provider availability depends on your enabled RHEL repositories. These instructions use `podman-compose` explicitly rather than the `docker` compatibility command.
+Docker Engine with Docker Compose v2 is the reference deployment. The optional rootful Podman instructions below target RHEL 10 with a current `podman-compose` provider that supports `--profile` and honors Compose `profiles`. RHEL 8 and legacy providers such as `podman-compose` 1.0.6 are outside the supported scope; no legacy-provider workarounds are maintained. The RHEL 10 runtime has not yet been validated.
+
+Install Podman and a profile-capable `podman-compose` provider from repositories appropriate for your host. Check `podman-compose --version` and `podman-compose --help` for profile support before proceeding: upgrading the OS alone does not establish provider compatibility. These instructions use `podman-compose` explicitly rather than the `docker` compatibility command.
 
 Complete the certificate generation, directory setup, `make vendor` (if building locally), and array configuration steps above. The directory setup script creates `data/vm` as well as Grafana's directories; run it again when upgrading an existing checkout.
 
 Add these settings to the checkout's `.env` file, preserving its existing values:
 
 ```dotenv
-CONTAINER_SOCKET=/run/podman/podman.sock
 SELINUX_VOLUME_SUFFIX=,z
 ```
 
-`CONTAINER_SOCKET` changes only the host socket path; Traefik still sees `/var/run/docker.sock` inside its container. `SELINUX_VOLUME_SUFFIX=,z` enables shared SELinux labels on application bind mounts, including certificates used by multiple services. Leave it unset for Docker's existing behavior. Do not apply `:z` or `:Z` to the container engine socket.
+The Podman override selects `/run/podman/podman.sock` automatically; Traefik still sees `/var/run/docker.sock` inside its container. Optionally set `CONTAINER_SOCKET` to override the host socket path. `SELINUX_VOLUME_SUFFIX=,z` enables shared SELinux labels on application bind mounts, including certificates used by multiple services. Leave it unset for Docker's existing behavior. Do not apply `:z` or `:Z` to the container engine socket.
 
 Start a root shell, change to the actual checkout directory, and enable Podman's rootful API socket:
 
@@ -129,22 +130,36 @@ Start a root shell, change to the actual checkout directory, and enable Podman's
 sudo -i
 cd /path/to/eseries-perf-analyzer
 systemctl enable --now podman.socket
+test -S /run/podman/podman.sock
+curl --fail --unix-socket /run/podman/podman.sock http://localhost/_ping
 podman-compose -f docker-compose.yml -f docker-compose.podman.yml config
 podman-compose -f docker-compose.yml -f docker-compose.podman.yml build collector grafana grafana-init
 podman-compose -f docker-compose.yml -f docker-compose.podman.yml up -d
 ```
 
+The socket check must succeed and the API ping must return `OK` before starting Traefik. Merely installing Podman does not enable its API socket. If Traefik was created with the wrong or unavailable socket, recreate it after correcting the mount and enabling the socket:
+
+```sh
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml up -d --force-recreate traefik
+podman inspect traefik --format '{{json .Mounts}}'
+podman logs --tail 50 traefik
+```
+
+The inspection should show source `/run/podman/podman.sock` mounted at destination `/var/run/docker.sock` (unless you configured a different source). If `test -S` fails, check `systemctl status podman.socket` and `journalctl -u podman.socket -u podman.service` on the host; do not start the stack with a missing socket path or a directory in its place.
+
 When using the pre-created GHCR images instead, skip the build command and remove the corresponding `build` entries. To upload the reference dashboards after Grafana is ready:
 
 ```sh
-podman-compose -f docker-compose.yml -f docker-compose.podman.yml --profile init run --rm grafana-init
+podman-compose -f docker-compose.yml -f docker-compose.podman.yml --profile init run --rm --no-deps grafana-init
 ```
+
+Normal startup must leave the `init` and `test` profiles inactive so neither the initializer nor the optional `fio-test` workload starts automatically. `--no-deps` in the initializer command leaves the already-running Grafana stack alone. If your provider ignores profiles, upgrade it or use Docker Compose; do not run the stack with that provider.
 
 Use the same two `-f` options for subsequent commands such as `logs` and `down`. Rootful Podman has separate image and container storage from rootless Podman; `--privileged` is not needed.
 
 The [Podman override](./docker-compose.podman.yml) disables SELinux container separation only for Traefik so it can access the API socket; SELinux remains enabled for the host and other services. Socket access grants powerful control over rootful containers even when the socket is mounted read-only. Do not expose the API over an unauthenticated TCP port.
 
-Upstream image names and Dockerfile base images are fully qualified to avoid Podman's registry-selection prompts. Locally built Collector and Grafana initializer images use the `localhost/` namespace. Docker users do not need the Podman override or either setting above, and can continue using `docker compose up -d`.
+Upstream image names and Dockerfile base images are fully qualified to avoid Podman's registry-selection prompts. Locally built Collector and Grafana initializer images use the `localhost/` namespace. Docker users do not need the Podman override or the settings above, and can continue using `docker compose up -d`.
 
 #### Docker Compose service ports
 
