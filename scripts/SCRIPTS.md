@@ -68,8 +68,13 @@ You can edit `.env` (that shouldn't be necessary, though) and `docker-compose.ym
 
 ## FIO
 
-Used for calibration and guesstimating what metrics mean what, since the public E-Series documentation is lacking.
+Used for calibration and guesstimating what metrics might mean what (and what its units might be), since the public E-Series documentation on this is non-existent.
 
 It is executed from the `epa-fio-tester` service (Compose profile `test`).
 
-Don't forget to mount the job in `./scripts/job.fio` and bind-mount a SANtricity volume that supports Direct I/O. By default, the first job is a write job (10 x 1MiB write requests per second), followed by a break and another 15 minutes of read at the same rate.
+Don't forget to:
+
+- mount the job in `./scripts/job.fio`
+- create `./data/fio` and bind-mount it (a SANtricity volume that supports Direct I/O)
+
+Container command is optional and required only if you want to override the FIO run parameters. The FIO scriopt has two jobs: the first is a 100% write (10 x 1MiB write requests per second for 15 minutes), followed by a pause and another 15 minutes of read at the same rate.

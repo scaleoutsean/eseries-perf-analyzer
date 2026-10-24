@@ -21,3 +21,4 @@ tests
 certs/
 data/
 epa/santricity_client
+scripts/__pycache__

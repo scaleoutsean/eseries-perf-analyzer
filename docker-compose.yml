@@ -63,7 +63,7 @@ services:
       - eseries_perf_analyzer
 
   grafana:
-    image: docker.io/grafana/grafana:13.0-ubuntu
+    image: docker.io/grafana/grafana:13.2,4-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
@@ -100,7 +100,7 @@ services:
 
   grafana-init:
     image: localhost/grafana-init:${TAG}
-    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.0.0 # example of using GHCR image instead of building locally
+    # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.1.0 # example of using GHCR image instead of building locally
     profiles: ["init"]
     build: 
       context: ./grafana-init
@@ -146,8 +146,9 @@ services:
 
 
   # -- WORKLOAD CALIBRATION --
-  # A synthetic fio workload generator for validating metrics in Grafana.
-  # Run this manually via: sudo docker compose --profile test up epa-fio-tester
+  # A synthetic fio workload generator for validating metrics in Prometheus/Grafana.
+  # Edit the FIO job (runs automatically) configuration and volumes.
+  # Run it manually via: sudo docker compose --profile test up epa-fio-tester
   epa-fio-tester:
     image: localhost/fio
     container_name: epa-fio-tester
