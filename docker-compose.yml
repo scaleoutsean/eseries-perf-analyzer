@@ -147,7 +147,7 @@ services:
 
   # -- WORKLOAD CALIBRATION --
   # A synthetic fio workload generator for validating metrics in Grafana.
-  # Run this manually via:  sudo docker compose --profile test up fio-test
+  # Run this manually via: sudo docker compose --profile test up epa-fio-tester
   epa-fio-tester:
     image: localhost/fio
     container_name: epa-fio-tester
