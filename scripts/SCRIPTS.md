@@ -65,3 +65,11 @@ $ docker compose build
 ```
 
 You can edit `.env` (that shouldn't be necessary, though) and `docker-compose.yml` (you need to, especially E-Series controller IP(s) and password for the monitor account), before you run `docker compose up -d`.
+
+## FIO
+
+Used for calibration and guesstimating what metrics mean what, since the public E-Series documentation is lacking.
+
+It is executed from the `epa-fio-tester` service (Compose profile `test`).
+
+Don't forget to mount the job in `./scripts/job.fio` and bind-mount a SANtricity volume that supports Direct I/O. By default, the first job is a write job (10 x 1MiB write requests per second), followed by a break and another 15 minutes of read at the same rate.

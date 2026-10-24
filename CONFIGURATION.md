@@ -110,6 +110,32 @@ Older arrays fall back to `/analysed-drive-statistics` only when the initial rep
 
 Existing drive metric names, mappings, and units are unchanged. These remain array-calculated rates and averages, not raw counter deltas. The replacement and an actual disk-only collector cycle were verified against the EF80 12.1 simulator, returning all 24 drives without legacy fallback. Legacy fallback and multi-page history handling are covered by offline regression tests.
 
+## SANtricity 12.1 host performance
+
+Three additional analyzed-performance groups are enabled by default only when both the SANtricity release is 12.1 or later and the array model is positively identified as `EF50` or `EF80`. Unknown releases/models, E4000, EF600, and other models do not receive these new API calls. The allowlist is shared with transport capability discovery, and can be expanded when other models are verified.
+
+| Measurement (`--include`) | API endpoint | Metric prefix | Identity labels beyond `sys_id`, `sys_name` |
+| :--- | :--- | :--- | :--- |
+| `host_performance` | `/analyzed/host-statistics` | `eseries_host_` | `host_id` |
+| `host_interface_performance` | `/analyzed/host-interface-statistics` | `eseries_host_interface_` | `host_id`, `controller_id`, `interface_id` |
+| `host_interface_lun_performance` | `/analyzed/host-interface-lun-statistics` | `eseries_host_interface_lun_` | `host_id`, `controller_id`, `interface_id`, `volume_id` |
+
+For example:
+
+```sh
+python3 ./epa/collector.py --api 1.2.3.4 --password monitor123 --include host_performance host_interface_performance host_interface_lun_performance
+```
+
+All new host-performance metrics are **gauges**, including operation counts for the analyzed interval. They are not cumulative counters. Query `eseries_host_iops{operation="combined"}` directly, without `rate()`. No existing metric is renamed or retyped.
+
+Each prefix exposes `iops` (`operation=read/write/other/combined`), `throughput_bytes_per_second` (`direction=read/write/combined`), `response_time_seconds`, `response_time_stddev_seconds`, `response_time_max_seconds`, `average_io_size_bytes`, `operations_per_interval` (each with the relevant read/write/combined `operation`), and `observed_timestamp_seconds`. Null/missing fields, negative readings, non-finite values, and invalid values are omitted; valid zeros remain visible. The observed timestamp is a gauge rather than a changing label, so consumers can detect repeated/stale analyzed observations without multiplying time series.
+
+Average response times and their standard deviations are converted from milliseconds to seconds; maximum response times are converted from microseconds. Throughput is converted from source binary MB/s to bytes/s (the supplied physical EF80 captures confirm `IOPS * average operation size / 1048576` matches the source throughput). Operation sizes remain bytes. The host-LUN endpoint identifies volumes using `volumeId`; no numeric host LUN is inferred.
+
+Paging, newest-first history selection, and the at-least-300-second history window follow drive collection, but host identities use the complete label dimensions above. `sourceController` identifies the source of the observation and is not substituted for the row's `controllerId`. There is no legacy host-performance fallback. Missing endpoints or successful empty responses back off for 15 minutes; HTTP 422 (including `insufficientStatisticsData`), other transient failures, and malformed responses retry after 60 seconds. A failed or empty group removes its old samples without affecting the others. Host-interface-LUN cardinality scales with host/interface/volume combinations; omit that group through selective `--include` collection when it is unnecessary.
+
+Validation used supplied physical EF80 response captures: 1 host, 4 host/interface identities, and 120 host/interface/volume identities replayed to 17, 68, and 2040 gauge samples respectively. On the localhost EF80 simulator, `monitor` metadata and release discovery succeeded, but all three host endpoints returned HTTP 422 with `insufficientStatisticsData` and a stated 300-second source polling interval. Retry suppression and recovery attempts were verified; no populated host-performance metrics were validated live on the simulator. Real-array polling, EF50 behavior, and source averaging semantics still require lab validation.
+
 ## SANtricity 12.1 transport counters
 
 The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The `EF80` model identifier has been confirmed against a live 12.1 simulator; `EF50` still requires live confirmation. No numeric model aliases are guessed.
@@ -188,6 +214,8 @@ If you replace Victoria Metrics with Prometheus, the reference dashboards may ne
 
 A minimal workload generator may be used to evaluate collection and visualization of metrics in EPA stack.
 
+You must create bind mounts and enable them by editing `docker-compose.yml`. Also see [SCRIPTS](./scripts/SCRIPTS.md).
+
 ```sh
-sudo docker compose --profile test up fio-test
+sudo docker compose --profile test up epa-fio-tester
 ```

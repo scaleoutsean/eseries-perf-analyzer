@@ -148,18 +148,18 @@ services:
   # -- WORKLOAD CALIBRATION --
   # A synthetic fio workload generator for validating metrics in Grafana.
   # Run this manually via:  sudo docker compose --profile test up fio-test
-  fio-test:
-    image: docker.io/dmonakhov/alpine-fio:latest
+  epa-fio-tester:
+    image: localhost/fio
     container_name: epa-fio-tester
+    build: 
+      context: ./fio    
     profiles: ["test"]
-    volumes:
-      # Change this path to match your SANtricity mount point!
-      - ./data/fio_test_mnt:/mnt/santricity:rw${SELINUX_VOLUME_SUFFIX:-}
-    # 8k block size, strictly throttled to 10 IOPS
-    command: >
-      fio --name=test-workload --filename=/mnt/santricity/test.img 
-      --size=50M --rw=randrw --bs=4k --ioengine=libaio
-      --direct=1 --rate_iops=80,20 --time_based --runtime=3600 --status-interval=600
+    # volumes:
+      # Change the data path to match your mount point. You can customize FIO run
+      # with: fio --name ... 
+      # - ./data/fio:/data/
+      # - ./scripts/job.fio:/etc/fio/job.fio
+    # command: fio --name=write --filename=/data/test.img --size=100m ...
     networks:
       - eseries_perf_analyzer
 
