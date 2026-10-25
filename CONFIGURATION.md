@@ -31,11 +31,13 @@ If you change Prometheus port to another value *and* want to use Victoria Metric
 Example test for `collector1` (if two collectors are used, the first one may be `collector1`):
 
 ```sh
-# single collector setup
+# single collector setup, accessing from another Docker container
 sudo docker exec vm wget -qO- http://collector:9080/metrics | head -3
 # multi-collector setup depends on the name you gave it; by convention, in multi-array setups we use collector1
 sudo docker exec vm wget -qO- http://collector1:9080/metrics | head -3
 ```
+
+When scraping a single collector through Traefik: `https://hostname:9080/collector/metrics`.
 
 ## Configure Traefik
 

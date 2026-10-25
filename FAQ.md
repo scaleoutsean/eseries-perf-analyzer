@@ -52,9 +52,11 @@ EPA 4 is recommended - it certainly takes less time to install and figure out.
 
 ### Where can I see list of supported metrics?
 
-You can run collector (or browser) and see with `curl https://localhost:9080/metrics`. Some may not be present (e.g. Flash Cache on a SSD-only system). Keep an eye on issue #41 as incorrectly named metrics (gauges with `_total` in mame) since v4.1.0 have corrected "shadow" metrics that drop `_total` and have identical values, so uses should use the currected metrics in new dashboards or panels. The included Grafana dashboards still use the old names as those remain available throughout EPA v4.
+You can run collector (or browser) and see with `curl https://localhost:9080/collector/metrics`. Some may not have values (e.g. Flash Cache on a SSD-only system).
 
-Example from 4.0.0:
+After issue #41, with incorrectly named metrics (gauges had `_total` in mame), v4.1.0 corrects that with "shadow" metrics that drop `_total` and have identical values, so uses should scrape or use the currected metrics in dashboards or panels. The included Grafana dashboards may still use the old names as those remain available throughout EPA v4.
+
+Example from 4.1.0:
 
 ```raw
 # TYPE epa_scrape_duration_seconds summary
@@ -63,6 +65,7 @@ Example from 4.0.0:
 # TYPE epa_metrics_generated_total gauge
 # TYPE eseries_disk_iops_total gauge
 # TYPE eseries_disk_throughput_bytes_per_second gauge
+# TYPE eseries_disk_throughput_mebibytes_per_second gauge
 # TYPE eseries_disk_response_time_seconds gauge
 # TYPE eseries_disk_ssd_wear_percent gauge
 # TYPE eseries_controller_iops_total gauge
