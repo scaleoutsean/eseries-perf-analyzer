@@ -207,12 +207,12 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 
 ## Change log
 
-- 4.1.0 (2026-10-26)
+- 4.1.0 (Oct 26, 2026)
   - New: add hand-picked (not all available) RDMA, NVMe, kernel metrics for SANtricity 12.1+ *and* EF50/EF80 (not collected for other arrays or any v12.0): nvmeof/statistics, rdma/statistics, nvme-tcp/kernel-statistics. Grafana dashboards do not show any of these new metrics.
   - New: basic Podman support added for latest RPM-based distributions (RHEL 10-like). Traefik container may require additional changes, but the key container (EPA Collector) should work fine.
   - New: two aggregate (throughput and IOPS) panels in Disks dashboard.
   - Changed: fixed several minor response-handling bugs in Collector, one in upstream santricity-client library (also updated, Collector now uses santricity-client 0.3.3)
-  - Changed: incorrectly named counters (issue #41) remain available in Prometheus, but are now deprecated (but remain available throughout v4). The correct counter names have been added (same values, different names). Grafana dashboards keep using the old names, but can be modified to use new since both are available.
+  - Changed: incorrectly named counters (issue #41) remain available in Prometheus, but are now deprecated (while remaining available throughout v4). The correct counter names have been added (same values, different names). Grafana dashboards keep using the old names, but can be modified to use new since both are available.
   - Changed: fixed incorrect Grafana queries for disk drive latency and throughput (Disks dashboard).
   - Changed: `analysed/drive-statistics` (deprecated in SANtricity API v12.1) to use `analyzed/drive-statistics` without affecting metrics (issue #40).
   - Changed: Collector's `requirements.txt` default to latest `requests` client library.
