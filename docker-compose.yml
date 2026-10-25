@@ -150,16 +150,18 @@ services:
   # Edit the FIO job (runs automatically) configuration and volumes.
   # Run it manually via: sudo docker compose --profile test up epa-fio-tester
   epa-fio-tester:
-    image: localhost/fio
+    image: localhost/epa-fio-tester:${TAG:-latest}
     container_name: epa-fio-tester
     build: 
       context: ./fio    
     profiles: ["test"]
     # volumes:
-      # Change the data path to match your mount point. You can customize FIO run
+      # Change the data paths to match your mount points. You can customize FIO run
       # with: fio --name ... 
       # - ./data/fio:/data/
       # - ./scripts/job.fio:/etc/fio/job.fio
+      # - ./data/fio_logs:/data/fio_logs
+    # Optional (for overrides):
     # command: fio --name=write --filename=/data/test.img --size=100m ...
     networks:
       - eseries_perf_analyzer
