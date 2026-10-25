@@ -19,17 +19,19 @@
 
 EPA 4 builds upon EPA 3 while adopting ideas from [E-Series SANtricity Collector](https://github.com/scaleoutsean/eseries-santricity-collector).
 
-EPA 4 is essentially **an opinionated Prometheus exporter** (or a solution stack, if provided 3rd party components are deployed together with it).
+EPA 4 is essentially **an opinionated Prometheus exporter** (or a solution stack, if the provided 3rd party components are deployed together with it).
 
 ![EPA 4 Diagram](./images/epa_diagram.png)
 
 Each EPA Collector monitors one and only one SANtricity system using the lowest-privilege monitor account. Each storage administrator can spin their own and have metrics scraped by own or centralized Prometheus scraper.
 
-You can find more about its positioning and direction in my [post about EPA 4](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html).
+You can find more about its positioning and direction in my [post about EPA 4](https://scaleoutsean.github.io/2026/04/23/epa_400_beta.html). Array events (apart from some alerts) and logs have been removed in v4 - those should haven't been included in the first place. Send those to [Victoria Logs](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) or other place for logs.
+
+EPA 4 is simple - some 5,000 lines of code - and with few dependencies, which means less bloat and fewer CVEs. You can **easily** package it into own container or run it from the CLI.
 
 ## Requirements
 
-- NetApp E-Series SANtricity >=11.90
+- NetApp E-Series SANtricity >=12.00 (11.90 might work)
 - Python >=3.12
 
 ## Quick start
@@ -38,12 +40,12 @@ You can find more about its positioning and direction in my [post about EPA 4](h
 
 | EPA version | SANtricity version | Where to go |
 | :---:   | :-------:|  :-----| 
-| 4       | 12.x, 11.9x| stay on this page |
+| 4       | 12.xx | stay on this page |
 | 3       | 11.9x | [click here](https://github.com/scaleoutsean/eseries-perf-analyzer/tree/v3.5.5) |
 
 ### Use SANtricity `monitor` account
 
-EPA Collector defaults to using SANtricity's built-in `monitor` account unless you override that in arguments or Compose.
+EPA Collector defaults to using SANtricity's built-in `monitor` account unless you override that in Collector arguments or Compose YAML.
 
 It is suggested to just set a password for the SANtricity `monitor` account and use those credentials.
 
@@ -57,7 +59,7 @@ EPA Collector defaults to running Prometheus exporter on HTTPS port **9080**, wh
 curl -v https://HOSTNAME:9080/collector/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HTTP)"
 ```
 
-If you run multiple instances of Collector on same system, VM or Compose stack, make sure each exposes a different external Prometheus port. But, if you scrape two collectors from the outside, use a different prefix (e.g. collector2) for the second instance.
+If you run multiple instances of Collector on same system, VM or Compose stack, make sure each exposes a different external Prometheus port; there's a recipe for doing that in Traefik (especially if you scrape two collectors from the outside, then it's better to use a different prefix (e.g. collector2) for the second instance).
 
 ### Containerized EPA
 
