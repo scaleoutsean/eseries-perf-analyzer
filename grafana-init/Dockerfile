@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.10.16-alpine3.19
+FROM docker.io/library/python:3.14.9-alpine3.24
 
 # Install Python dependencies
 COPY requirements.txt /requirements.txt
