@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.14.3-alpine3.23 AS builder
+FROM docker.io/library/python:3.14.9-alpine3.24 AS builder
 
 RUN apk update && apk upgrade && apk add --no-cache git
 RUN python -m venv /opt/venv
@@ -8,7 +8,7 @@ RUN python -m pip install --upgrade pip
 ADD requirements.txt ./
 RUN pip --default-timeout=5 --retries 15 install --upgrade -r requirements.txt
 
-FROM docker.io/library/python:3.14.3-alpine3.23
+FROM docker.io/library/python:3.14.9-alpine3.24
 ARG TAG=latest
 
 LABEL VERSION=${TAG}
