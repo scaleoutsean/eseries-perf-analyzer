@@ -9,10 +9,11 @@ rate_iops=10
 time_based
 runtime=900
 exitall_on_error=1 
-write_bw_log=/data/fio_logs/fio
-write_iops_log=/data/fio_logs/fio
-write_lat_log=/data/fio_logs/fio
+write_bw_log=/fio_logs/
+write_iops_log=/fio_logs/
+write_lat_log=/fio_logs/
 log_avg_msec=1000
+progress
 
 [write]
 name=write

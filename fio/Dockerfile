@@ -27,6 +27,6 @@ RUN git clone https://github.com/axboe/fio
 WORKDIR /tmp/build/fio
 RUN ./configure --enable-libiscsi --enable-libnbd && make && make install
 # COPY job.fio /etc/fio/job.fio
-WORKDIR /data
+WORKDIR /data/fio
 CMD ["fio", "/etc/fio/job.fio"]
 

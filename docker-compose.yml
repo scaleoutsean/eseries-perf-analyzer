@@ -63,7 +63,7 @@ services:
       - eseries_perf_analyzer
 
   grafana:
-    image: docker.io/grafana/grafana:13.2,4-ubuntu
+    image: docker.io/grafana/grafana:13.2-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
@@ -158,9 +158,9 @@ services:
     # volumes:
       # Change the data paths to match your mount points. You can customize FIO run
       # with: fio --name ... 
-      # - ./data/fio:/data/
+      # - ./data/fio:/data/fio
       # - ./scripts/job.fio:/etc/fio/job.fio
-      # - ./data/fio_logs:/data/fio_logs
+      # - ./data/fio_logs:/fio_logs
     # Optional (for overrides):
     # command: fio --name=write --filename=/data/test.img --size=100m ...
     networks:

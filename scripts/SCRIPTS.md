@@ -74,8 +74,8 @@ It is executed from the `epa-fio-tester` service (Compose profile `test`).
 
 Don't forget to:
 
-- mount the job `./scripts/job.fio`
-- create `./data/fio` and bind-mount it (a SANtricity volume that supports Direct I/O)
-- create `./data/fio_logs` for output
+- mount the job at `./scripts/job.fio`
+- create `./data/fio` and bind-mount it (a SANtricity volume that supports Direct I/O, unless you remove `directio` from `job.fio`)
+- create `./data/fio_logs` for FIO log output
 
 The container command in FIO service is optional and required only if you want to override the FIO run parameters from `job.fio`. The FIO script contains two jobs that run sequentially: the first is a 100% write job (10 x 1MiB write requests per second for 15 minutes), followed by a pause and another 15 minutes of read at the same rate.
