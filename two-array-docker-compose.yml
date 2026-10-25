@@ -12,7 +12,7 @@
 services:
 
   collector1:
-    image: collector:${TAG}
+    image: localhost/collector:${TAG}
     # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/collector:4.1.0 # example of using GHCR image instead of building locally
     container_name: collector1
     build: ./epa/
@@ -48,7 +48,7 @@ services:
       - "traefik.http.services.collector1.loadbalancer.server.port=9080"
 
   collector2:
-    image: collector:${TAG}
+    image: localhost/collector:${TAG}
     container_name: collector2
     build: ./epa/
     mem_limit: 256m
@@ -83,7 +83,7 @@ services:
       - "traefik.http.services.collector2.loadbalancer.server.port=9080"
 
   traefik:
-    image: traefik:v3.7
+    image: docker.io/library/traefik:v3.7
     container_name: traefik
     restart: unless-stopped
     command:
@@ -107,7 +107,7 @@ services:
       - eseries_perf_analyzer
 
   grafana:
-    image: grafana/grafana:13.0-ubuntu
+    image: docker.io/grafana/grafana:13.2-ubuntu
     container_name: grafana
     build:
       context: ./grafana/
@@ -143,7 +143,7 @@ services:
       - "traefik.http.services.grafana.loadbalancer.server.scheme=https"
 
   grafana-init:
-    image: grafana-init:${TAG}
+    image: localhost/grafana-init:${TAG}
     # image: ghcr.io/scaleoutsean/eseries-perf-analyzer/grafana-init:4.1.0 # example of using GHCR image instead of building locally
     profiles: ["init"]
     build: 
@@ -168,7 +168,7 @@ services:
     restart: "no"
 
   vm:
-    image: victoriametrics/victoria-metrics:latest
+    image: docker.io/victoriametrics/victoria-metrics:latest
     container_name: vm
     # ports:  # Grafana users will just use Grafana and not VM, but if you require access to VM, uncomment this section and enable Traefik routing to VM in the traefik_dynamic.yml file.
     #  - "8428:8428"
