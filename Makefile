@@ -1,7 +1,7 @@
 .PHONY: vendor build run clean
 
 SANTRICITY_CLIENT_REPO ?= https://github.com/scaleoutsean/santricity-client.git
-SANTRICITY_CLIENT_VERSION ?= 0.2.6
+SANTRICITY_CLIENT_VERSION ?= 0.3.3
 SANTRICITY_DEST = epa/santricity_client
 
 all: vendor build
