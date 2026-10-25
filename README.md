@@ -169,13 +169,13 @@ Services:
 
 | Service | Exposed | URL | Note |
 | :------ | :------:| :----| :-----|
-| `traefik` | Yes   | https://HOSTNAME:9080/metrics, https://HOSTNAME:3443 | Reverse proxy for external access to `collector`, `grafana` (**HTTPS**-only) |
+| `traefik` | Yes   | https://HOSTNAME:9080/collector/metrics, https://HOSTNAME:3443 | Reverse proxy for external access to `collector` (first instance), `grafana` (**HTTPS**-only) |
 | `collector`| No   | http://collector:9080/metrics | Accessible within Compose (i.e. `vm`, `traefik`) |
 | `grafana` | No    | https://grafana:3443 | Grafana service, proxied by Traefik |
 | `grafana-init` |No| - | Deploys reference dashboards to Grafana |
 | `vm`    | No      | https://vm:8428        | Victoria Metrics, scrapes metrics directly from `collector` |
 
-For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same place (but exposed Prometheus ports and container names must be different for each). And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same stack and use different prefix paths in Traefik. And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
 
 ## Use `collector` from CLI
 
