@@ -291,7 +291,7 @@ If you need more features related to logging, consider adding [Victoria Logs](ht
 
 ### How to scrape Prometheus metrics externally?
 
-`curl -ks https://EPA_HOST:9080/collector/metrics`. Traefik proxies over HTTPS and adds `/collector/` in front of the usual `/metrics` path.
+`curl -ks https://EPA_HOST:9080/collector/metrics`. Traefik proxies over HTTPS and adds `/collector/` in front of the usual `/metrics` path. Create `collector[2...N]` for additional instances if you have them.
 
 ## EPA 3
 
