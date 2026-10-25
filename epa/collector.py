@@ -137,7 +137,8 @@ __version__ = '4.1.0'
 #######################
 
 # Naming convention: *_ANALYZED_* and *_LIVE_* refer to payload shape intent.
-# Keep API paths exactly as implemented (some SANtricity endpoints use analysed, others analyzed).
+# Keep API paths exactly as implemented. Up to 12.1 some SANtricity endpoints use analysed, others analyzed. 
+# Since 12.1 all endpoints use available as "analyzed". "Analysed" are dimmed in Swagger for 12.1 - i.e. available, but deprecated.
 
 
 FLASHCACHE_REALTIME_COUNTERS = [

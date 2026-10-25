@@ -5,8 +5,8 @@
     "name": "epa-controllers",
     "namespace": "default",
     "uid": "e823a6fe-ea8e-49cb-b2ee-09680655dbf0",
-    "resourceVersion": "1792947558119009",
-    "generation": 31,
+    "resourceVersion": "1792948299207003",
+    "generation": 34,
     "creationTimestamp": "2026-10-25T15:18:58Z",
     "labels": {
       "grafana.app/deprecatedInternalID": "2187952918638592"
@@ -14,10 +14,9 @@
     "annotations": {
       "grafana.app/createdBy": "user:bflpdmic799mob",
       "grafana.app/folder": "epa-folder",
-      "grafana.app/message": "Add aggregate throughput and IOPS across all controllers on a system",
       "grafana.app/saved-from-ui": "Grafana v13.0.2 (3fcdbc5a)",
       "grafana.app/updatedBy": "user:bflpdmic799mob",
-      "grafana.app/updatedTimestamp": "2026-10-25T16:59:18Z",
+      "grafana.app/updatedTimestamp": "2026-10-25T17:11:39Z",
       "grafana.app/folderTitle": "EPA",
       "grafana.app/folderUrl": "/dashboards/f/epa-folder/epa"
     }
@@ -162,7 +161,7 @@
         "spec": {
           "id": 10,
           "title": "Aggregate throughput (combined)",
-          "description": "Aggregate throughput - both controllers, read and write",
+          "description": "Aggregate throughput (all controllers, read and write)",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -882,7 +881,7 @@
             "version": "13.0.2",
             "spec": {
               "options": {
-                "colorMode": "value",
+                "colorMode": "none",
                 "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
@@ -900,16 +899,13 @@
               },
               "fieldConfig": {
                 "defaults": {
+                  "unit": "iops",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": 0,
                         "color": "green"
-                      },
-                      {
-                        "value": 80,
-                        "color": "red"
                       }
                     ]
                   },

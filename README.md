@@ -51,7 +51,7 @@ It is suggested to just set a password for the SANtricity `monitor` account and 
 
 When you start Collector, check Prometheus exporter on EPA 4 host (`localhost` or other, with firewall allowing access).
 
-EPA Collector defaults to running Prometheus exporter on HTTP port **9080**, which can be changed in Compose or using Collector's Prometheus port option.
+EPA Collector defaults to running Prometheus exporter on HTTPS port **9080**, which can be changed in Compose or using Collector's Prometheus port option.
 
 ```sh
 curl -v https://HOSTNAME:9080/collector/metrics 2>&1 | grep -E "(Date:|Last-Modified:|< HTTP)"
@@ -62,6 +62,8 @@ If you run multiple instances of Collector on same system, VM or Compose stack, 
 ### Containerized EPA
 
 Users are encouraged to run own Prometheus scraper, database and Grafana, but a ready-made stack is available.
+
+Docker Compose is preferred. Podman is enabled, but weakly tested.
 
 #### Build own Collector container
 
