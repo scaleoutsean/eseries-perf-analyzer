@@ -175,7 +175,7 @@ Services:
 | `grafana-init` |No| - | Deploys reference dashboards to Grafana |
 | `vm`    | No      | https://vm:8428        | Victoria Metrics, scrapes metrics directly from `collector` |
 
-For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same stack and use different prefix paths in Traefik. And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
+For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same stack (see `two-array-docker-compose.yml`) and use different prefix paths for each Prometheus instance in Traefik. And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
 
 ## Use `collector` from CLI
 
@@ -196,7 +196,7 @@ Using default username `monitor` with SANtricity Web/API address 2.2.2.2:
 python3 ./epa/collector.py --api 2.2.2.2 --password monitor123 --prometheus-port 9080 --no-verify-ssl
 ```
 
-Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0.1:9080/metrics) to see if Collector's Prometheus exporter is working. If running from Docker, Traefik is used and HTTPS must be specified instead.
+Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0.1:9080/metrics) to see if Collector's Prometheus exporter is working. If running from Docker, Traefik is used and HTTPS paths from the table above must be used.
 
 ## Other documents
 
