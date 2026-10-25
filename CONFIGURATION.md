@@ -138,7 +138,7 @@ Validation used supplied physical EF80 response captures: 1 host, 4 host/interfa
 
 ## SANtricity 12.1 transport counters
 
-The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. The `EF80` model identifier has been confirmed against a live 12.1 simulator; `EF50` still requires live confirmation. No numeric model aliases are guessed.
+The `nvmeof`, `rdma`, and `nvme_tcp_kernel` measurement groups are collected by default on arrays positively identified as `EF50` or `EF80` with SANtricity 12.1 or later. Other models, unknown model identifiers, and unknown releases are skipped. This initial allowlist deliberately excludes older arrays even when individual endpoints might return useful data. Both `EF50` and `EF80` model identifiers have been confirmed against live 12.1 simulators. No numeric model aliases are guessed.
 
 To request only these groups:
 
@@ -168,7 +168,9 @@ RDMA `txWaitTime` and unicast/multicast breakdowns are intentionally excluded pe
 
 Live validation on 2026-10-23 used an EF80 NVMe/RoCE simulator with `model: EF80`, management version `12.10.00.9024`, display version `12.10`, and separate RAID firmware `02.10.01.00`. Read-only requests using the supplied `admin` account succeeded with both system ID `1` and the array WWN. Two collector cycles exposed 128 NVMe-oF samples and 96 RDMA samples across eight interfaces, with valid Prometheus counter/gauge types and a healthy metrics HTTP endpoint. RDMA `symbolErrors` was marked unknown on all interfaces and correctly omitted.
 
-The simulator returned successful empty interface lists for TCP kernel statistics despite identifying as EF80. The exporter produced no TCP kernel metrics and backed off after one request; a model match alone therefore does not guarantee populated counters. Firmware discovery ran once, and NVMe-oF/RDMA were fetched once per polling cycle. The exported values did not change between cycles, so counter progression and accuracy were not established. Populated TCP kernel responses remain fixture-tested only. Permissions under the `monitor` account and EF50 live identification remain unverified.
+The simulator returned successful empty interface lists for TCP kernel statistics despite identifying as EF80. The exporter produced no TCP kernel metrics and backed off after one request; a model match alone therefore does not guarantee populated counters. Firmware discovery ran once, and NVMe-oF/RDMA were fetched once per polling cycle. The exported values did not change between cycles, so counter progression and accuracy were not established. Populated TCP kernel responses remain fixture-tested only. Transport endpoint permissions under the `monitor` account remain unverified.
+
+On 2026-10-25, read-only `admin` requests to an EF50 simulator confirmed `model`, controller `boardID`, and controller `modelName` all equal `EF50`, with management version `12.10.00.9024`, display version `12.10`, and RAID firmware `02.10.01.00`. Both the transport and host-performance gates accepted this identity unchanged. NVMe-oF returned eight interfaces and exported 128 samples; TCP kernel statistics returned two controllers with empty interface lists. RDMA returned HTTP 422 with `retcode: "0"` and `Value when an object has not been initialized`; all three host-performance endpoints returned HTTP 422 with `insufficientStatisticsData`. These results confirm EF50 identity and defensive handling, not real-hardware counter accuracy. The E4000 allowlist remains unchanged.
 
 Offline regression tests cover HTTP failures, discovery caching, nested mappings, Prometheus types, counter resets, endpoint isolation, and selective collector cycles with mocked HTTP. With the collector requirements installed, run them from the checkout root:
 
@@ -214,7 +216,7 @@ If you replace Victoria Metrics with Prometheus, the reference dashboards may ne
 
 A minimal workload generator may be used to evaluate collection and visualization of metrics in EPA stack.
 
-You must create bind mounts and enable them by editing `docker-compose.yml`. Also see [SCRIPTS](./scripts/SCRIPTS.md).
+To use it, you must enable `volumes` for the service, create bind mounts and enable them by editing `docker-compose.yml` mount points. Also see [SCRIPTS](./scripts/SCRIPTS.md).
 
 ```sh
 sudo docker compose --profile test up epa-fio-tester
