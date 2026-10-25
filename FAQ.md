@@ -12,6 +12,7 @@
     - [I've generated TLS certificates but my client still says it's untrusted](#ive-generated-tls-certificates-but-my-client-still-says-its-untrusted)
     - [IOPS seem off](#iops-seem-off)
     - [What replaces MEL events in EPA 4?](#what-replaces-mel-events-in-epa-4)
+    - [How to scrape Prometheus metrics externally?](#how-to-scrape-prometheus-metrics-externally)
   - [EPA 3](#epa-3)
     - [Is EPA 3 still maintained?](#is-epa-3-still-maintained)
     - [Why do I need to fill in so many details in Collector's YAML file?](#why-do-i-need-to-fill-in-so-many-details-in-collectors-yaml-file)
@@ -287,6 +288,10 @@ Documentation links:
 - Prometheus [Alert Manager](https://prometheus.io/docs/alerting/latest/alertmanager/)
 
 If you need more features related to logging, consider adding [Victoria Logs](https://scaleoutsean.github.io/2026/04/26/santricity-syslog-forward-victoria-metrics-logs.html) to Docker Compose and forwarding SANtricity logs to it.
+
+### How to scrape Prometheus metrics externally?
+
+`curl -ks https://EPA_HOST:9080/collector/metrics`. Traefik proxies over HTTPS and adds `/collector/` in front of the usual `/metrics` path.
 
 ## EPA 3
 

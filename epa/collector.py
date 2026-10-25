@@ -885,6 +885,7 @@ def send_to_prometheus(measurement, tags, fields):
             for direction, field in [('read', 'read_throughput'), ('write', 'write_throughput'), ('combined', 'combined_throughput')]:
                 if field in fields and fields[field] is not None:
                     measurement_metrics['throughput'].labels(**dtags, direction=direction).set(fields[field])
+                    measurement_metrics['throughput_mib'].labels(**dtags, direction=direction).set(fields[field])
 
             # Response time metrics
             for operation, field in [('read', 'read_response_time'), ('write', 'write_response_time'), ('combined', 'combined_response_time')]:

@@ -2,11 +2,25 @@
   "apiVersion": "dashboard.grafana.app/v2",
   "kind": "Dashboard",
   "metadata": {
-    "name": "adgs95l",
-    "generation": 29,
-    "creationTimestamp": "2026-04-18T15:22:48Z",
-    "labels": {},
-    "annotations": {}
+    "name": "epa-disks",
+    "namespace": "default",
+    "uid": "01a81f99-4c68-43e0-abb5-3250e99a85b3",
+    "resourceVersion": "1792944921511986",
+    "generation": 6,
+    "creationTimestamp": "2026-10-25T15:18:58Z",
+    "labels": {
+      "grafana.app/deprecatedInternalID": "2187952318853120"
+    },
+    "annotations": {
+      "grafana.app/createdBy": "user:bflpdmic799mob",
+      "grafana.app/folder": "epa-folder",
+      "grafana.app/message": "Use transformation to show <system>_<pool> in response time panels (read, write, combined)",
+      "grafana.app/saved-from-ui": "Grafana v13.0.2 (3fcdbc5a)",
+      "grafana.app/updatedBy": "user:bflpdmic799mob",
+      "grafana.app/updatedTimestamp": "2026-10-25T16:15:21Z",
+      "grafana.app/folderTitle": "EPA",
+      "grafana.app/folderUrl": "/dashboards/f/epa-folder/epa"
+    }
   },
   "spec": {
     "annotations": [
@@ -17,10 +31,7 @@
             "kind": "DataQuery",
             "group": "grafana",
             "version": "v0",
-            "spec": {},
-            "labels": {
-              "grafana.app/export-label": "grafana-1"
-            }
+            "spec": {}
           },
           "enable": true,
           "hide": true,
@@ -57,9 +68,6 @@
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -76,9 +84,6 @@
                       "spec": {
                         "expression": "100-$A",
                         "type": "math"
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "__expr__-1"
                       }
                     },
                     "refId": "B",
@@ -104,7 +109,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "stat",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "colorMode": "value",
@@ -181,9 +186,6 @@
                         "format": "time_series",
                         "legendFormat": "{{sys_tray}}_{{sys_tray_slot}}_{{vol_group_name}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -198,7 +200,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -296,13 +298,10 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "eseries_disk_throughput_bytes_per_second{sys_name=~\"$SystemName\", vol_group_name=~\"$Pool\", direction=\"combined\"}",
+                        "expr": "eseries_disk_throughput_mebibytes_per_second{sys_name=~\"$SystemName\", vol_group_name=~\"$Pool\", direction=\"combined\"} * 1048576",
                         "format": "time_series",
                         "legendFormat": "{{sys_tray}}_{{sys_tray_slot}}_{{vol_group_name}}",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -317,7 +316,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -415,16 +414,13 @@
                       "group": "victoriametrics-metrics-datasource",
                       "version": "v0",
                       "spec": {
-                        "editorMode": "builder",
+                        "editorMode": "code",
                         "exemplar": false,
-                        "expr": "sum by(vol_group_name) (eseries_disk_response_time_seconds{sys_name=~\"$SystemName\", vol_group_name=~\"$Pool\", operation=\"combined\"})",
+                        "expr": "avg by(sys_name, vol_group_name) (\n  eseries_disk_response_time_seconds{\n    sys_name=~\"$SystemName\",\n    vol_group_name=~\"$Pool\",\n    operation=\"combined\"\n  }\n)",
                         "format": "time_series",
                         "instant": false,
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -438,8 +434,8 @@
                   "group": "renameByRegex",
                   "spec": {
                     "options": {
-                      "regex": "eseries_disk_response_time_seconds{instance=\"(.*)\",job=\"(.*)\",operation=\"(.*)\",sys_id=\"(.*)\",sys_name=\"(.*)\",sys_tray=\"(.*)\",sys_tray_slot=\"(.*)\",vol_group_name=\"(.*)\"}",
-                      "renamePattern": "$8"
+                      "regex": "{sys_name=\"(.*)\",vol_group_name=\"(.*)\"}",
+                      "renamePattern": "$1_$2"
                     }
                   }
                 }
@@ -450,7 +446,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -549,16 +545,13 @@
                       "group": "victoriametrics-metrics-datasource",
                       "version": "v0",
                       "spec": {
-                        "editorMode": "builder",
+                        "editorMode": "code",
                         "exemplar": false,
-                        "expr": "sum by(vol_group_name) (eseries_disk_response_time_seconds{sys_name=~\"$SystemName\", vol_group_name=~\"$Pool\", operation=\"write\"})",
+                        "expr": "avg by(sys_name, vol_group_name) (\n  eseries_disk_response_time_seconds{\n    sys_name=~\"$SystemName\",\n    vol_group_name=~\"$Pool\",\n    operation=\"write\"\n  }\n)",
                         "format": "time_series",
                         "instant": false,
                         "legendFormat": "__auto",
                         "range": true
-                      },
-                      "labels": {
-                        "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
                       }
                     },
                     "refId": "A",
@@ -572,8 +565,8 @@
                   "group": "renameByRegex",
                   "spec": {
                     "options": {
-                      "regex": "eseries_disk_response_time_seconds{instance=\"(.*)\",job=\"(.*)\",operation=\"(.*)\",sys_id=\"(.*)\",sys_name=\"(.*)\",sys_tray=\"(.*)\",sys_tray_slot=\"(.*)\",vol_group_name=\"(.*)\"}",
-                      "renamePattern": "$8"
+                      "regex": "{sys_name=\"(.*)\",vol_group_name=\"(.*)\"}",
+                      "renamePattern": "$1_$2"
                     }
                   }
                 }
@@ -584,7 +577,138 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
+            "spec": {
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "s",
+                  "min": 0,
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Response Time (Read)",
+          "description": "Average read time",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "victoriametrics-metrics-datasource",
+                      "version": "v0",
+                      "spec": {
+                        "editorMode": "code",
+                        "exemplar": false,
+                        "expr": "avg by(sys_name, vol_group_name) (\n  eseries_disk_response_time_seconds{\n    sys_name=~\"$SystemName\",\n    vol_group_name=~\"$Pool\",\n    operation=\"read\"\n  }\n)",
+                        "format": "time_series",
+                        "instant": false,
+                        "legendFormat": "__auto",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "renameByRegex",
+                  "spec": {
+                    "options": {
+                      "regex": "{sys_name=\"(.*)\",vol_group_name=\"(.*)\"}",
+                      "renamePattern": "$1_$2"
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -733,6 +857,19 @@
                 "name": "panel-1"
               }
             }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
           }
         ]
       }
@@ -785,9 +922,6 @@
               "qryType": 1,
               "query": "label_values(sys_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",
@@ -820,9 +954,6 @@
               "qryType": 1,
               "query": "label_values(pool_name)",
               "refId": "VariableQueryEditor-VariableQuery"
-            },
-            "labels": {
-              "grafana.app/export-label": "victoriametrics-metrics-datasource-1"
             }
           },
           "regex": "",

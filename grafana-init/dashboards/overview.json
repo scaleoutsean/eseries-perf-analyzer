@@ -370,7 +370,7 @@
                       "version": "v0",
                       "spec": {
                         "editorMode": "builder",
-                        "expr": "eseries_disk_throughput_bytes_per_second{sys_name=~\"$SystemName\", direction=\"combined\"}",
+                        "expr": "eseries_disk_throughput_mebibytes_per_second{sys_name=~\"$SystemName\", direction=\"combined\"} * 1048576",
                         "format": "time_series",
                         "legendFormat": "__auto",
                         "range": true
@@ -387,7 +387,7 @@
                   "group": "renameByRegex",
                   "spec": {
                     "options": {
-                      "regex": "eseries_disk_throughput_bytes_per_second{direction=\"combined\",instance=\"(.*)\",job=\"(.*)\",sys_id=\"(.*)\",sys_name=\"(.*)\",sys_tray=\"(.*)\",sys_tray_slot=\"(.*)\",vol_group_name=\"(.*)\"}",
+                      "regex": "eseries_disk_throughput_mebibytes_per_second{direction=\"combined\",instance=\"(.*)\",job=\"(.*)\",sys_id=\"(.*)\",sys_name=\"(.*)\",sys_tray=\"(.*)\",sys_tray_slot=\"(.*)\",vol_group_name=\"(.*)\"}",
                       "renamePattern": "T$5-D$6"
                     }
                   }

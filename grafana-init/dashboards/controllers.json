@@ -3,10 +3,24 @@
   "kind": "Dashboard",
   "metadata": {
     "name": "epa-controllers",
-    "generation": 4,
-    "creationTimestamp": "2026-04-27T05:19:02Z",
-    "labels": {},
-    "annotations": {}
+    "namespace": "default",
+    "uid": "e823a6fe-ea8e-49cb-b2ee-09680655dbf0",
+    "resourceVersion": "1792947558119009",
+    "generation": 31,
+    "creationTimestamp": "2026-10-25T15:18:58Z",
+    "labels": {
+      "grafana.app/deprecatedInternalID": "2187952918638592"
+    },
+    "annotations": {
+      "grafana.app/createdBy": "user:bflpdmic799mob",
+      "grafana.app/folder": "epa-folder",
+      "grafana.app/message": "Add aggregate throughput and IOPS across all controllers on a system",
+      "grafana.app/saved-from-ui": "Grafana v13.0.2 (3fcdbc5a)",
+      "grafana.app/updatedBy": "user:bflpdmic799mob",
+      "grafana.app/updatedTimestamp": "2026-10-25T16:59:18Z",
+      "grafana.app/folderTitle": "EPA",
+      "grafana.app/folderUrl": "/dashboards/f/epa-folder/epa"
+    }
   },
   "spec": {
     "annotations": [
@@ -102,7 +116,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "table",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "cellHeight": "sm",
@@ -143,12 +157,12 @@
           }
         }
       },
-      "panel-2": {
+      "panel-10": {
         "kind": "Panel",
         "spec": {
-          "id": 2,
-          "title": "Cache hit percentage",
-          "description": "",
+          "id": 10,
+          "title": "Aggregate throughput (combined)",
+          "description": "Aggregate throughput - both controllers, read and write",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -162,14 +176,52 @@
                       "group": "victoriametrics-metrics-datasource",
                       "version": "v0",
                       "spec": {
-                        "editorMode": "builder",
-                        "expr": "eseries_controller_cache_hit_percent{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\"}",
+                        "editorMode": "code",
+                        "expr": "sum by(sys_id, sys_name) (\n  eseries_controller_throughput_bytes_per_second{\n    sys_name=~\"$SystemName\", controller_id=\"A\", direction=\"combined\"\n  }\n)",
                         "format": "time_series",
                         "legendFormat": "{{controller_id}}",
                         "range": true
                       }
                     },
                     "refId": "A",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "victoriametrics-metrics-datasource",
+                      "version": "v0",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "sum by(sys_id, sys_name) (\n  eseries_controller_throughput_bytes_per_second{\n    sys_name=~\"$SystemName\", controller_id=\"B\", direction=\"combined\"\n  }\n)",
+                        "format": "time_series",
+                        "legendFormat": "{{controller_id}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "B",
+                    "hidden": true
+                  }
+                },
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "__expr__",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "__expr__"
+                      },
+                      "spec": {
+                        "expression": "($A+$B)",
+                        "type": "math"
+                      }
+                    },
+                    "refId": "C",
                     "hidden": false
                   }
                 }
@@ -181,11 +233,11 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "stat",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
-                "colorMode": "background",
-                "graphMode": "none",
+                "colorMode": "value",
+                "graphMode": "area",
                 "justifyMode": "auto",
                 "orientation": "auto",
                 "percentChangeColorMode": "standard",
@@ -202,28 +254,19 @@
               },
               "fieldConfig": {
                 "defaults": {
-                  "unit": "percent",
+                  "unit": "binBps",
                   "thresholds": {
                     "mode": "absolute",
                     "steps": [
                       {
                         "value": 0,
                         "color": "green"
-                      },
-                      {
-                        "value": 50,
-                        "color": "orange"
-                      },
-                      {
-                        "value": 75,
-                        "color": "red"
                       }
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
-                  },
-                  "fieldMinMax": false
+                    "mode": "thresholds"
+                  }
                 },
                 "overrides": []
               }
@@ -231,10 +274,10 @@
           }
         }
       },
-      "panel-3": {
+      "panel-11": {
         "kind": "Panel",
         "spec": {
-          "id": 3,
+          "id": 11,
           "title": "Throughput (combined)",
           "description": "",
           "links": [],
@@ -269,7 +312,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -348,6 +391,210 @@
           }
         }
       },
+      "panel-12": {
+        "kind": "Panel",
+        "spec": {
+          "id": 12,
+          "title": "IOPS (combined)",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "victoriametrics-metrics-datasource",
+                      "version": "v0",
+                      "spec": {
+                        "editorMode": "code",
+                        "expr": "eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"combined\"}",
+                        "format": "time_series",
+                        "legendFormat": "{{controller_id}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "timeseries",
+            "version": "13.0.2",
+            "spec": {
+              "options": {
+                "annotations": {
+                  "clustering": -1,
+                  "multiLane": false
+                },
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "placement": "bottom",
+                  "showLegend": true
+                },
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "",
+                    "axisPlacement": "auto",
+                    "barAlignment": 0,
+                    "barWidthFactor": 0.6,
+                    "drawStyle": "line",
+                    "fillOpacity": 0,
+                    "gradientMode": "none",
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "insertNulls": false,
+                    "lineInterpolation": "linear",
+                    "lineWidth": 1,
+                    "pointSize": 5,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "showPoints": "auto",
+                    "showValues": false,
+                    "spanNulls": false,
+                    "stacking": {
+                      "group": "A",
+                      "mode": "none"
+                    },
+                    "thresholdsStyle": {
+                      "mode": "off"
+                    }
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-2": {
+        "kind": "Panel",
+        "spec": {
+          "id": 2,
+          "title": "Cache hit percentage",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "victoriametrics-metrics-datasource",
+                      "version": "v0",
+                      "spec": {
+                        "editorMode": "builder",
+                        "expr": "eseries_controller_cache_hit_percent{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\"}",
+                        "format": "time_series",
+                        "legendFormat": "{{controller_id}}",
+                        "range": true
+                      }
+                    },
+                    "refId": "A",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "stat",
+            "version": "13.0.2",
+            "spec": {
+              "options": {
+                "colorMode": "background",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 50,
+                        "color": "orange"
+                      },
+                      {
+                        "value": 75,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "fieldMinMax": false
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
       "panel-4": {
         "kind": "Panel",
         "spec": {
@@ -386,7 +633,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -503,7 +750,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -586,8 +833,8 @@
         "kind": "Panel",
         "spec": {
           "id": 6,
-          "title": "IOPS (combined)",
-          "description": "",
+          "title": "Aggregate IOPS (combined)",
+          "description": "Aggregate combined IOPS (all controllers, read and write)",
           "links": [],
           "data": {
             "kind": "QueryGroup",
@@ -601,10 +848,11 @@
                       "group": "victoriametrics-metrics-datasource",
                       "version": "v0",
                       "spec": {
-                        "editorMode": "builder",
-                        "expr": "eseries_controller_iops_total{sys_name=~\"$SystemName\", controller_id=~\"$ControllerId\", operation=\"combined\"}",
+                        "editorMode": "code",
+                        "expr": "sum by(sys_id, sys_name) (\n  eseries_controller_iops_total{\n    sys_name=~\"$SystemName\",\n    operation=\"combined\"\n  }\n)",
                         "format": "time_series",
-                        "legendFormat": "{{controller_id}}",
+                        "interval": "",
+                        "legendFormat": "__auto",
                         "range": true
                       }
                     },
@@ -613,31 +861,42 @@
                   }
                 }
               ],
-              "transformations": [],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "renameByRegex",
+                  "spec": {
+                    "options": {
+                      "regex": "{sys_id=\"(.*)\",sys_name=\"(.*)\"}",
+                      "renamePattern": "$1_$2"
+                    }
+                  }
+                }
+              ],
               "queryOptions": {}
             }
           },
           "vizConfig": {
             "kind": "VizConfig",
-            "group": "timeseries",
-            "version": "13.0.1",
+            "group": "stat",
+            "version": "13.0.2",
             "spec": {
               "options": {
-                "annotations": {
-                  "clustering": -1,
-                  "multiLane": false
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                  "calcs": [
+                    "lastNotNull"
+                  ],
+                  "fields": "",
+                  "values": false
                 },
-                "legend": {
-                  "calcs": [],
-                  "displayMode": "list",
-                  "placement": "bottom",
-                  "showLegend": true
-                },
-                "tooltip": {
-                  "hideZeros": false,
-                  "mode": "single",
-                  "sort": "none"
-                }
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
               },
               "fieldConfig": {
                 "defaults": {
@@ -655,41 +914,7 @@
                     ]
                   },
                   "color": {
-                    "mode": "palette-classic"
-                  },
-                  "custom": {
-                    "axisBorderShow": false,
-                    "axisCenteredZero": false,
-                    "axisColorMode": "text",
-                    "axisLabel": "",
-                    "axisPlacement": "auto",
-                    "barAlignment": 0,
-                    "barWidthFactor": 0.6,
-                    "drawStyle": "line",
-                    "fillOpacity": 0,
-                    "gradientMode": "none",
-                    "hideFrom": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": false
-                    },
-                    "insertNulls": false,
-                    "lineInterpolation": "linear",
-                    "lineWidth": 1,
-                    "pointSize": 5,
-                    "scaleDistribution": {
-                      "type": "linear"
-                    },
-                    "showPoints": "auto",
-                    "showValues": false,
-                    "spanNulls": false,
-                    "stacking": {
-                      "group": "A",
-                      "mode": "none"
-                    },
-                    "thresholdsStyle": {
-                      "mode": "off"
-                    }
+                    "mode": "thresholds"
                   }
                 },
                 "overrides": []
@@ -736,7 +961,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -852,7 +1077,7 @@
           "vizConfig": {
             "kind": "VizConfig",
             "group": "timeseries",
-            "version": "13.0.1",
+            "version": "13.0.2",
             "spec": {
               "options": {
                 "annotations": {
@@ -970,7 +1195,7 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-3"
+                "name": "panel-10"
               }
             }
           },
@@ -996,7 +1221,7 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-4"
+                "name": "panel-11"
               }
             }
           },
@@ -1009,7 +1234,7 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-7"
+                "name": "panel-12"
               }
             }
           },
@@ -1022,7 +1247,7 @@
               "height": 8,
               "element": {
                 "kind": "ElementReference",
-                "name": "panel-5"
+                "name": "panel-4"
               }
             }
           },
@@ -1031,6 +1256,32 @@
             "spec": {
               "x": 12,
               "y": 21,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-7"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 29,
+              "width": 12,
+              "height": 8,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-5"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 29,
               "width": 12,
               "height": 8,
               "element": {

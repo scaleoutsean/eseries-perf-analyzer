@@ -70,7 +70,7 @@ TAG="v4.1.0"
 git clone --depth 1 --branch ${TAG} https://github.com/scaleoutsean/eseries-perf-analyzer/
 cd eseries-perf-analyzer
 cat ./scripts/SCRIPTS.md          # Read what these scripts do and how to use them; you need a venv, etc.
-./scripts/gen_ca_tls_certs.py all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs; may require: pip install tomlkit
+./scripts/gen_ca_tls_certs.py --service all # REQUIRED, unless you supply own TLS certificates. Answer "N" for E-Series with factory TLS certs; may require: pip install tomlkit
 ./scripts/setup-data-dirs.sh      # REQUIRED; creates data directories for Grafana, VM
 make vendor                       # REQUIRED; downloads SANtricity Client (Python) to ./epa/santricity_client
 vim .env                          # optional, for Docker Compose Grafana version or non-default initial credentials
@@ -208,9 +208,10 @@ Open the browser and navigate to http://HOSTNAME:9080/metrics (or http://127.0.0
 - 4.1.0 (TBD)
   - New: add hand-picked (not all available) RDMA, NVMe, kernel metrics for SANtricity 12.1+ *and* EF50/EF80 (not collected for other arrays or any v12.0): nvmeof/statistics, rdma/statistics, nvme-tcp/kernel-statistics.
   - New: basic Podman support added for latest RPM-based distributions (RHEL 10-like). Traefik container requires additional changes, but key container (EPA Collector) should work fine.
-  - Changed: fixed several minor response-handling bugs.
+  - Changed: fixed several minor response-handling bugs in Collector, one in upstream santricity-client library (also had a bug fix, Collector now uses santricity-client 0.3.3)
   - Changed: incorrectly named counters from issue #41 remain available, but are now deprecated (and will remain throughout v4). Correct counter names have been added (same values, different names). Grafana dashboards keep using the old names, but can be modified to use new since both are available.
-  - Changed: `analysed/drive-statistics` (deprecated in 12.1) to use `analyzed/drive-statistics` without affecting metrics
+  - Changed: `analysed/drive-statistics` (deprecated in 12.1) to use `analyzed/drive-statistics` without affecting metrics.
+  - Changed: Collector's requirements.txt default to latest `requests` client library.
 
 - 4.0.1 (Oct 10, 2026)
   - **No changes** to EPA Collector

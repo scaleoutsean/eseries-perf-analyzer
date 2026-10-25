@@ -516,7 +516,12 @@ PROMETHEUS_METRICS_CONFIG = {
         },
         'throughput': {
             'name': 'eseries_disk_throughput_bytes_per_second',
-            'desc': 'Disk throughput in bytes/sec',
+            'desc': 'Deprecated: legacy disk throughput values are MiB/s despite this metric name; use eseries_disk_throughput_mebibytes_per_second',
+            'labels': ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name', 'direction']
+        },
+        'throughput_mib': {
+            'name': 'eseries_disk_throughput_mebibytes_per_second',
+            'desc': 'Analyzed disk throughput in mebibytes per second (MiB/s)',
             'labels': ['sys_id', 'sys_name', 'sys_tray', 'sys_tray_slot', 'vol_group_name', 'direction']
         },
         'response_time': {
