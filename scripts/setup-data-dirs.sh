@@ -14,7 +14,7 @@ echo "Setting up EPA data directories..."
 
 # Create data directories
 echo "Creating data directories..."
-mkdir -p data/vm data/grafana data/grafana-dashboards certs/grafana
+mkdir -p data/vm data/vl data/grafana data/grafana-dashboards certs/grafana
 
 # Set ownership for Grafana (user ID 472) 
 echo "Setting Grafana ownership (472:472)..."

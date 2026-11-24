@@ -16,7 +16,7 @@ services:
     environment: 
       - USERNAME=admin
       - PASSWORD=infiniti  # non-production pass, thank you very much
-      - API=192.168.1.13
+      - API=192.168.1.194
       - API_PORT=8447
       - DEBUG=false
       - TLS_VERIFY=false
@@ -140,6 +140,26 @@ services:
       - '-tls'
       - '-tlsCertFile=/etc/victoria-metrics/vm.crt'
       - '-tlsKeyFile=/etc/victoria-metrics/vm.key'
+    networks:
+      - eseries_perf_analyzer
+    restart: unless-stopped
+
+
+  victorialogs:
+    image: docker.io/victoriametrics/victoria-logs:latest
+    container_name: victoria-logs
+    profiles: ["logs"]
+    command:
+      - "-storageDataPath=/var/lib/victoria-logs-syslog"
+      - "-retentionPeriod=30d"
+      - "-syslog.listenAddr.tcp=:1514"
+      - "-syslog.listenAddr.udp=:1514"
+    ports:
+      - "9429:9428"
+      - "15514:1514/tcp"
+      - "15514:1514/udp"
+    volumes:
+      - ./data/vl:/var/lib/victoria-logs-syslog:rw${SELINUX_VOLUME_SUFFIX:-}
     networks:
       - eseries_perf_analyzer
     restart: unless-stopped

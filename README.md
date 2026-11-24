@@ -176,6 +176,7 @@ Services:
 | `grafana` | No    | https://grafana:3443 | Grafana service, proxied by Traefik |
 | `grafana-init` |No| - | Deploys reference dashboards to Grafana |
 | `vm`    | No      | https://vm:8428        | Victoria Metrics, scrapes metrics directly from `collector` |
+| `victorialogs` | Optional | http://HOSTNAME:9429 | Syslog receiver on TCP and UDP port 15514; see [CONFIGURATION](./CONFIGURATION.md#optional-victorialogs) |
 
 For multiple E-Series systems, it's best to create multiple collector-only Docker Compose files, although you can have all of them in same stack (see `two-array-docker-compose.yml`) and use different prefix paths for each Prometheus instance in Traefik. And finally, you'd have to scrape each Prometheus metrics endpoint and start managing Victoria Metrics, either from the UI or API/CLI. See [CONFIGURATION](./CONFIGURATION.md) for more.
 

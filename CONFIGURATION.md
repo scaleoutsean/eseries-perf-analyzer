@@ -12,6 +12,37 @@ This step is needed if you plan to run Compose stack, which requires data direct
 
 I'm not even sure the second Grafana sub-directory (grafana-dashboards) is still required, but it may be if you want to upload own dashboards or something along those lines. They don't take up any space so it doesn't really matter.
 
+## Optional VictoriaLogs
+
+The `logs` Compose profile adds a VictoriaLogs syslog receiver for SANtricity
+alerts and API/UI audit logs. It is not started by the default Compose command.
+Start it alongside an existing stack with:
+
+```sh
+docker compose --profile logs up -d victorialogs
+```
+
+Configure SANtricity syslog forwarding to the Compose host on port `15514`
+(UDP or TCP). VictoriaLogs stores logs in `./data/vl` with 30-day retention;
+Compose creates the directory if needed. Disk usage depends on the volume of
+logs, not just the retention period. On SELinux hosts use the same
+`SELINUX_VOLUME_SUFFIX=,z` setting described in the README.
+
+The HTTP API and UI are exposed at `http://HOSTNAME:9429`; for example:
+
+```sh
+curl -fsS http://localhost:9429/select/logsql/query \
+  --data-urlencode 'query=app_name:StorageArray' \
+  --data-urlencode 'limit=100'
+```
+
+These ports bypass Traefik. The HTTP API is unencrypted and unauthenticated,
+and the TCP/UDP syslog listeners accept plaintext without sender authentication.
+Restrict access to trusted hosts and networks using firewall rules; audit logs
+can contain user, client and operation details. The supplied sample contains
+both plain-text and JSON messages; parsing and event classification are not
+configured by this service.
+
 ## Prepare TLS certificates
 
 This step is required if you plan to run Victoria Metrics or Grafana as these require TLS certificates. If you provide your own, you can skip this step.

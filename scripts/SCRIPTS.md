@@ -57,6 +57,9 @@ drwxr-xr-x  4 root root 4096 Apr 26 15:58 .
 drwxr-xr-x 14 root root 4096 Apr 26 15:58 ..
 drwxr-xr-x  2  472  472 4096 Apr 26 15:58 grafana
 drwxr-xr-x  2  472  472 4096 Apr 26 15:58 grafana-dashboards
+drwxr-xr-x  2  472  472 4096 Apr 26 15:58 vm
+drwxr-xr-x  2  472  472 4096 Apr 26 15:58 vl
+
 
 Setup complete! You can now run:
   docker compose up -d
